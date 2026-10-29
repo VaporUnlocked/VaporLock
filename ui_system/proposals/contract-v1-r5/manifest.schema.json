@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "PROPOSAL ONLY; cross-file semantics.json is required",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "VaporLockUI"
+    },
+    "formatVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 96
+        },
+        "author": {
+          "type": "string",
+          "maxLength": 96
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^(0|[1-9][0-9]{0,3})\\.(0|[1-9][0-9]{0,3})\\.(0|[1-9][0-9]{0,3})(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "author",
+        "description",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "minimumVaporLockVersion": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^(0|[1-9][0-9]{0,3})\\.(0|[1-9][0-9]{0,3})\\.(0|[1-9][0-9]{0,3})(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+        }
+      },
+      "required": [
+        "minimumVaporLockVersion"
+      ],
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "style": {
+          "const": true
+        },
+        "media": {
+          "type": "boolean"
+        },
+        "layout": {
+          "type": "boolean"
+        },
+        "customCSS": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "style",
+        "media",
+        "layout",
+        "customCSS"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "format",
+    "formatVersion",
+    "theme",
+    "requirements",
+    "features"
+  ],
+  "additionalProperties": false
+}

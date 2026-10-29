@@ -1,0 +1,25 @@
+{
+  "kind": "community-suite-cleared-assets",
+  "files": [
+    {
+      "path": "assets/characters/SWAT.glb",
+      "bytes": 1560900,
+      "sha256": "a835107bac833eb916c494e10997ae1709e85957ea6f6c59ace3c9a66f6d1fec"
+    },
+    {
+      "path": "assets/fonts/Interface.ttf",
+      "bytes": 202460,
+      "sha256": "331c8639d7598b2cde62a911a71db195e30cb655cd6bdf2e324a7e984955f907"
+    },
+    {
+      "path": "assets/fonts/OFL.txt",
+      "bytes": 4456,
+      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+    },
+    {
+      "path": "assets/Suite.ico",
+      "bytes": 7671,
+      "sha256": "f11e54906ba3d77c97d8570aec60847bce5716e5278b542e7790726d5323b6bc"
+    }
+  ]
+}

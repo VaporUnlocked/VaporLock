@@ -1,0 +1,55 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "windows-debug",
+      "displayName": "Windows Debug",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/windows-cuda-debug",
+      "architecture": "x64",
+      "cacheVariables": {
+        "CUDAToolkit_ROOT": "${sourceDir}/third_party/cuda-toolkit-13.2.2",
+        "ONNXRUNTIME_ROOT": "${sourceDir}/third_party/onnxruntime-gpu",
+        "VAPORLOCK_CUDA_RUNTIME_ROOT": "${sourceDir}/third_party/cuda-runtime"
+      }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows Release",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/windows-cuda-release",
+      "architecture": "x64",
+      "cacheVariables": {
+        "CUDAToolkit_ROOT": "${sourceDir}/third_party/cuda-toolkit-13.2.2",
+        "ONNXRUNTIME_ROOT": "${sourceDir}/third_party/onnxruntime-gpu",
+        "VAPORLOCK_CUDA_RUNTIME_ROOT": "${sourceDir}/third_party/cuda-runtime"
+      }
+    },
+    {
+      "name": "windows-free-release",
+      "displayName": "Windows Free Release",
+      "inherits": "windows-release",
+      "binaryDir": "${sourceDir}/build/windows-free-release",
+      "cacheVariables": {
+        "VAPORLOCK_EDITION": "free"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "windows-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "windows-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "free-release",
+      "configurePreset": "windows-free-release",
+      "configuration": "Release"
+    }
+  ]
+}

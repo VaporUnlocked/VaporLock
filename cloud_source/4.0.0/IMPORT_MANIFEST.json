@@ -1,0 +1,415 @@
+{
+  "version": "4.0.0",
+  "files": [
+    {
+      "path": "runtime_sdk/cloud_sdk/__init__.py",
+      "bytes": 691,
+      "sha256": "c7c21a1b70bc343a24ab74c4ba16476a4129a7f6d8630358a5f4fe1479786cd9"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/config.py",
+      "bytes": 5262,
+      "sha256": "f989231ef0f65b3f30ac3148767c2ab5a1c31520e730fb87e48df0a958f57e78"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/export.py",
+      "bytes": 9932,
+      "sha256": "110ef69b5fed9ed958ca313fe86f0548c3ec7f90b4b81b45fe8863e7f4fc2605"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/format.py",
+      "bytes": 15915,
+      "sha256": "730c171e4e9df7ae4f388e8475a5463bbc38af65aa40bbd46aa713fdf46ab2e5"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/geometry.py",
+      "bytes": 11471,
+      "sha256": "bdcae7d0c26dfb956f46956a840f4cee92b4df3add04cc8b9e70d3b63e89208c"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/masks.py",
+      "bytes": 13712,
+      "sha256": "fa4bec8118c6a7ee576fc8b79a5f113b261ab73829ffb01033c07cf98cf20942"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/model.py",
+      "bytes": 14424,
+      "sha256": "a109b329dc12bbfb5a120bc4ffabf90b9a733c39bcf19e823b0203df2a159e1f"
+    },
+    {
+      "path": "runtime_sdk/cloud_sdk/runtime.py",
+      "bytes": 34823,
+      "sha256": "9f90f07d29f156f0ff0b8dbb7bcceda63b14a4868e4cbf0731bed797823b6640"
+    },
+    {
+      "path": "training_source/cloudstudio/__init__.py",
+      "bytes": 87,
+      "sha256": "487f05e699097264cd2c9e3866dc128e38e6eede2453b14ac2426867d305412a"
+    },
+    {
+      "path": "training_source/cloudstudio/__main__.py",
+      "bytes": 80,
+      "sha256": "6a170fc866c867a1e5812daad308396f0940a23f2ecf55e56be39d5d67d23f10"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/__init__.py",
+      "bytes": 77,
+      "sha256": "b5755d160a46afb664a5c8abcf21080a016d5c266fbb3cc951f544bcae0b10b1"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/LICENSE-TinyViT.txt",
+      "bytes": 2067,
+      "sha256": "a6fd7405fa1855dda8e6333a46bb47e1c78a98a7414b9be20f8bbe90d35be1f6"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/NOTICE.txt",
+      "bytes": 523,
+      "sha256": "4964b499dd8c822798713c4098d757a3f3873ad24f93e6e80fc2a4f70a66cb6f"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/PROVENANCE.json",
+      "bytes": 8510,
+      "sha256": "e3a5f0f53b4c05db4472d5e472a697cbc5640c06c0842b7e3bd46790373daa14"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/__init__.py",
+      "bytes": 363,
+      "sha256": "840433d3cc5f2c328f3c89422a14756f93f6099cd766c20108e7dc60633d848f"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/build_sam.py",
+      "bytes": 5460,
+      "sha256": "e25ab6a31f1de1dd1f9442b8cf07b6fb7ee7bb9928b7736ed0e30e973f33fedd"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/__init__.py",
+      "bytes": 462,
+      "sha256": "bcceda10c3ac65d2a2249620b8abca08dad41dd1f538e66d5a1977c58a1c59ac"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/_layers.py",
+      "bytes": 1251,
+      "sha256": "d4c7834d70f750464453d872de2f75199890b8e1238c6d3ab0d7c2c14066dd1c"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/common.py",
+      "bytes": 1479,
+      "sha256": "59a53bfa5d0a4d446df7f2bb57d2e95808b130601592b934600fb663d256ce17"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/image_encoder.py",
+      "bytes": 14549,
+      "sha256": "4e363b929ef5099e4ca63fef376ee569930a438c10a9c96044594f83b970da38"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/mask_decoder.py",
+      "bytes": 6685,
+      "sha256": "64d955ea491c58893c3bab671f33b9d8f9fa750f3f84bbebc952acea70b416e8"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/mask_decoder_hq.py",
+      "bytes": 9784,
+      "sha256": "0a94dd931d905803ed15f8492d1f1fdf359553ae364d3d677be87bc342327013"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/prompt_encoder.py",
+      "bytes": 8594,
+      "sha256": "bd8f2f5903f0647f55c21c608bcbb334eec2901ebe76aa41061b1c513df4a06f"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/sam.py",
+      "bytes": 7473,
+      "sha256": "edf1720501d410c63167ffcfa3d0170bef4adf39d5ebb459cac9dbc09104a749"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/tiny_vit_sam.py",
+      "bytes": 22045,
+      "sha256": "71d9e64e4e972cc7565ef5f91ebde47d693b7d1dddd860a43a0c5e434720581a"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/modeling/transformer.py",
+      "bytes": 8397,
+      "sha256": "566a8f6db8b608398de939548bd0f485b21752fda2bdda36900e6444ef938d11"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/predictor.py",
+      "bytes": 11935,
+      "sha256": "d2660684f385dc28da5a08b002347479459e1dbd58d758a3e006d7d0847fa93f"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/utils/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/light_hq_sam/utils/transforms.py",
+      "bytes": 4055,
+      "sha256": "fc6c6751d445dbe5cab0b4e19f1fff653f6a141a30c778c06cf0e6a986607dd2"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/LICENSE-TinyViT.txt",
+      "bytes": 2067,
+      "sha256": "a6fd7405fa1855dda8e6333a46bb47e1c78a98a7414b9be20f8bbe90d35be1f6"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/NOTICE.txt",
+      "bytes": 1707,
+      "sha256": "9b4e7443448a23cc0caf41e4eeaa507b10c5d10f52603fb1a50d37f73c6255f7"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/PROVENANCE.json",
+      "bytes": 10165,
+      "sha256": "dda079b61243a0db469f3f86d9a0b9ff51a85b0f5c533deba1b89adb759d9e38"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/__init__.py",
+      "bytes": 549,
+      "sha256": "4fd84c1c8db06a68861807b7393649a12ab7c0100e265210fdbbcc24bf10db61"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/build_sam.py",
+      "bytes": 4959,
+      "sha256": "33d23a31ba85b8a6d998b4afb6a88a6441ce00aa03071f333b55bc501665c644"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/__init__.py",
+      "bytes": 419,
+      "sha256": "6f9d091c722036a33eac2ae767eea2a5fdf940c6f47a5710f9b044a64067f252"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/_layers.py",
+      "bytes": 1251,
+      "sha256": "d4c7834d70f750464453d872de2f75199890b8e1238c6d3ab0d7c2c14066dd1c"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/common.py",
+      "bytes": 1479,
+      "sha256": "59a53bfa5d0a4d446df7f2bb57d2e95808b130601592b934600fb663d256ce17"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/image_encoder.py",
+      "bytes": 14420,
+      "sha256": "1665ada2902722c9a8cd566c840e324d623ef2b12f7d9ae9f38b24aed0e39886"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/mask_decoder.py",
+      "bytes": 6615,
+      "sha256": "6a2455e990515c67a061187c92c236b879b189f21ef6ebfce1627cae9a6b2f93"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/prompt_encoder.py",
+      "bytes": 8594,
+      "sha256": "bd8f2f5903f0647f55c21c608bcbb334eec2901ebe76aa41061b1c513df4a06f"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/sam.py",
+      "bytes": 7283,
+      "sha256": "8abefaefd5a1c0edf06c9749bd746a93002d929b390f8c95cee498657102238d"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/tiny_vit_sam.py",
+      "bytes": 21934,
+      "sha256": "692eee6ac91464c8498f080b744e28fb23848d22503dac3e8cbd02a0bd81c136"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/modeling/transformer.py",
+      "bytes": 8397,
+      "sha256": "566a8f6db8b608398de939548bd0f485b21752fda2bdda36900e6444ef938d11"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/predictor.py",
+      "bytes": 11752,
+      "sha256": "c36f83c97727b48673425e48ed6552cb1d503e32ed26112f1faef0436082f03d"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/utils/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "training_source/cloudstudio/_vendor/mobile_sam/utils/transforms.py",
+      "bytes": 4290,
+      "sha256": "62d639e216536cd63d6f8f299614b7c9b711240df275aa10c9c0db9b7c41053b"
+    },
+    {
+      "path": "training_source/cloudstudio/annotation_assist.py",
+      "bytes": 48559,
+      "sha256": "50110a8fce3d31c085292344fafd1252fa8643d5b3473ee7930f435a8adc909a"
+    },
+    {
+      "path": "training_source/cloudstudio/assistant_backends.py",
+      "bytes": 2081,
+      "sha256": "af5f0291d5af5ccf2942c9ba410e656c8b04afe72ae62745e50a3450165c1d44"
+    },
+    {
+      "path": "training_source/cloudstudio/augmentation.py",
+      "bytes": 8508,
+      "sha256": "41b2e1b20a9c2c9f9de9abbec9934a84928a69520eb278efe0feb6a29659041e"
+    },
+    {
+      "path": "training_source/cloudstudio/benchmark.py",
+      "bytes": 14544,
+      "sha256": "28905e1e2fc17557b10eb47f375cbb15bf7280aba54ec1d7c7dd6edae1b653be"
+    },
+    {
+      "path": "training_source/cloudstudio/canvas.py",
+      "bytes": 33695,
+      "sha256": "9c5a82e1800cdf7d7f41cf9f9bf5d1b3d0aef50de2deece7b1beb67f24f1745a"
+    },
+    {
+      "path": "training_source/cloudstudio/cli.py",
+      "bytes": 21201,
+      "sha256": "58ce533f4575891321862c72d10c3fa577db5dd13cbc5dc276b4ad225d79d8b4"
+    },
+    {
+      "path": "training_source/cloudstudio/comparison.py",
+      "bytes": 21477,
+      "sha256": "ed8477346903a3c0971e092f132d8514d62878c2b79ccd6eb9b9fe1c267b01db"
+    },
+    {
+      "path": "training_source/cloudstudio/competitive_benchmark.py",
+      "bytes": 21635,
+      "sha256": "5648120d4f49f06989b4f0c1022779fa100e9f512f362f569924f48993272b3b"
+    },
+    {
+      "path": "training_source/cloudstudio/config.py",
+      "bytes": 5262,
+      "sha256": "f989231ef0f65b3f30ac3148767c2ab5a1c31520e730fb87e48df0a958f57e78"
+    },
+    {
+      "path": "training_source/cloudstudio/data.py",
+      "bytes": 22593,
+      "sha256": "844030944dc9f25774461739148ab3d6a3eba8df719657140bdb5c4227ff95b5"
+    },
+    {
+      "path": "training_source/cloudstudio/dataset_merge.py",
+      "bytes": 24512,
+      "sha256": "5928da499bc9bce0df4fec2e4d3e235cbb10ab891ce0db7fe81392b0a3750d46"
+    },
+    {
+      "path": "training_source/cloudstudio/demo.py",
+      "bytes": 3840,
+      "sha256": "75e8d09d252280c68d9884aa1a1b492e0ab310d118448066e86d291d42e3aa6b"
+    },
+    {
+      "path": "training_source/cloudstudio/evaluation.py",
+      "bytes": 24728,
+      "sha256": "7ba947047edd3f78e321093615dc2a876234ec16301fc709e6393ae7dc7b20bd"
+    },
+    {
+      "path": "training_source/cloudstudio/export.py",
+      "bytes": 9932,
+      "sha256": "110ef69b5fed9ed958ca313fe86f0548c3ec7f90b4b81b45fe8863e7f4fc2605"
+    },
+    {
+      "path": "training_source/cloudstudio/format.py",
+      "bytes": 15915,
+      "sha256": "730c171e4e9df7ae4f388e8475a5463bbc38af65aa40bbd46aa713fdf46ab2e5"
+    },
+    {
+      "path": "training_source/cloudstudio/geometry.py",
+      "bytes": 11471,
+      "sha256": "bdcae7d0c26dfb956f46956a840f4cee92b4df3add04cc8b9e70d3b63e89208c"
+    },
+    {
+      "path": "training_source/cloudstudio/gui.py",
+      "bytes": 181310,
+      "sha256": "bdd77a5a32c99882188f9e0ffeff33b33f7324209aa8d9437d37eb4c58259349"
+    },
+    {
+      "path": "training_source/cloudstudio/live.py",
+      "bytes": 11429,
+      "sha256": "8b610c0421ccebe993c637f75d1e0f3e233ec3b84d826112bda9757bcbf7e281"
+    },
+    {
+      "path": "training_source/cloudstudio/mask_paint.py",
+      "bytes": 2804,
+      "sha256": "8843690147e061924272508dc31fa73fc50176d42176f9a6b5100edc1f3d200d"
+    },
+    {
+      "path": "training_source/cloudstudio/masks.py",
+      "bytes": 13712,
+      "sha256": "fa4bec8118c6a7ee576fc8b79a5f113b261ab73829ffb01033c07cf98cf20942"
+    },
+    {
+      "path": "training_source/cloudstudio/model.py",
+      "bytes": 14424,
+      "sha256": "a109b329dc12bbfb5a120bc4ffabf90b9a733c39bcf19e823b0203df2a159e1f"
+    },
+    {
+      "path": "training_source/cloudstudio/overlay.py",
+      "bytes": 24187,
+      "sha256": "56d58a709264aaccb7a2bac12bd790d92b24e3ad041ff9946ec2ca9ef8156316"
+    },
+    {
+      "path": "training_source/cloudstudio/project_store.py",
+      "bytes": 7400,
+      "sha256": "6b8d73cf9a75d413f885aab0803515444d034a3f49dd1589696346d625b3cf40"
+    },
+    {
+      "path": "training_source/cloudstudio/review.py",
+      "bytes": 3926,
+      "sha256": "077e0f5000332284ee5c3f7782600a4cd2322129aad494f31f9c65ca37ced739"
+    },
+    {
+      "path": "training_source/cloudstudio/runtime.py",
+      "bytes": 34823,
+      "sha256": "9f90f07d29f156f0ff0b8dbb7bcceda63b14a4868e4cbf0731bed797823b6640"
+    },
+    {
+      "path": "training_source/cloudstudio/target_preview.py",
+      "bytes": 19268,
+      "sha256": "abd1090f4a449e5fb0143e8305b6ecd9ca739b8825ee99a3379712c54a860f3e"
+    },
+    {
+      "path": "training_source/cloudstudio/training.py",
+      "bytes": 76570,
+      "sha256": "6041d84251b9e8bf4fa42c6a490b91c4e05dcce97f701195f41c297333f89b1e"
+    },
+    {
+      "path": "training_source/cloudstudio/training_controls.py",
+      "bytes": 3881,
+      "sha256": "cb515b003289c76de05173541edae50b58a06dbe4be25f4c2de67a7b74e84377"
+    },
+    {
+      "path": "training_source/cloudstudio/training_masks.py",
+      "bytes": 8734,
+      "sha256": "f9ddddcfbb3309285fe24d09b33309bea0f26354245ac952cebf96625455a6eb"
+    },
+    {
+      "path": "training_source/cloudstudio/training_ops.py",
+      "bytes": 3945,
+      "sha256": "90f7ef718cd1bc928adbb488231a188612215f2fb342eecea3a948fc5dfcece4"
+    },
+    {
+      "path": "training_source/cloudstudio/training_settings.py",
+      "bytes": 34572,
+      "sha256": "304ffa8dd3ba39546fa396fcfad8d72c1abc550003e5e5ab96a738a481845c59"
+    },
+    {
+      "path": "training_source/cloudstudio/training_targets.py",
+      "bytes": 6403,
+      "sha256": "280c47f6dc7e011242ef6e3541b99f810b6f4a8b468f77a0d4e19bb23bad3f41"
+    },
+    {
+      "path": "training_source/cloudstudio/workflow.py",
+      "bytes": 76509,
+      "sha256": "6720be28e00e123449c059250ff99fec28fdc3ec862fdb0cc01b3f2f8ffef19d"
+    },
+    {
+      "path": "training_source/cloudstudio/yolo.py",
+      "bytes": 38989,
+      "sha256": "4b2c8506a901dfc4d5fb2baff7e63f100cb859b009bfcdee702c17596dd78c85"
+    }
+  ]
+}

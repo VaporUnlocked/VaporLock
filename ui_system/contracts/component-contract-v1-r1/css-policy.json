@@ -1,0 +1,123 @@
+{
+  "status": "PROPOSAL: Security and Design approval required before implementation",
+  "parsers": {
+    "client": "tinycss2==1.5.1",
+    "browser": "CSSTree pinned offline build, exact version/hash Website to propose"
+  },
+  "limits": {
+    "bytes": 65536,
+    "rules": 256,
+    "declarations": 2048,
+    "nesting": 4,
+    "tokens": 16384,
+    "selectorsPerRule": 8,
+    "selectorBytes": 256,
+    "inputDelimiterDepth": 8,
+    "valueFunctionDepth": 2,
+    "validationDeadlineMilliseconds": 5000
+  },
+  "selectors": {
+    "root": "[data-vl-component=\"<known-registry-id>\"]",
+    "optionalDescendant": [
+      ".vl-card",
+      ".vl-heading",
+      ".vl-muted",
+      ".vl-value",
+      ".vl-profile",
+      ".vl-card-list",
+      ".vl-placeholder",
+      ".vl-decoration",
+      ".vl-field",
+      ".vl-button",
+      ".vl-control",
+      ".vl-control-label",
+      ".vl-control-value",
+      ".vl-state"
+    ],
+    "optionalState": [
+      ":hover",
+      ":focus",
+      ":focus-visible",
+      ":disabled",
+      ".is-selected",
+      ".is-active"
+    ],
+    "maximumDescendants": 1,
+    "selectorLists": true,
+    "canonicalReconstruction": true
+  },
+  "atRules": {
+    "media": "one (min-width:Npx) or (max-width:Npx), N integer240..8192; nesting up to4; no other media features initially"
+  },
+  "properties": {
+    "color": "typed color or matching known color var, text alpha>=0.5",
+    "background-color": "typed color or matching known color var",
+    "border-color": "1..4 typed colors or matching known color vars",
+    "border-radius": "1..4 nonnegative pixel lengths <=80, or matching known length var",
+    "border-width": "1..4 nonnegative pixel lengths <=8, or matching known length var within property bound",
+    "border-style": "1..4 enums none/solid/dashed/dotted/double",
+    "padding": "1..4 pixel lengths0..64, or matching known length var within property bound",
+    "margin": "1..4 pixel lengths0..64, no negative/auto, or matching known length var within bound",
+    "gap": "1..2 pixel lengths0..64 or matching known length var within property bound",
+    "font-family": "one approved font string Segoe UI/Segoe UI Variable/Arial/Tahoma/Verdana or --vl-font; canonical output ALWAYS appends trusted CJK/Cyrillic fallback stack",
+    "font-size": "pixels10..32; renderer multiplies by personal accessibility scale, cannot reset preference",
+    "font-weight": "enum400/500/600/700",
+    "line-height": "unitless1.2..2",
+    "letter-spacing": "pixels0..3",
+    "opacity": "ONLY .vl-decoration; number0..1, never inherited by functional content/focus/canvas",
+    "box-shadow": "none or <=2 shadows; x/y0..24px, blur0..64px, spread0..16px, typed color; no inset initially",
+    "backdrop-filter": "none or single blur(0..40px), matching --vl-blur allowed",
+    "filter": "ONLY .vl-decoration; none or one drop-shadow(x y [blur] color); x/y0..24px, blur0..64px, exactly2offsets, no spread/inset",
+    "transform": "ONLY .vl-decoration; none or one scale(0.85..1.15); decorative layer clips within component; no arbitrary matrices/translations/rotation",
+    "background-image": "none, one url(canonical existing raster asset), or linear-gradient(0..360deg, two typed colors); no chained functions",
+    "background-size": "cover or contain",
+    "background-position": "one center/top/bottom/left/right OR exactly two keywords: horizontal(left/center/right) then vertical(top/center/bottom)",
+    "background-repeat": "no-repeat or repeat"
+  },
+  "variables": "Only reviewed --vl-* references matching property family and bounds; no fallbacks/definitions/custom properties. Resolve to validated canonical literal using current effective tokens. Revalidate/recompile atomically on EACH appearance change/theme switch/entitlement change; keep last valid preview if an edit makes CSS invalid.",
+  "urls": "Exactly canonical existing assets/... raster member, no preview.webp URL from user CSS; normalized rewritten vlui://SHA256/assets/... for client, internally owned blobs for isolated browser preview.",
+  "geometryAuthority": "width/height/position/order/grid/flex dimension declarations are rejected; layout.json owns component dimensions/minima. Padding/gap/margin only bounded appearance; trusted box-sizing, viewport clamping, form reflow and internal canvas pan remain. Functional content cannot receive transform/filter/opacity.",
+  "editorBehavior": "Autocomplete/diagnostics expose only supported subset. Errors identify unsupported declaration and retain last valid preview; no partial CSS application.",
+  "rejections": [
+    "parse errors/Raw recovery",
+    "unknown selectors/properties/functions/at-rules",
+    "@import/font-face/keyframes/supports/container",
+    "!important",
+    "custom properties",
+    "pseudo-elements/generated text",
+    "sensitive attribute selectors/:has",
+    "network/file/data/blob/javascript URLs",
+    "display/visibility/pointer-events/overflow/z-index/position/width/height",
+    "animations/transitions/resource loops"
+  ],
+  "output": "Only canonical serialized validated AST rules, never raw source; browser CSS preview isolated allow-scripts-only iframe; CSS does not style trusted native controls or builder UI",
+  "entitlement": "Python checks current valid Premium before apply and after asynchronous completion; kept in original package while disabled for Free",
+  "notYetImplemented": [
+    "CSS validator",
+    "media validation",
+    "renderer user CSS/layout",
+    "native bridge"
+  ],
+  "astGrammar": {
+    "selector": "One []attribute block with ident data-vl-component, literal=, quoted string of known ID; optional ONE whitespace-descendant .class from allowlist; optional ONE final state :hover/:focus/:focus-visible/:disabled OR .is-selected/.is-active attached to the selected element. No other tokens/combinators. Comma-separated up to8 nonempty selectors. Reconstruct using canonical literal IDs/classes/state.",
+    "selectorEscapes": "Parser-decoded escaped identifiers/strings accepted only if resulting EXACT identifier/string belongs to grammar. Canonical serialization removes escapes; no raw selector passthrough.",
+    "declarations": "Parse declaration list; canonical ASCII lowercase property names. Duplicate canonical properties within one rule reject, including escaped/case aliases. Same selector in separate rules follows source order. Any important flag rejects.",
+    "values": "Whitespace/comments ignored after accounting. Every remaining AST token is consumed by property's explicit grammar; parse errors/unknown/recovery nodes reject at any depth. Reject empty values and trailing unconsumed tokens.",
+    "variables": "var(ONE ident --vl-known), no comma/fallback; permitted only as a typed leaf where color/length/number/angle/font expected, including corresponding shadow/blur/gradient arguments. Evaluate family and property's effective bound, substitute literal before output. Enums/URLs cannot use vars.",
+    "color": "Hash6/8hex OR rgba(three ASCIIinteger channels0..255, alpha0..1 <=6fraction digits); exactly four comma-separated args, no percentages/currentColor/otherfunctions. color property alpha>=0.5; other color contexts0..1.",
+    "length": "one px dimension with finite numericvalue in property bound; no unitless0, exponent syntax, percentages/calc; authored decimal <=3fractiondigits. Canonical zero emits0px.",
+    "number": "one finite number in property bound; authored decimal <=6fractiondigits, no exponent syntax; canonical negative zero0. Number enums use mathematical integer semantics.",
+    "angle": "one deg dimension0..360, decimal<=3fractiondigits; no other units",
+    "font": "one quoted approved-font string OR var(--vl-font); output chosen font plus trusted fallback stack. No arbitrary font lists or external font source",
+    "boxShadow": "none OR one/two comma-separated groups of x y blur spread color, exactly four boundedpx leaves plus color; no inset. CSS var allowed as correctly typed leaf.",
+    "dropShadow": "none OR drop-shadow(two boundedpx offsets, optional boundedpx blur, color); NOspread/inset, color required",
+    "blur": "none OR blur(one boundedpx leaf); var allowed inside blur as length leaf; decoration requirement applies to filter but backdrop-filter affects surface behind content",
+    "scale": "none OR scale(one boundednumeric leaf); only .vl-decoration, clips to component, functional/canvas coordinates unchanged",
+    "gradient": "linear-gradient(one degree leaf, color leaf, color leaf), exactly threecomma-separated args; no extra stops/positions or nested gradients",
+    "URL": "one URLtoken OR url(ONE quoted string), parser-decodedcanonical existing assets raster name <=240ASCIIchars; canonical URLrewrite is internally supplied by trusted runtime, never supplied origin/network/raw source",
+    "media": "only @media, ASCIIcase canonicalized; prelude exactly ONE ()block containing min-width or max-width ident, colon, finite mathematically integral pxdimension240..8192. Qualified rules and nestedmedia only in body. No and/or/not/range/otherfeatures.",
+    "counting": "Maximum256 rules = all qualified and @media rules, includingnested. Maximum2048 declarations acrossallrules. Maxmedia nesting4. Token budget16384 =1per literal/ident/number/dimension/hash/string/URL/function/block recursively includingchildren; contiguous whitespace/comments do notcount. Rule/declaration counts separate from tokens. Parser-specific ASTwrapper nodes do notcount.",
+    "depth": "Before ASTparse, bounded lexical scan ignores quoted/escaped string and comments while checking delimiter nesting<=8 and valid balancing; this is resource preflight, not semantic sanitizer. Value function nesting<=2; media nesting<=4. UTF8source<=64KiB before parse. Same deadline/cancellation across parse, traversal and serialization.",
+    "serialization": "Drop comments. Emit only reconstructed selectors, canonical media, allowedproperty names and normalized literals/functions. No raw sourcelines. Apply atomically with stylesheet.textContent, never innerHTML; reject whole input on any error, retain last valid preview."
+  }
+}

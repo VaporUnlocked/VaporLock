@@ -1,0 +1,5421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "PROPOSAL ONLY; cross-file semantics.json is required",
+  "type": "object",
+  "properties": {
+    "--vl-accent": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "#7dbcf5"
+    },
+    "--vl-accent-secondary": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "#7dbcf5"
+    },
+    "--vl-background": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "#080b12"
+    },
+    "--vl-panel": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "rgba(8,11,18,0.678431)"
+    },
+    "--vl-text": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "#f2f6fa"
+    },
+    "--vl-text-muted": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "#b4bfcd"
+    },
+    "--vl-border": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "#708498"
+    },
+    "--vl-radius": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 40,
+      "default": "4px"
+    },
+    "--vl-blur": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 40,
+      "default": "0px"
+    },
+    "--vl-glass-strength": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 1,
+      "default": 0.68
+    },
+    "--vl-border-width": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 6,
+      "default": "1px"
+    },
+    "--vl-spacing": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 4,
+      "x-vlNumericMaximum": 24,
+      "default": "9px"
+    },
+    "--vl-ui-scale": {
+      "type": "number",
+      "minimum": 0.75,
+      "maximum": 1.5,
+      "default": 1
+    },
+    "--vl-font": {
+      "enum": [
+        "Segoe UI",
+        "Segoe UI Variable",
+        "Arial",
+        "Tahoma",
+        "Verdana"
+      ],
+      "default": "Segoe UI Variable"
+    },
+    "--vl-animation-intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0
+    },
+    "--vl-shadow-color": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "rgba(0,0,0,0)"
+    },
+    "--vl-shadow-blur": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 64,
+      "default": "0px"
+    },
+    "--vl-shadow-spread": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 16,
+      "default": "0px"
+    },
+    "--vl-glow-color": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "rgba(125,188,245,0)"
+    },
+    "--vl-glow-blur": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?px(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 40,
+      "default": "0px"
+    },
+    "--vl-gradient-start": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "rgba(8,11,18,0.678431)"
+    },
+    "--vl-gradient-end": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])",
+      "default": "rgba(8,11,18,0.678431)"
+    },
+    "--vl-gradient-angle": {
+      "type": "string",
+      "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3})?deg(?![\\s\\S])",
+      "x-vlNumericMinimum": 0,
+      "x-vlNumericMaximum": 360,
+      "default": "135deg"
+    },
+    "background": {
+      "type": "object",
+      "properties": {
+        "asset": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "fit": {
+          "enum": [
+            "cover",
+            "contain",
+            "tile"
+          ]
+        },
+        "position": {
+          "enum": [
+            "center",
+            "top",
+            "bottom",
+            "left",
+            "right",
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right"
+          ]
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "brightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "blur": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 40
+        },
+        "overlay": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "type": "string",
+              "maxLength": 80,
+              "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "color",
+            "opacity"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "asset"
+          ],
+          "not": {
+            "required": [
+              "source"
+            ]
+          }
+        },
+        {
+          "required": [
+            "source"
+          ],
+          "not": {
+            "required": [
+              "asset"
+            ]
+          }
+        }
+      ]
+    },
+    "panelMedia": {
+      "type": "object",
+      "properties": {
+        "workspace": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "sidebar": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "workspace-header": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "settings-guide": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "model-library": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "detection-settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "targeting-settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "movement-settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "training-data": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "profiles": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "shortcuts": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "api-suite": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "diagnostics": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "appearance": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "readiness": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "profile-card": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "system-monitor": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "connection-status": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "session-summary": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "testing-suite": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "official-models": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "model-inspection": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "provider-benchmark": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "target-preview": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "capture-settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "capture-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "target-policy": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "tracking-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "movement-tuning": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "preview": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "preview-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "annotation-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "overlay-settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "overlay-editor": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "activation-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "transport-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "event-controls": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "output-diagnostics": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "data-collection": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "data-review": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "annotation-canvas": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "training-tools": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "local-training": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "training-status": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "general-settings": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        },
+        "my-themes": {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "source": {
+              "type": "string",
+              "maxLength": 240,
+              "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+              "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+            },
+            "fit": {
+              "enum": [
+                "cover",
+                "contain",
+                "tile"
+              ]
+            },
+            "position": {
+              "enum": [
+                "center",
+                "top",
+                "bottom",
+                "left",
+                "right",
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "brightness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "saturation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "blur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40
+            },
+            "overlay": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|rgba\\( *[0-9]{1,3} *, *[0-9]{1,3} *, *[0-9]{1,3} *, *(0(\\.[0-9]{1,6})?|1(\\.0{1,6})?) *\\))(?![\\s\\S])"
+                },
+                "opacity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "color",
+                "opacity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "asset"
+              ],
+              "not": {
+                "required": [
+                  "source"
+                ]
+              }
+            },
+            {
+              "required": [
+                "source"
+              ],
+              "not": {
+                "required": [
+                  "asset"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "icons": {
+      "type": "object",
+      "properties": {
+        "sidebar": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "workspace-header": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "readiness": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "profile-card": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "system-monitor": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "connection-status": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "session-summary": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "testing-suite": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "official-models": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "model-inspection": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "provider-benchmark": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "target-preview": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "capture-settings": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "capture-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "target-policy": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "tracking-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "movement-tuning": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "preview": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "preview-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "annotation-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "overlay-settings": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "overlay-editor": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "activation-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "transport-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "event-controls": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "output-diagnostics": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "data-collection": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "data-review": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "annotation-canvas": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "training-tools": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "local-training": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "training-status": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        },
+        "my-themes": {
+          "type": "string",
+          "maxLength": 240,
+          "pattern": "^assets/[A-Za-z0-9][A-Za-z0-9._/-]*\\.(png|jpg|jpeg|webp|gif)(?![\\s\\S])",
+          "x-vlRequirement": "canonical member grammar plus exact existing raster member; never URL or filesystem path"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

@@ -1,0 +1,263 @@
+/* Real native Smokey Glass defaults. No theme CSS/media/layout activation. */
+.vl-native-app {
+  --vl-accent:#7dbcf5; --vl-accent-secondary:#7dbcf5; --vl-background:#080b12;
+  --vl-panel:rgba(8,11,18,.678431); --vl-text:#f2f6fa; --vl-text-muted:#b4bfcd; --vl-border:#708498;
+  --vl-radius:4px; --vl-blur:0px; --vl-spacing:9px; --vl-ui-scale:1;
+  --vl-font:"Segoe UI Variable Text"; --vl-border-width:1px;
+  --vl-shadow-color:rgba(0,0,0,0); --vl-shadow-blur:0px; --vl-shadow-spread:0px;
+  --vl-glow-color:rgba(125,188,245,0); --vl-glow-blur:0px; --vl-glass-strength:.68;
+  --vl-animation-intensity:0; --vl-gradient-angle:135deg;
+  position:relative; isolation:isolate; height:100%; min-width:0; min-height:0;
+  display:grid; grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden;
+  color:var(--vl-text); background:#080b12;
+  font:calc(13.333333px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1))/normal var(--vl-font),"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","Noto Sans",sans-serif;
+}
+.vl-native-app *, .vl-native-app *::before, .vl-native-app *::after {box-sizing:border-box;}
+.vl-native-app [hidden] {display:none!important;}
+.vl-native-app .vl-native-backdrop {position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(rgba(8,11,18,.356863),rgba(8,11,18,.356863)),url("./assets/SmokeyGlass.png") center/cover no-repeat;}
+.vl-native-app .vl-native-workspace {display:grid;grid-template-columns:196px minmax(0,1fr);min-width:0;min-height:0;
+  font-size:calc(13.333333px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1));color:var(--vl-text);}
+.vl-native-app.vl-native-without-chrome {grid-template-rows:minmax(0,1fr);}
+.vl-native-app .vl-fixed-commandBar {display:flex;align-items:center;gap:11px;height:72px;min-height:72px;padding:10px 24px;border-bottom:0;
+  background:rgba(8,11,18,.901961);box-shadow:inset 0 -1px #708498;flex-wrap:nowrap;min-width:0;}
+.vl-native-app .vl-brandMark {display:grid;place-items:center;flex:0 0 36px;height:36px;background:#12233c;border:1px solid #7dbcf5;border-radius:5px;color:#b9e7ff;font-size:calc(12px * var(--vl-accessibility-text-scale,1));font-weight:800;}
+.vl-native-app .vl-native-identity {display:flex;flex-direction:column;flex-shrink:0;}
+.vl-native-app .vl-brandWordmark {font-size:calc(14.666667px * var(--vl-accessibility-text-scale,1));font-weight:800;white-space:nowrap;}
+.vl-native-app .vl-brandPath,.vl-native-app .vl-headerKicker {font-size:calc(10.666667px * var(--vl-accessibility-text-scale,1));font-weight:700;color:#b4bfcd;}
+.vl-native-app .vl-headerDivider {width:1px;height:32px;background:#708498;flex-shrink:0;}
+.vl-native-app .vl-native-context {flex:1;min-width:0;display:flex;flex-direction:column;}
+.vl-native-app .vl-headerPage {font-size:calc(16px * var(--vl-accessibility-text-scale,1));font-weight:700;white-space:nowrap;}
+.vl-native-app .vl-native-command-choice {display:flex;flex-direction:column;gap:1px;flex-shrink:0;transform:translateY(2px);}
+.vl-native-app .vl-profileQuickSwitch {width:148px;max-width:180px;}
+.vl-native-app .vl-sessionModeChoice {width:124px;max-width:145px;}
+.vl-native-app .vl-statusPill {display:grid;place-items:center;min-width:64px;min-height:52px;background:#080b12;border:1px solid #7dbcf5;border-radius:5px;font-size:calc(10.666667px * var(--vl-accessibility-text-scale,1));font-weight:800;padding:6px 10px;white-space:nowrap;flex-shrink:0;}
+.vl-native-app button,.vl-native-app select,.vl-native-app input,.vl-native-app textarea {font:inherit;color:inherit;}
+.vl-native-app button {background:var(--vl-background);border:var(--vl-border-width) solid var(--vl-border);border-radius:5px;font-weight:650;min-height:42px;padding:4px 12px;cursor:pointer;}
+.vl-native-app button:hover {background:var(--vl-background);border-color:var(--vl-accent);}
+.vl-native-app button:disabled {color:var(--vl-text-muted);cursor:default;}
+.vl-native-app .vl-native-compact-button {padding-inline:4px;min-width:calc(34px * var(--vl-accessibility-text-scale,1));}
+.vl-native-app .vl-primaryButton {background:var(--vl-accent);border-color:var(--vl-accent);color:#05070a;}
+.vl-native-app .vl-dangerButton {border:2px solid #ffb3c6;color:#ffb3c6;}
+.vl-native-app .vl-primaryButton:disabled,.vl-native-app .vl-dangerButton:disabled {background:#080b12;color:#b4bfcd;border:1px solid #708498;}
+.vl-native-app .vl-native-icon-button {width:34px;flex:0 0 34px;min-height:37px;padding:0;}
+.vl-native-app .vl-native-icon-button::before {content:"";display:inline-block;vertical-align:middle;background:currentColor;}
+.vl-native-app .vl-native-icon-back::before {width:9px;height:13px;clip-path:polygon(0 50%,100% 0,100% 100%);}
+.vl-native-app .vl-native-icon-save::before {width:13px;height:13px;}
+.vl-native-app .vl-native-icon-search::before {width:14px;height:17px;clip-path:polygon(30% 0,100% 0,100% 100%,30% 100%,30% 66%,0 66%,0 34%,30% 34%);}
+.vl-native-app :is(.vl-native-icon-play,.vl-openTestingGrounds)::before {content:"";display:inline-block;width:11px;height:12px;vertical-align:-1px;background:currentColor;clip-path:polygon(0 0,100% 50%,0 100%);margin-inline-end:5px;}
+.vl-native-app .vl-native-icon-stop::before {content:"";display:inline-block;width:9px;height:9px;vertical-align:0;background:currentColor;margin-inline-end:5px;}
+.vl-native-app select:not([size]) {appearance:none;background-image:url("./assets/arrow-down-light.svg");background-position:right 8px center;background-repeat:no-repeat;background-size:10px 6px;}
+.vl-native-app .vl-fixed-commandBar .vl-primaryButton {min-width:140px;}
+.vl-native-app .vl-fixed-commandBar .vl-dangerButton {min-width:74px;}
+.vl-native-app .vl-fixed-commandBar .vl-native-command-choice small {line-height:15px;}
+.vl-native-app .vl-fixed-commandBar .vl-headerDivider {height:32px;}
+.vl-native-app :is(button,input,select,textarea,[tabindex]):focus-visible {outline:2px solid var(--vl-accent);outline-offset:2px;}
+.vl-native-app select,.vl-native-app input:not([type=checkbox]):not([type=radio]):not([type=range]),.vl-native-app textarea {
+  background:var(--vl-background);border:1px solid var(--vl-border);border-radius:5px;min-height:40px;padding:3px 9px;min-width:0;}
+.vl-native-app select {padding-right:24px;}
+.vl-native-app option {background:#080b12;color:#f2f6fa;}
+.vl-native-app input::placeholder {color:var(--vl-text-muted);}
+.vl-native-app input:disabled,.vl-native-app select:disabled {color:var(--vl-text-muted);}
+.vl-native-app textarea {resize:vertical;min-height:120px;}
+.vl-native-app .vl-native-sidebar {background:rgba(8,11,18,.901961);border-right:1px solid var(--vl-border);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;}
+.vl-native-app .vl-native-navigation {flex:1;overflow:auto;overflow-x:hidden;min-height:0;padding:14px 8px;}
+.vl-native-app .vl-native-nav-group {display:flex;flex-direction:column;gap:2px;}
+.vl-native-app .vl-native-nav-group+.vl-native-nav-group {margin-top:9px;}
+.vl-native-app .vl-navGroup {color:var(--vl-accent);font-size:.8em;font-weight:800;letter-spacing:1px;padding:12px 12px 4px;}
+.vl-native-app .vl-navGroup {white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-navGroup {line-height:calc(15px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1));}
+.vl-native-app .vl-navButton {border:0;border-left:3px solid transparent;border-radius:0;background:transparent;text-align:left;min-height:46px;padding:5px 12px;font-size:.9em;white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-navButton[aria-current=page] {background:var(--vl-background);color:var(--vl-accent);border-left-color:var(--vl-accent);font-weight:750;}
+.vl-native-app .vl-native-guide {flex-shrink:0;padding:8px 8px 14px;}
+.vl-native-app .vl-guideLink {display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--vl-accent);text-decoration:underline;min-height:40px;white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-native-content {min-width:0;min-height:0;overflow:hidden;}
+.vl-native-app .vl-native-content>.vl-pageScroll {height:100%;}
+.vl-native-app .vl-native-scroll {min-width:0;min-height:0;overflow:auto;}
+.vl-native-app .vl-native-scroll::-webkit-scrollbar,.vl-native-app .vl-native-navigation::-webkit-scrollbar {width:10px;height:9px;}
+.vl-native-app .vl-native-scroll::-webkit-scrollbar-track,.vl-native-app .vl-native-navigation::-webkit-scrollbar-track {background:#080c14;}
+.vl-native-app .vl-native-scroll::-webkit-scrollbar-thumb,.vl-native-app .vl-native-navigation::-webkit-scrollbar-thumb {background:var(--vl-border);border-radius:5px;min-height:28px;}
+.vl-native-app .vl-native-scroll>.vl-q {min-height:100%;}
+.vl-native-app .vl-native-stack {min-width:0;min-height:0;display:flex;flex-direction:column;}
+.vl-native-app .vl-native-stack>div:not([hidden]) {flex:1;}
+.vl-native-app .vl-layout {min-width:0;min-height:0;}
+.vl-native-app .vl-vbox {display:flex;flex-direction:column;}
+.vl-native-app .vl-hbox {display:flex;align-items:center;}
+.vl-native-app .vl-hbox>.vl-q:not(.vl-spacer) {min-width:0;}
+.vl-native-app .vl-grid {display:grid;}
+.vl-native-app .vl-q {min-width:0;}
+.vl-native-app span.vl-q {display:block;white-space:pre;}
+.vl-native-app span.vl-q.vl-word-wrap {white-space:pre-wrap;}
+.vl-native-app .vl-spacer {flex-shrink:0;}
+.vl-native-app .vl-pageContent>.vl-layout {min-height:100%;}
+.vl-native-app .vl-pageColumn>.vl-layout>* {--vl-parent-gap:var(--vl-spacing)!important;}
+.vl-native-app .vl-pageHeading {box-shadow:inset 0 -1px var(--vl-border);}
+.vl-native-app .vl-pageKicker,.vl-native-app .vl-sectionLabel {color:var(--vl-accent);font-size:.8em;font-weight:800;letter-spacing:1px;}
+.vl-native-app .vl-pageTitle {font-size:2.2em;font-weight:750;margin:0;}
+.vl-native-app .vl-pageTitle {line-height:calc(38px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1));}
+.vl-native-app .vl-pageKicker,.vl-native-app .vl-sectionLabel {line-height:calc(15px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1));}
+.vl-native-app .vl-sectionDot {flex:0 0 3px;width:3px;height:12px;background:#ffb3c6;border-radius:1px;}
+.vl-native-app .vl-sectionRule {height:3px;flex:1;background:var(--vl-border);}
+.vl-native-app .vl-settingAccent {flex:0 0 2px;align-self:stretch;min-height:28px;border-radius:1px;background:rgba(125,188,245,.537255);}
+.vl-native-app .vl-settingsCard,.vl-native-app .vl-metricCard,.vl-native-app .vl-signalPanel {
+  background:var(--vl-panel);border:var(--vl-border-width) solid var(--vl-border);border-radius:var(--vl-radius);
+  backdrop-filter:blur(calc(var(--vl-blur) * var(--vl-glass-strength)));box-shadow:0 0 var(--vl-shadow-blur) var(--vl-shadow-spread) var(--vl-shadow-color);}
+.vl-native-app .vl-settingsCard {min-height:56px;}
+.vl-native-app .vl-settingsCard:hover,.vl-native-app .vl-metricCard:hover {border-color:var(--vl-accent);}
+.vl-native-app .vl-settingsCard>.vl-hbox {min-height:54px;}
+.vl-native-app .vl-settingsCard>.vl-hbox>.vl-q:last-child {min-width:250px;}
+.vl-native-app .vl-fieldTitle {font-weight:680;}
+.vl-native-app .vl-detail,.vl-native-app .vl-muted,.vl-native-app .vl-metricCaption,.vl-native-app .vl-signalCaption,.vl-native-app .vl-hudLabel,
+.vl-native-app .vl-policyWorkspaceSubtitle,.vl-native-app .vl-policyControlLabel,.vl-native-app .vl-policyMetricDetail,.vl-native-app .vl-policyPreviewCaption {color:var(--vl-text-muted);}
+.vl-native-app .vl-metricValue {font-size:1.8em;font-weight:750;}
+.vl-native-app .vl-metricCaption,.vl-native-app .vl-signalCaption,.vl-native-app .vl-hudLabel {font-size:.8em;font-weight:800;letter-spacing:.5px;}
+.vl-native-app .vl-signalValue,.vl-native-app .vl-hudValue {font-weight:700;}
+.vl-native-app .vl-signalDivider,.vl-native-app .vl-headerDivider {flex:0 0 1px;width:1px;background:var(--vl-border);height:38px;}
+.vl-native-app .vl-native-tabs {display:flex;flex-direction:column;min-height:460px;background:var(--vl-panel);border:1px solid var(--vl-border);border-radius:var(--vl-radius);overflow:hidden;}
+.vl-native-app .vl-native-tab-rail {display:flex;gap:2px;padding:0 8px;overflow-x:auto;flex-shrink:0;background:var(--vl-panel);border-bottom:1px solid var(--vl-border);}
+.vl-native-app .vl-secondaryTabButton {border:0;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap;min-width:100px;min-height:47px;padding:5px 14px;background:transparent;color:var(--vl-text-muted);font-size:.9em;font-weight:650;}
+.vl-native-app .vl-secondaryTabButton[aria-selected=true],.vl-native-app .vl-secondaryTabButton[aria-pressed=true] {border-bottom:3px solid var(--vl-accent);color:var(--vl-accent);background:var(--vl-background);}
+.vl-native-app .vl-native-tab-panels {flex:1;min-height:0;display:flex;flex-direction:column;}
+.vl-native-app .vl-native-tab-panels>.vl-native-scroll {flex:1;}
+.vl-native-app .vl-native-tabs .vl-settingsCard,.vl-native-app .vl-policyInspector .vl-policyInspectorCard {background:transparent;box-shadow:none;backdrop-filter:none;}
+.vl-native-app .vl-native-tabs .vl-settingsCard {border:0;border-bottom:1px solid rgba(180,191,205,.184314);border-radius:0;}
+.vl-native-app .vl-native-tabs .vl-settingAccent {background:transparent;}
+.vl-native-app .vl-native-range {display:flex;align-items:center;gap:10px;min-width:250px;}
+.vl-native-app .vl-native-range[data-vl-live-numeric] {flex-wrap:wrap;}
+.vl-native-app .vl-live-numeric-feedback {flex-basis:100%;font-size:.9em;line-height:1.4;color:var(--vl-text-muted);overflow-wrap:anywhere;}
+.vl-native-app .vl-live-apply-value {flex:0 0 auto;}
+.vl-native-app .vl-native-number-box {position:relative;display:flex;align-items:center;min-width:100px;width:100px;flex-shrink:0;background:var(--vl-background);border:1px solid var(--vl-border);border-radius:5px;}
+.vl-native-app .vl-native-number-box input {width:100%;background:transparent!important;border:0!important;padding-right:4px!important;}
+.vl-native-app .vl-native-standalone-number {min-width:0;}
+.vl-native-app .vl-native-number-suffix {font-size:inherit;white-space:nowrap;padding-right:6px;}
+.vl-native-app .vl-native-number-stepper {width:20px;align-self:stretch;flex:0 0 20px;display:grid;grid-template-rows:1fr 1fr;border-left:1px solid var(--vl-border);}
+.vl-native-app .vl-native-number-stepper button {min-height:0;height:100%;border:0;border-radius:0;padding:0;background-position:center;background-repeat:no-repeat;background-size:10px 6px;}
+.vl-native-app .vl-native-number-stepper .vl-native-number-up {background-image:url("./assets/arrow-up-light.svg");}
+.vl-native-app .vl-native-number-stepper .vl-native-number-down {background-image:url("./assets/arrow-down-light.svg");border-top:1px solid var(--vl-border);}
+.vl-native-app .vl-native-number-box input::-webkit-inner-spin-button {appearance:none;}
+.vl-native-app .vl-native-number-box input {appearance:textfield;}
+.vl-native-app .vl-native-slider {appearance:none;height:8px;flex:1;min-width:50px;border:0;border-radius:3px;padding:0;background:linear-gradient(to right,var(--vl-slider-accent,var(--vl-accent)) 0 var(--vl-slider-fill,0%),var(--vl-border) var(--vl-slider-fill,0%) 100%);cursor:pointer;}
+.vl-native-app .vl-native-slider::-webkit-slider-thumb {appearance:none;width:10px;height:14px;background:var(--vl-accent);border:2px solid #05070a;border-radius:0;}
+.vl-native-app .vl-native-slider::-moz-range-thumb {width:10px;height:14px;border:2px solid #05070a;background:var(--vl-accent);border-radius:0;}
+.vl-native-app .vl-native-check {display:flex;align-items:center;gap:8px;min-height:24px;}
+.vl-native-app .vl-native-check input {appearance:none;flex:0 0 18px;width:18px;height:18px;border:1px solid var(--vl-border);border-radius:3px;background:var(--vl-background);margin:0;}
+.vl-native-app .vl-native-check input:checked {background:var(--vl-accent);border:2px solid #05070a;}
+.vl-native-app .vl-native-check input:checked {background-image:url("./assets/check-dark.svg");background-position:center;background-repeat:no-repeat;background-size:12px 12px;}
+.vl-native-app .vl-native-check input[type=radio] {border-radius:50%;}
+.vl-native-app .vl-native-canvas {display:grid;place-items:center;background:var(--vl-background);border:1px solid var(--vl-border);height:410px;min-width:0;overflow:hidden;}
+.vl-native-app .vl-native-canvas-caption {color:var(--vl-text-muted);text-align:center;}
+.vl-native-app .vl-native-canvas {position:relative;touch-action:none;}
+.vl-native-app .vl-native-canvas canvas {position:absolute;inset:0;width:100%;height:100%;}
+.vl-native-app .vl-native-canvas-status {position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);}
+.vl-native-app .vl-native-canvas-DatasetReviewCanvas {height:auto;min-height:390px;flex:1;}
+.vl-native-app .vl-native-canvas-StickView {height:150px;border:0;background:transparent;}
+.vl-native-app .vl-native-canvas-PerformanceChart {height:260px;border:0;}
+.vl-native-app .vl-native-progress {position:relative;width:100%;min-height:23px;background:var(--vl-background);border:1px solid var(--vl-border);border-radius:5px;color:var(--vl-text);overflow:hidden;text-align:center;}
+.vl-native-app .vl-native-progress-fill {position:absolute;inset:0 auto 0 0;background:var(--vl-accent);border-radius:4px;}
+.vl-native-app .vl-native-progress-caption {position:relative;display:block;line-height:21px;}
+.vl-native-app .vl-policyCommandDeck {background:var(--vl-panel);border:1px solid var(--vl-border);border-radius:5px;}
+.vl-native-app .vl-policyCommandDeck>.vl-hbox {align-items:stretch;}
+.vl-native-app .vl-policyMainSurface {border-right:1px solid var(--vl-border);flex:1;}
+.vl-native-app .vl-policyInspector {position:relative;width:var(--vl-inspector-width,320px);flex:0 0 var(--vl-inspector-width,320px);background:var(--vl-panel);}
+.vl-native-app .vl-policyInspector>.vl-layout {position:absolute;inset:0;}
+.vl-native-app .vl-policyInspector .vl-secondaryTabButton {min-height:57px;}
+.vl-native-app .vl-policyInspectorRange {min-width:0;}
+.vl-native-app .vl-policyInspectorRange .vl-native-number-box {width:82px;min-width:72px;}
+.vl-native-app .vl-policyInspectorCard {border-bottom:1px solid rgba(180,191,205,.184314);}
+.vl-native-app .vl-policyTopMetric {background:var(--vl-panel);border-left:2px solid var(--vl-accent);}
+.vl-native-app .vl-policyTopMetric.vl-native-metric-pink {border-left-color:#ffb3c6;}
+.vl-native-app .vl-policyWorkspaceTitle {font-size:1.7em;font-weight:750;}
+.vl-native-app .vl-policyTrackMetric,.vl-native-app .vl-policyConfidenceMetric {font-size:1.7em;font-weight:750;}
+.vl-native-app .vl-policyPreviewFooter {background:var(--vl-panel);border-top:1px solid var(--vl-border);}
+.vl-native-app .vl-policyPreviewStatus,.vl-native-app .vl-policyMetricCaption {color:var(--vl-accent);}
+.vl-native-app .vl-native-list {min-height:180px;width:100%;padding:0;}
+.vl-native-app .vl-native-list option {padding:4px 8px;min-height:28px;border-bottom:1px solid var(--vl-border);}
+.vl-native-app .vl-native-policy-table {min-height:230px;overflow:auto;background:var(--vl-background);border:1px solid var(--vl-border);}
+.vl-native-app .vl-native-policy-table table {width:100%;border-collapse:collapse;table-layout:fixed;min-width:500px;}
+.vl-native-app .vl-native-policy-table th {text-align:center;font-weight:650;border:1px solid var(--vl-border);padding:7px 4px;}
+.vl-native-app .vl-native-policy-table td {padding:0;border:1px solid var(--vl-border);}
+.vl-native-app .vl-native-policy-table :is(input,select) {width:100%;min-width:0;border:0;border-radius:0;}
+.vl-native-app .vl-native-row-selected {outline:1px solid var(--vl-accent);outline-offset:-1px;}
+.vl-native-app .vl-fixed-telemetryStrip {min-height:30px;display:flex;align-items:center;gap:16px;padding:0 24px;background:rgba(8,11,18,.901961);border-top:1px solid #708498;white-space:nowrap;}
+.vl-native-app .vl-fixed-telemetryStrip {min-width:0;}
+.vl-native-app .vl-native-hud-group {display:flex;gap:6px;align-items:center;}
+.vl-native-app .vl-native-hud-spacer {flex:1;}
+.vl-native-app .vl-selected {outline:2px solid var(--vl-accent);outline-offset:2px;}
+.vl-native-app .vl-native-search {width:min(560px,90vw);max-height:80vh;overflow:auto;background:#080b12;color:#f2f6fa;border:1px solid #708498;border-radius:5px;}
+.vl-native-app .vl-native-search-results {display:flex;flex-direction:column;gap:6px;margin:12px 0;}
+.vl-native-app .vl-native-search::backdrop {background:rgba(0,0,0,.6);}
+.vl-native-app.vl-command-compact .vl-brandPath,.vl-native-app.vl-command-compact .vl-headerKicker {display:none;}
+.vl-native-app.vl-command-compact .vl-fixed-commandBar {padding:10px 14px;gap:8px;}
+.vl-native-app.vl-command-compact .vl-profileQuickSwitch {width:112px;}
+.vl-native-app.vl-command-compact .vl-sessionModeChoice {width:105px;}
+.vl-native-app.vl-command-wrapped .vl-fixed-commandBar {flex-wrap:wrap;height:auto;}
+.vl-native-app.vl-command-wrapped .vl-native-context {min-width:160px;}
+.vl-native-app.vl-command-wrapped .vl-headerPage {white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app.vl-command-wrapped .vl-fixed-telemetryStrip {flex-wrap:wrap;white-space:normal;padding:5px 14px;}
+.vl-native-app .vl-targeting-stacked .vl-policyCommandDeck>.vl-hbox {flex-direction:column;}
+.vl-native-app .vl-targeting-stacked .vl-policyMainSurface {border-right:0;border-bottom:1px solid var(--vl-border);}
+.vl-native-app .vl-targeting-stacked .vl-policyInspector {width:auto;flex:auto;}
+.vl-native-app .vl-targeting-stacked .vl-policyInspector {min-height:calc(630px * var(--vl-accessibility-text-scale,1));}
+.vl-native-app .vl-native-review-toolbar {flex-wrap:wrap;gap:6px!important;}
+.vl-native-app .vl-native-review-toolbar>* {margin-inline-start:0!important;}
+.vl-native-app .vl-native-review-toolbar button {white-space:normal;min-width:max-content;}
+.vl-native-app .vl-native-review-zoom {display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.vl-native-app .vl-native-review-zoom>* {margin-inline-start:0!important;}
+.vl-native-app .vl-native-review-body {align-items:stretch;}
+.vl-native-app .vl-native-review-body>.vl-native-list {flex:0 0 260px;width:260px;}
+.vl-native-app .vl-native-review-stacked {flex-direction:column;gap:12px;}
+.vl-native-app .vl-native-review-stacked>.vl-q {margin-inline-start:0!important;width:100%;}
+.vl-native-app .vl-native-review-stacked>.vl-native-list {flex:0 0 180px;max-height:200px;}
+.vl-native-app .vl-native-cockpit-two {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+.vl-native-app .vl-native-cockpit-two>.vl-q {grid-row:auto!important;grid-column:auto!important;}
+.vl-native-app .vl-native-community {color:var(--vl-accent);text-decoration:underline;}
+.vl-native-app .vl-compact [data-vl-attribute=overview_release] {display:none;}
+.vl-native-app .vl-native-review-card>.vl-hbox {flex-wrap:wrap;}
+.vl-native-app .vl-native-review-card>.vl-hbox>.vl-q:last-child {flex:1 1 100%;width:100%;}
+.vl-native-app .vl-compact .vl-settingsCard>.vl-hbox {flex-wrap:wrap;}
+.vl-native-app .vl-compact .vl-settingsCard>.vl-hbox>.vl-q:last-child {min-width:min(250px,100%);max-width:100%;}
+.vl-native-app .vl-compact .vl-fieldTitle {white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-compact :is(.vl-metricCaption,.vl-metricValue,.vl-policyMetricCaption,.vl-policyMetricValue,.vl-signalCaption,.vl-signalValue) {white-space:normal;overflow-wrap:anywhere;min-width:0;}
+.vl-native-app .vl-compact .vl-settingsCard>.vl-hbox {row-gap:8px;}
+.vl-native-app .vl-compact .vl-settingsCard>.vl-hbox>.vl-fieldTitle {flex:1 1 230px!important;}
+.vl-native-app .vl-compact .vl-settingsCard>.vl-hbox>.vl-q:last-child>.vl-hbox {flex-wrap:wrap;row-gap:8px;}
+.vl-native-app .vl-compact .vl-settingsCard>.vl-hbox>.vl-q:last-child .vl-hbox {flex-wrap:wrap;row-gap:8px;}
+@media(max-width:900px) {
+  .vl-native-app .vl-fixed-commandBar {flex-wrap:wrap;}
+  .vl-native-app .vl-native-workspace {grid-template-columns:160px minmax(0,1fr);}
+  .vl-native-app .vl-fixed-telemetryStrip {flex-wrap:wrap;white-space:normal;padding:5px 14px;}
+}
+@media(max-width:600px) {
+  .vl-native-app .vl-native-workspace {grid-template-columns:130px minmax(0,1fr);}
+  .vl-native-app .vl-fixed-commandBar .vl-primaryButton {min-width:80px;}
+  .vl-native-app .vl-native-command-choice {flex:1;}
+  .vl-native-app .vl-native-context {min-width:100px;}
+}
+@media(prefers-reduced-motion:reduce) {.vl-native-app *, .vl-native-app *::before,.vl-native-app *::after {animation:none!important;transition:none!important;}}
+
+/* Compact native presentation: complete wrapped labels and usable navigation. */
+.vl-native-app .vl-navButton {height:auto;flex-shrink:0;line-height:1.4;white-space:normal;}
+.vl-native-app .vl-native-navigation {min-height:44px;}
+.vl-native-app .vl-native-guide {max-height:none;min-height:min-content;overflow:visible;flex:0 0 auto;}
+.vl-native-app .vl-guideLink {height:auto;line-height:1.4;white-space:normal;}
+
+.vl-native-choice-field{min-width:0;flex:1;}
+.vl-native-choice-field>select{width:100%;}
+.vl-native-check[data-vl-live-discrete]{flex-wrap:wrap;}
+.vl-live-discrete-feedback{display:block;flex-basis:100%;font-size:.875em;line-height:1.4;}
+.vl-native-app .vl-live-guide-feedback {display:block;font-size:.875em;line-height:1.4;color:var(--vl-text-muted);white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-live-guide-feedback[hidden] {display:none;}
+
+/* Native text scaling also reserves width for translated navigation. */
+.vl-native-app .vl-native-workspace {grid-template-columns:min(38%, calc(196px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1))) minmax(0,1fr);}
+.vl-native-app .vl-native-sidebar {overflow:auto;overflow-x:hidden;}
+.vl-native-app .vl-native-navigation {min-height:4em;}
+.vl-native-app .vl-navButton,.vl-native-app .vl-navGroup {overflow-wrap:break-word;hyphens:auto;}
+.vl-native-app .vl-native-range.vl-native-percent {display:grid;grid-template-columns:minmax(0,1fr) auto;min-width:0;width:calc(250px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1));max-width:100%;margin-inline-start:auto;}
+.vl-native-app .vl-native-percent>.vl-native-number-box {grid-column:2;width:calc(100px * var(--vl-ui-scale) * var(--vl-accessibility-text-scale,1));}
+.vl-native-app .vl-native-percent>.vl-live-numeric-feedback,.vl-native-app .vl-native-percent>.vl-live-apply-value {grid-column:1 / -1;min-width:0;}
+
+/* Keep this action's status beneath its heading and button at every scale. */
+.vl-native-app .vl-live-mouse-removal-row {flex-wrap:wrap;row-gap:8px!important;}
+.vl-native-app .vl-live-mouse-removal-row>button {flex-shrink:0;min-width:min(250px,100%);max-width:100%;}
+.vl-native-app .vl-live-mouse-removal-feedback {display:block;flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;}

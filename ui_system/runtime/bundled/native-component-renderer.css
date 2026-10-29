@@ -1,0 +1,34 @@
+/* New source groups add no film. Defaults preserve native Smokey Glass. */
+body.vl-component-demo-compact #mount {width:980px;height:720px;max-width:100%;max-height:100%;}
+.vl-native-app .vl-native-component-group {background:transparent;border:0;box-shadow:none;min-width:0;}
+.vl-native-app .vl-native-workspace {font-family:var(--vl-font),"Segoe UI","Microsoft YaHei UI","Microsoft YaHei","Noto Sans",sans-serif;}
+.vl-native-app .vl-native-workspace-heading {display:flex;flex-direction:column;gap:2px;min-width:0;min-height:44px;background:transparent;}
+.vl-native-app .vl-native-heading-slot {min-width:0;}
+.vl-native-app .vl-native-workspace-heading :is(h1,span) {white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-native-workspace-heading h1 {margin:0;}
+.vl-native-app .vl-generated-scroll {height:100%;}
+.vl-native-app .vl-generated-page {min-height:100%;min-width:0;padding:20px 27px 26px;display:flex;flex-direction:column;gap:var(--vl-spacing);}
+.vl-native-app .vl-generated-page-heading {min-width:0;}
+.vl-native-app .vl-generated-page p {margin:0;line-height:1.5;}
+.vl-native-app .vl-generated-info-row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--vl-spacing);min-width:0;}
+.vl-native-app .vl-generated-card {background:var(--vl-panel);border:var(--vl-border-width) solid var(--vl-border);border-radius:var(--vl-radius);padding:12px 14px;min-width:0;
+  backdrop-filter:blur(calc(var(--vl-blur) * var(--vl-glass-strength)));box-shadow:0 0 var(--vl-shadow-blur) var(--vl-shadow-spread) var(--vl-shadow-color),0 0 var(--vl-glow-blur) var(--vl-glow-color);}
+.vl-native-app .vl-generated-card h2 {font-size:1em;margin:0 0 9px;font-weight:700;}
+.vl-native-app .vl-generated-info-value {display:block;font-size:1.15em;line-height:1.5;overflow-wrap:anywhere;}
+.vl-native-app .vl-generated-muted {color:var(--vl-text-muted);line-height:1.5;white-space:normal;overflow-wrap:anywhere;}
+.vl-native-app .vl-generated-connections {margin:0 0 9px;}
+.vl-native-app .vl-generated-connections>div {display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;}
+.vl-native-app .vl-generated-connections dd {margin:0;color:var(--vl-text-muted);}
+.vl-native-app .vl-generated-field {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;min-height:56px;border-bottom:1px solid var(--vl-border);}
+.vl-native-app .vl-generated-field:last-of-type {border-bottom:0;}
+.vl-native-app .vl-generated-field-copy {display:flex;flex-direction:column;min-width:0;flex:1;gap:4px;overflow-wrap:anywhere;}
+.vl-native-app .vl-generated-field :is(input,select) {flex:0 1 250px;width:250px;max-width:100%;}
+.vl-native-app .vl-generated-actions {display:flex;flex-wrap:wrap;gap:9px;margin-top:12px;}
+.vl-native-app .vl-generated-card>[role=status] {margin:9px 0;}
+.vl-native-app [aria-invalid=true] {outline:2px solid #ffb3c6;outline-offset:2px;}
+.vl-native-app .vl-native-workspace .vl-navGroup,.vl-native-app .vl-native-workspace .vl-pageKicker,.vl-native-app .vl-native-workspace .vl-sectionKicker {color:var(--vl-accent-secondary);}
+.vl-native-app .vl-native-workspace.vl-has-gradient {background-image:linear-gradient(var(--vl-gradient-angle),var(--vl-gradient-start,#080b12),var(--vl-gradient-end,#7dbcf5));}
+.vl-native-app .vl-native-workspace button {transition:background-color calc(var(--vl-animation-intensity) * 180ms),border-color calc(var(--vl-animation-intensity) * 180ms);}
+.vl-native-app .vl-compact .vl-generated-info-row {grid-template-columns:minmax(0,1fr);}
+.vl-native-app .vl-compact .vl-generated-field {align-items:stretch;flex-direction:column;gap:8px;}
+.vl-native-app .vl-compact .vl-generated-field :is(input,select) {width:100%;flex:auto;}

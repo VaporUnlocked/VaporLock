@@ -1,0 +1,7 @@
+# Headless training with already reviewed box + mask labels.
+# Install a suitable GPU build of torch first when CUDA is required.
+# This requirement will accept an already installed compatible torch build.
+numpy>=1.26,<3
+Pillow>=10,<14
+PyYAML>=6,<7
+torch>=2.6,<3

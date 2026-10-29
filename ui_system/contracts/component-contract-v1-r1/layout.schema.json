@@ -1,0 +1,510 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "PROPOSAL ONLY; cross-file semantics.json is required",
+  "type": "object",
+  "properties": {
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "additionalProperties": false
+    },
+    "components": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "sidebar",
+          "workspace-header",
+          "readiness",
+          "profile-card",
+          "system-monitor",
+          "connection-status",
+          "session-summary",
+          "testing-suite",
+          "official-models",
+          "model-inspection",
+          "provider-benchmark",
+          "target-preview",
+          "capture-settings",
+          "capture-controls",
+          "target-policy",
+          "tracking-controls",
+          "movement-tuning",
+          "preview",
+          "preview-controls",
+          "annotation-controls",
+          "overlay-settings",
+          "overlay-editor",
+          "activation-controls",
+          "transport-controls",
+          "event-controls",
+          "output-diagnostics",
+          "data-collection",
+          "data-review",
+          "annotation-canvas",
+          "training-tools",
+          "local-training",
+          "training-status",
+          "my-themes"
+        ]
+      },
+      "maxProperties": 33,
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "parent": {
+                "type": "string",
+                "enum": [
+                  "workspace",
+                  "sidebar",
+                  "navigation",
+                  "workspace-header",
+                  "settings-guide",
+                  "dashboard",
+                  "model-library",
+                  "detection-settings",
+                  "targeting-settings",
+                  "movement-settings",
+                  "training-data",
+                  "profiles",
+                  "settings",
+                  "shortcuts",
+                  "api-suite",
+                  "diagnostics",
+                  "appearance",
+                  "readiness",
+                  "profile-card",
+                  "system-monitor",
+                  "connection-status",
+                  "session-summary",
+                  "testing-suite",
+                  "official-models",
+                  "model-inspection",
+                  "provider-benchmark",
+                  "target-preview",
+                  "capture-settings",
+                  "capture-controls",
+                  "target-policy",
+                  "tracking-controls",
+                  "movement-tuning",
+                  "preview",
+                  "preview-controls",
+                  "annotation-controls",
+                  "overlay-settings",
+                  "overlay-editor",
+                  "activation-controls",
+                  "transport-controls",
+                  "event-controls",
+                  "output-diagnostics",
+                  "data-collection",
+                  "data-review",
+                  "annotation-canvas",
+                  "training-tools",
+                  "local-training",
+                  "training-status",
+                  "general-settings",
+                  "my-themes"
+                ]
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "mode": {
+                "const": "freeform"
+              },
+              "anchor": {
+                "enum": [
+                  "top-left",
+                  "top",
+                  "top-right",
+                  "left",
+                  "center",
+                  "right",
+                  "bottom-left",
+                  "bottom",
+                  "bottom-right"
+                ]
+              },
+              "x": {
+                "type": "number",
+                "minimum": -8192,
+                "maximum": 8192
+              },
+              "y": {
+                "type": "number",
+                "minimum": -8192,
+                "maximum": 8192
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1023
+              }
+            },
+            "required": [
+              "mode",
+              "anchor",
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "parent": {
+                "type": "string",
+                "enum": [
+                  "workspace",
+                  "sidebar",
+                  "navigation",
+                  "workspace-header",
+                  "settings-guide",
+                  "dashboard",
+                  "model-library",
+                  "detection-settings",
+                  "targeting-settings",
+                  "movement-settings",
+                  "training-data",
+                  "profiles",
+                  "settings",
+                  "shortcuts",
+                  "api-suite",
+                  "diagnostics",
+                  "appearance",
+                  "readiness",
+                  "profile-card",
+                  "system-monitor",
+                  "connection-status",
+                  "session-summary",
+                  "testing-suite",
+                  "official-models",
+                  "model-inspection",
+                  "provider-benchmark",
+                  "target-preview",
+                  "capture-settings",
+                  "capture-controls",
+                  "target-policy",
+                  "tracking-controls",
+                  "movement-tuning",
+                  "preview",
+                  "preview-controls",
+                  "annotation-controls",
+                  "overlay-settings",
+                  "overlay-editor",
+                  "activation-controls",
+                  "transport-controls",
+                  "event-controls",
+                  "output-diagnostics",
+                  "data-collection",
+                  "data-review",
+                  "annotation-canvas",
+                  "training-tools",
+                  "local-training",
+                  "training-status",
+                  "general-settings",
+                  "my-themes"
+                ]
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "mode": {
+                "const": "grid"
+              },
+              "column": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "columnSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "rowSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              }
+            },
+            "required": [
+              "mode",
+              "column",
+              "row",
+              "columnSpan",
+              "rowSpan"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "parent": {
+                "type": "string",
+                "enum": [
+                  "workspace",
+                  "sidebar",
+                  "navigation",
+                  "workspace-header",
+                  "settings-guide",
+                  "dashboard",
+                  "model-library",
+                  "detection-settings",
+                  "targeting-settings",
+                  "movement-settings",
+                  "training-data",
+                  "profiles",
+                  "settings",
+                  "shortcuts",
+                  "api-suite",
+                  "diagnostics",
+                  "appearance",
+                  "readiness",
+                  "profile-card",
+                  "system-monitor",
+                  "connection-status",
+                  "session-summary",
+                  "testing-suite",
+                  "official-models",
+                  "model-inspection",
+                  "provider-benchmark",
+                  "target-preview",
+                  "capture-settings",
+                  "capture-controls",
+                  "target-policy",
+                  "tracking-controls",
+                  "movement-tuning",
+                  "preview",
+                  "preview-controls",
+                  "annotation-controls",
+                  "overlay-settings",
+                  "overlay-editor",
+                  "activation-controls",
+                  "transport-controls",
+                  "event-controls",
+                  "output-diagnostics",
+                  "data-collection",
+                  "data-review",
+                  "annotation-canvas",
+                  "training-tools",
+                  "local-training",
+                  "training-status",
+                  "general-settings",
+                  "my-themes"
+                ]
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "mode": {
+                "const": "dock"
+              },
+              "edge": {
+                "enum": [
+                  "left",
+                  "right",
+                  "top",
+                  "bottom"
+                ]
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1023
+              }
+            },
+            "required": [
+              "mode",
+              "edge",
+              "order"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "parent": {
+                "type": "string",
+                "enum": [
+                  "workspace",
+                  "sidebar",
+                  "navigation",
+                  "workspace-header",
+                  "settings-guide",
+                  "dashboard",
+                  "model-library",
+                  "detection-settings",
+                  "targeting-settings",
+                  "movement-settings",
+                  "training-data",
+                  "profiles",
+                  "settings",
+                  "shortcuts",
+                  "api-suite",
+                  "diagnostics",
+                  "appearance",
+                  "readiness",
+                  "profile-card",
+                  "system-monitor",
+                  "connection-status",
+                  "session-summary",
+                  "testing-suite",
+                  "official-models",
+                  "model-inspection",
+                  "provider-benchmark",
+                  "target-preview",
+                  "capture-settings",
+                  "capture-controls",
+                  "target-policy",
+                  "tracking-controls",
+                  "movement-tuning",
+                  "preview",
+                  "preview-controls",
+                  "annotation-controls",
+                  "overlay-settings",
+                  "overlay-editor",
+                  "activation-controls",
+                  "transport-controls",
+                  "event-controls",
+                  "output-diagnostics",
+                  "data-collection",
+                  "data-review",
+                  "annotation-canvas",
+                  "training-tools",
+                  "local-training",
+                  "training-status",
+                  "general-settings",
+                  "my-themes"
+                ]
+              },
+              "hidden": {
+                "type": "boolean"
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4096
+              },
+              "mode": {
+                "const": "flow"
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1023
+              },
+              "columnSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              }
+            },
+            "required": [
+              "mode",
+              "order"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "hidden": {
+                "type": "boolean"
+              },
+              "pinned": {
+                "type": "boolean"
+              }
+            },
+            "required": [],
+            "additionalProperties": false,
+            "minProperties": 1
+          }
+        ]
+      }
+    }
+  },
+  "required": [],
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "workspace"
+      ]
+    },
+    {
+      "required": [
+        "components"
+      ],
+      "properties": {
+        "components": {
+          "minProperties": 1
+        }
+      }
+    }
+  ]
+}

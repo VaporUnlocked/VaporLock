@@ -1,0 +1,32 @@
+MobileSAM annotation assistant — third-party notices
+
+This is a locally adapted prompt-inference subset of the official MobileSAM
+project by Chaoning Zhang and contributors, using its original mobile_sam.pt
+checkpoint. It is MobileSAM, not SAM 3.1.
+
+Official repository: https://github.com/ChaoningZhang/MobileSAM
+Pinned commit: f706ad9c4eb7f219c00d9050e46328518ffb65d2
+
+MobileSAM and inherited Segment Anything source:
+Copyright (c) Meta Platforms, Inc. and affiliates.
+All rights reserved. Licensed under Apache License 2.0; see LICENSE.
+MobileSAM project authors and contributors retain their respective rights.
+
+TinyViT architecture:
+Copyright (c) 2022 Microsoft. Adapted from LeViT and Swin Transformer.
+The Microsoft TinyViT MIT license and its dependency attributions are retained
+in LICENSE-TinyViT.txt. Existing copyright headers remain in all vendored files.
+
+Local modifications (2026-10-17): package-relative imports; direct Pillow
+bilinear resizing for uint8 RGB arrays; small locally implemented helper layers
+in place of the timm dependency; removal of optional automatic-mask generation
+and classification/download factories; CPU weights-only checkpoint loading;
+refresh of evaluation attention-bias caches after loading trained tensors.
+Modified files carry explicit notices. These local modifications are supplied
+under Apache-2.0. No checkpoint tensor was changed or retrained.
+
+The model is loaded from a local checkpoint with torch.load(weights_only=True)
+and strict tensor-key validation. Ordinary app use makes no model download.
+
+Full source URLs, original Git blob checks, SHA-256 digests, per-file changes,
+and the checkpoint's repository license context are in PROVENANCE.json.

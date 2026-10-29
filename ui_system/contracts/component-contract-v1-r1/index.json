@@ -1,0 +1,52 @@
+{
+  "kind": "vapor-lock-fixed-component-schema-resources",
+  "revision": "component-contract-v1-r1",
+  "sourceAdoptionIndexSHA256": "42543931423d6708292e856e2eabf76688d6c2b7cade91dc0bd20ca78f8b6fd8",
+  "baseContractIndexSHA256": "8798d95932c84552634232cbb4eadd72dd4b3e164494a1c5897de714a6674106",
+  "registrySHA256": "22a3c761d9afc132e6307c2398cbbcee4b8f57ab783daf67b1f8db53dfe50891",
+  "sourceMapIndexSHA256": "9adb329b4932c8f93cf7106c5e3dcaf8e2af68f84d2f3d99933b882c627c4710",
+  "files": [
+    {
+      "path": "components-v1.json",
+      "bytes": 69500,
+      "sha256": "22a3c761d9afc132e6307c2398cbbcee4b8f57ab783daf67b1f8db53dfe50891"
+    },
+    {
+      "path": "css-policy.json",
+      "bytes": 10100,
+      "sha256": "4da62d3f44944913c64d8f8fa339c44f8111080ac3f59f4db161a74182df9c22"
+    },
+    {
+      "path": "layout.schema.json",
+      "bytes": 14736,
+      "sha256": "a0439648d9a158a8b136f34732097f690923d9a4c93787889b68b4f1d04bc48f"
+    },
+    {
+      "path": "manifest.schema.json",
+      "bytes": 2281,
+      "sha256": "a7e29c31033f8b25dcb7f6bf6af3813921d19f270bf004197ce78aa5d1063af0"
+    },
+    {
+      "path": "presentation-defaults.json",
+      "bytes": 2447,
+      "sha256": "bf24609609c63a3078f676ac9f1bb5789b886e2b9b93e78dd5b5184815149fe0"
+    },
+    {
+      "path": "semantics.json",
+      "bytes": 8597,
+      "sha256": "a86ca9ed4dc7d90285e6e9e619c34c7fde5c5e45299dfe1c43ae69cac9252ea7"
+    },
+    {
+      "path": "style.schema.json",
+      "bytes": 163906,
+      "sha256": "490c1062ac39ff5a3bacb93c6323fa614dd567def16e3eb7ec771813a28c18c1"
+    },
+    {
+      "path": "tokens.json",
+      "bytes": 2309,
+      "sha256": "5da3132089d713c41aa3146fd094816a69358c2f665b0fda374144bf49d234e4"
+    }
+  ],
+  "fileCount": 8,
+  "declaredBytes": 273876
+}

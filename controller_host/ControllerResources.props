@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project>
+  <ItemGroup>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0000.bin">
+      <LogicalName>VaporLock.ControllerResources.appxpackaging.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0001.bin">
+      <LogicalName>VaporLock.ControllerResources.appxsip.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0002.bin">
+      <LogicalName>VaporLock.ControllerResources.HIDMaestro.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0003.bin">
+      <LogicalName>VaporLock.ControllerResources.HMXInput.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0004.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.Kits.Logger.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0005.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.UniversalStore.HardwareWorkflow.Cabinets.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0006.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.UniversalStore.HardwareWorkflow.Catalogs.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0007.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.UniversalStore.HardwareWorkflow.InfReader.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0008.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.UniversalStore.HardwareWorkflow.SubmissionBuilder.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0009.bin">
+      <LogicalName>VaporLock.ControllerResources.mssign32.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0010.bin">
+      <LogicalName>VaporLock.ControllerResources.opcservices.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0011.bin">
+      <LogicalName>VaporLock.ControllerResources.wintrust.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0013.bin">
+      <LogicalName>VaporLock.ControllerResources.hidmaestro.inf</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0014.bin">
+      <LogicalName>VaporLock.ControllerResources.hidmaestro_xusb.inf</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0015.bin">
+      <LogicalName>VaporLock.ControllerResources.hmswd.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0016.bin">
+      <LogicalName>VaporLock.ControllerResources.Inf2Cat.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0017.bin">
+      <LogicalName>VaporLock.ControllerResources.signtool.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0019.bin">
+      <LogicalName>VaporLock.ControllerResources.inf2cat.exe.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0020.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.Windows.Build.Appx.AppxPackaging.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0021.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.Windows.Build.Appx.AppxSip.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0022.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.Windows.Build.Appx.OpcServices.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0023.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.Windows.Build.Signing.mssign32.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0024.bin">
+      <LogicalName>VaporLock.ControllerResources.Microsoft.Windows.Build.Signing.wintrust.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0025.bin">
+      <LogicalName>VaporLock.ControllerResources.signtool.exe.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0027.bin">
+      <LogicalName>VaporLock.ControllerResources.WindowsProtectedFiles.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="hidmaestro_integration\resources\resource-0028.bin">
+      <LogicalName>VaporLock.ControllerResources.wintrust.dll.ini</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>

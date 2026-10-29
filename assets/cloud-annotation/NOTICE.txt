@@ -1,0 +1,8 @@
+Light HQ-SAM inference subset for Cloud Studio 4.0.0.
+Upstream: https://github.com/SysCV/sam-hq
+Pinned commit: e696978d60352dc9a26b12631cd91781502c6546
+Copyright notices in the original source files are retained.
+Code and model release: Apache License 2.0; see LICENSE and model provenance.
+TinyViT includes Copyright (c) 2022 Microsoft, MIT; see LICENSE-TinyViT.txt.
+Local changes are recorded with exact upstream and bundled hashes in PROVENANCE.json.
+This annotation assistant is not included in trained .cloud weights.

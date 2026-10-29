@@ -1,0 +1,37 @@
+// Community project source: https://github.com/VaporUnlocked/VaporLock
+#include <windows.h>
+#include "@CMAKE_SOURCE_DIR@/source/resource_ids.h"
+
+IDR_SWAT RCDATA "@CMAKE_SOURCE_DIR@/assets/characters/SWAT.glb"
+IDR_FONT RCDATA "@CMAKE_SOURCE_DIR@/assets/fonts/Interface.ttf"
+IDR_LICENSES RCDATA "@CMAKE_SOURCE_DIR@/BUNDLED_LICENSES.txt"
+IDR_MODEL_GUIDE RCDATA "@CMAKE_SOURCE_DIR@/MODEL_GUIDE.txt"
+IDR_PORTABLE_GUIDE RCDATA "@CMAKE_SOURCE_DIR@/PORTABLE-README.txt"
+GLFW_ICON ICON "@CMAKE_SOURCE_DIR@/assets/Suite.ico"
+
+1 VERSIONINFO
+ FILEVERSION 1,1,0,0
+ PRODUCTVERSION 1,1,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904b0"
+  BEGIN
+   VALUE "FileDescription", "Vapor Lock Aim Testing Suite"
+   VALUE "FileVersion", "1.1.0.0"
+   VALUE "InternalName", "AimTestingSuite"
+   VALUE "OriginalFilename", "Aim Testing Suite.exe"
+   VALUE "ProductName", "Vapor Lock Aim Testing Suite"
+   VALUE "ProductVersion", "1.1.0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x0409, 1200
+ END
+END

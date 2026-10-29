@@ -1,0 +1,60 @@
+VaporLock Noncommercial Source License 1.0
+Copyright (c) 2026 Cloudy.Tired.Days and the respective contributors.
+
+1. Scope and permission
+For original VaporLock code, documentation and assets that their copyright
+holders make available under this license (the "Work"), permission is granted,
+without charge, to use, study, copy, modify, build and redistribute the Work
+and derivative works solely for noncommercial purposes, subject to these terms.
+Source inspection, reverse engineering of the Work, interoperability research,
+personal use and free community contributions are permitted under this grant.
+No VaporLock account, license key, paid edition or publisher-hosted service is
+required to exercise these permissions in this source release.
+
+2. No monetization
+Without separate written permission from the relevant copyright holders, you
+must not sell, rent, sublicense for payment, monetize or otherwise exploit the
+Work, any part of it, or a derivative work for commercial advantage or financial
+compensation. This includes paid forks, paid features, paid access, paid hosting
+or services using the Work, bundled sales, advertising or affiliate revenue
+attributable to distribution or use of the Work, and payments or donations
+solicited in exchange for access, development or support of the Work or a fork.
+Free distribution alone does not authorize indirect monetization. Incorporating
+the Work into another product does not remove these restrictions.
+
+3. Redistribution and changes
+Retain this license and applicable copyright and attribution notices with all
+copies and substantial portions. Make the corresponding source of your changes
+available under these same terms when distributing a modified version. Identify
+your changes and do not imply endorsement by VaporLock or its original authors.
+Do not add technical restrictions that prevent recipients exercising this grant.
+No rights to third-party trademarks or misleading use of the VaporLock name are
+granted. Rights not expressly granted are reserved.
+
+4. Third-party material and independent work
+Separately licensed dependencies, vendor code, fonts, models and assets retain
+their own licenses. This license neither relicenses them nor restricts rights
+their licenses grant independently. It cannot authorize a combination prohibited
+by a third-party license. See THIRD_PARTY_NOTICES.md. Independently authored
+datasets, annotations, inputs and outputs are not automatically covered merely
+because a user processed them with the Work; incorporated licensed material
+remains subject to its applicable terms.
+
+5. No warranty or service promise
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS AND COPYRIGHT HOLDERS ARE
+NOT LIABLE FOR CLAIMS, DAMAGES OR OTHER LIABILITY ARISING FROM THE WORK OR ITS
+USE. NO CONTINUED MAINTENANCE, HOSTED SERVICE, SUPPORT, COMPATIBILITY, MODEL
+ACCURACY OR PERFORMANCE IS PROMISED. MANDATORY LEGAL RIGHTS ARE NOT EXCLUDED.
+Users are responsible for lawful, authorized use and rules of their environment.
+
+6. Termination and severability
+Permissions terminate if you materially breach these terms. Termination does
+not remove obligations concerning copies already distributed. If a provision
+is held invalid or unenforceable, the remaining provisions remain effective to
+the extent permitted by law. This license applies to this source release and
+does not retroactively alter third-party rights or earlier purchase obligations.
+
+This is a noncommercial source-available license, not an OSI-approved open-source
+license. Copyright restrictions are legal terms, not software activation gates.

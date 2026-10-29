@@ -1,0 +1,11 @@
+# Source GUI dependencies. Optional model/annotation runtimes are separate venvs.
+PySide6>=6.9,<7
+numpy>=1.26,<3
+Pillow>=10,<14
+opencv-python-headless>=4.10,<5
+PyYAML>=6,<7
+requests>=2.32,<3
+cryptography>=44
+psutil>=6
+packaging>=24
+tinycss2>=1.4,<2

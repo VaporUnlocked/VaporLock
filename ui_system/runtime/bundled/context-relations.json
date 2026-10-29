@@ -1,0 +1,142 @@
+{
+  "status": "DESCRIPTIVE direction proposal only; no executable relational validator or observed fixture verdict",
+  "ref": {
+    "unknown/none": "displayId null; no label in semantic ref",
+    "known": "canonical lowercase UUIDv4; exactly one separately projected label except box",
+    "role": "derive from semantic ref TYPE; same ID always has the same role"
+  },
+  "runtime": {
+    "unknown": "revision unknown",
+    "checking/missing/installing/ready/failed/stale": "revision known; reported controller fact, no inferred readiness"
+  },
+  "modelResult": {
+    "unknown/none": "operationId corresponding unknown/none; blank unknown captured context; outcome/freshness/staleReason/actualProvider unknown",
+    "pending/running": "operationId/model/config known; outcome unknown; captured current or explicitly stale; actualProvider unknown; input/capture setting refs known; actualProvider unknown",
+    "passed": "operationId/model/config known; outcome ok; inspect actualProvider unknown, validate concrete actualProvider; input/capture setting refs known",
+    "failed": "known operation/model/config; inspect outcome invalid-model/operation-failed; validate also runtime-unavailable; inspect actualProvider unknown; input/capture refs known; validate provider unknown unless reported by this invocation",
+    "cancelled": "known operation/model/config; outcome cancelled; inspect actualProvider unknown; input/capture refs known; validate provider unknown unless reported by this invocation",
+    "fieldScopes": "inspectionResult inspect/model-structure; validationResult validate/model-runtime; never copy inspection pass to validation",
+    "freshness": "captured semantic configuration equals current =>current/none; differs =>stale/configuration-changed; projection-only changes preserve it",
+    "clearPending": "new request/config epoch; old completions fenced; no model =>none, known model =>new pending record",
+    "providerProvenance": "private native invocation fact; never preferred/current inference; not proved by serialized concrete provider"
+  },
+  "preflight": {
+    "unknown/none": "requestId corresponding unknown/none; config/baseModel/dataset unknown; outcome/freshness/staleReason unknown",
+    "pending/running": "known request/config/dataset, baseModel known or none, outcome unknown",
+    "passed": "same refs; outcome ok; dataset-check only, no model compatibility/readiness proof",
+    "failed": "same refs; outcome invalid-dataset/runtime-unavailable/operation-failed",
+    "cancelled": "same refs; outcome cancelled",
+    "freshness": "current config/dataset/baseModel exactly match prospective =>current/none; otherwise stale/configuration-changed preserving outcome"
+  },
+  "trainingJob": {
+    "unknown/none": "operation/all refs/DeviceRef corresponding unknown/none; outcome unknown",
+    "preparing/running/stopping": "known job/config; operation-specific refs; outcome unknown",
+    "completed": "known job/config plus operation refs; outcome ok",
+    "cancelled": "known job/config plus operation refs; outcome cancelled",
+    "failed": "known job/config and operation-specific refs; fixed outcome from operationFailures",
+    "train": "known run/baseModel/dataset/DeviceRef; device projection curated, native choice captured privately",
+    "dataset-check": "dataset known; run/baseModel/DeviceRef none",
+    "runtime-check/runtime-install": "run/baseModel/dataset/DeviceRef none",
+    "selectedCurrent": "ALL fields equal local-training.activeJob; known nonempty operation",
+    "selectedHistorical": "known terminal completed/cancelled/failed record, same operation matrix; not current readiness",
+    "selectedUnknown/None": "corresponding empty job envelope"
+  },
+  "benchmark": {
+    "unknown": "benchmark unknown, captured blank unknown, list empty, counts null, outcome/freshness/staleReason unknown",
+    "none": "benchmark none, captured blank unknown, list empty, counts0, outcome/freshness/staleReason unknown",
+    "preparing/running/stopping": "known benchmark/captured model/config,1..4 distinct providers;0<=successes<=completed<=list length; outcome unknown",
+    "completed": "same known refs; nonempty list; completed=list length; outcome ok iff successes>0, otherwise operation-failed/runtime-unavailable",
+    "failed": "known refs; empty list permitted; counts bounded; outcome invalid-model/runtime-unavailable/operation-failed",
+    "cancelled": "known refs; nonempty list; counts bounded; outcome cancelled",
+    "freshness": "captured semantic configuration equals current =>current/none; differs =>stale/configuration-changed; projection-only changes preserve it",
+    "zeroSuccessfulPresentation": "completed attempts with zero successes display failure; no successful-provider readiness claim"
+  },
+  "datasetJob": {
+    "unknown/none": "operation/all refs corresponding unknown/none; outcome unknown",
+    "preparing/running/stopping": "known job/config/dataset; outcome unknown",
+    "completed": "known job/config/dataset; outcome ok",
+    "cancelled": "known job/config/dataset; outcome cancelled",
+    "failed": "known job/config/dataset; fixed outcome from operationFailures",
+    "annotate": "annotationModel known, including resolved detection fallback at launch",
+    "archive": "annotationModel none; no model passed to native package invocation"
+  },
+  "collectionSource": {
+    "unknown": "unknown availability",
+    "none": "unknown/unavailable only; unavailable means no source selected, not observed probe failure",
+    "known": "any availability; never infer available from permissions"
+  },
+  "review": {
+    "datasetUnknown": "image unknown; box not known; decision/unsaved unknown",
+    "datasetNone": "image none; box not known; decision/unsaved unknown",
+    "imageKnown": "dataset known",
+    "imageUnknown/None": "box not known; decision/unsaved unknown; class/zoom may remain known without action target",
+    "boxKnown": "known dataset/image, known canonical box ID and integer ordinal0..2147483647",
+    "boxUnknown/None": "ID/ordinal null",
+    "nonunknownDecision/nonunknownUnsaved": "known dataset and image",
+    "targetChange": "advance selection revision on dataset/image/box/class/decision/unsaved target change; native expected target/revision checked independently"
+  },
+  "crossCurrent": [
+    "model-inspection.current ==provider-benchmark.current ==official-models.current in every field",
+    "official-models.selectedTrainingBaseModel ==local-training.prospective.baseModel",
+    "training-status selected attribution current ==local-training.activeJob in all job fields including state/outcome",
+    "Equal IDs never imply equal entity role across unrelated typed refs; compare actual type role"
+  ],
+  "projection": {
+    "entityLabels": "exact known-ref ID/role set excluding boxes; each ID once; no extras; max80",
+    "configurationSummaries": "exact distinct known complete ModelConfiguration config-ID set; max12",
+    "sameCompleteConfiguration": "same model/input-subset/capture-subset/preferredProvider semantic facts; separately captured runtime may change revision",
+    "renameLocale": "projection and sequence only; all group facts, IDs, outcomes, freshness and private operation/selection epochs unchanged",
+    "freshness": "exact captured/current SEMANTIC configuration, never display labels or summaries",
+    "bounds": "entire byte/primitive limits include both groups and all projection records"
+  },
+  "operationFailures": {
+    "inspect": [
+      "invalid-model",
+      "operation-failed"
+    ],
+    "validate": [
+      "invalid-model",
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "benchmark": [
+      "invalid-model",
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "train": [
+      "invalid-model",
+      "invalid-dataset",
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "dataset-check": [
+      "invalid-dataset",
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "runtime-check": [
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "runtime-install": [
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "annotate": [
+      "invalid-model",
+      "invalid-dataset",
+      "runtime-unavailable",
+      "operation-failed"
+    ],
+    "archive": [
+      "invalid-dataset",
+      "operation-failed"
+    ]
+  },
+  "visibility": {
+    "hiddenWholePanel": "permitted; context travels with panel",
+    "visibleOrRevealedPanel": "protected context strip, reserved200% space, no strip-only hiding/cropping/opacity",
+    "nativeControls": "independent and reachable; Reveal/reset/rollback/focus contract preserved"
+  }
+}

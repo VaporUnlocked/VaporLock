@@ -1,0 +1,52 @@
+{
+  "proposalVersion": 1,
+  "kind": "native-smokey-defaults-only-revision",
+  "baseContract": "contract-v1-r4",
+  "nativeReferenceManifestSHA256": "272035b26fc0bb76fb4367bb6bd3b9aeff36cb50c0430825b081f7dc7e257cf1",
+  "grammarChanges": [],
+  "defaults": {
+    "--vl-accent": "#7dbcf5",
+    "--vl-accent-secondary": "#7dbcf5",
+    "--vl-background": "#080b12",
+    "--vl-panel": "rgba(8,11,18,0.678431)",
+    "--vl-text": "#f2f6fa",
+    "--vl-text-muted": "#b4bfcd",
+    "--vl-border": "#708498",
+    "--vl-radius": "4px",
+    "--vl-blur": "0px",
+    "--vl-glass-strength": 0.68,
+    "--vl-border-width": "1px",
+    "--vl-spacing": "9px",
+    "--vl-ui-scale": 1,
+    "--vl-font": "Segoe UI Variable",
+    "--vl-animation-intensity": 0,
+    "--vl-shadow-color": "rgba(0,0,0,0)",
+    "--vl-shadow-blur": "0px",
+    "--vl-shadow-spread": "0px",
+    "--vl-glow-color": "rgba(125,188,245,0)",
+    "--vl-glow-blur": "0px",
+    "--vl-gradient-start": "rgba(8,11,18,0.678431)",
+    "--vl-gradient-end": "rgba(8,11,18,0.678431)",
+    "--vl-gradient-angle": "135deg"
+  },
+  "presentationRules": {
+    "fontMapping": {"Segoe UI Variable": "Segoe UI Variable Text"},
+    "fallbackFonts": ["Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans", "sans-serif"],
+    "baseFontCSSPixelsAt96DPI": 13.333333333333334,
+    "backgroundSHA256": "9e10189ae2c17764e5fd68b8b05be061e4d20595d032b47ced6dd7ac545297a3",
+    "backgroundFit": "centered cover over continuous whole application surface",
+    "film": {"color": "#080b12", "alpha255": 91},
+    "chrome": {"color": "#080b12", "alpha255": 230},
+    "cards": {"color": "#080b12", "alpha255": 173},
+    "nestedCards": "transparent within the outer glass surface",
+    "fieldAndButtonRadiusCSSPixels": 5,
+    "checkbox": {"sideCSSPixels": 18, "radiusCSSPixels": 3},
+    "gradients": "Default export omits gradient tokens unless explicitly authored; these fallback values add no gradient by themselves.",
+    "protectedChrome": "Native command/status/policy/recovery surfaces remain outside theme layout/CSS authority. Browser chrome is a synthetic visual representation only."
+  },
+  "limitations": [
+    "Proposal for a new immutable contract revision; existing r4 schemas and accepted fixtures are unchanged.",
+    "No theme import, media decode, CSS/layout runtime or release activation is authorized by this proposal.",
+    "Per-widget style roles and actual DOM results still require Design review."
+  ]
+}

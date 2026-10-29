@@ -1,0 +1,790 @@
+{
+  "mapVersion": 1,
+  "scope": "trusted build-time presentation map; no theme or command authority",
+  "registrySHA256": "22a3c761d9afc132e6307c2398cbbcee4b8f57ab783daf67b1f8db53dfe50891",
+  "descriptorSHA256": "7de01ca76c1184b8bd9856cf35840b85db77f2257dcf6f556e55a9a2bec4e8b9",
+  "components": [
+    {
+      "id": "workspace",
+      "defaultParent": null,
+      "originPage": null,
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "trusted-generated-shell",
+      "detail": null
+    },
+    {
+      "id": "sidebar",
+      "defaultParent": "workspace",
+      "originPage": null,
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "trusted-generated-shell",
+      "detail": null
+    },
+    {
+      "id": "navigation",
+      "defaultParent": "sidebar",
+      "originPage": null,
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "trusted-generated-shell",
+      "detail": null
+    },
+    {
+      "id": "settings",
+      "defaultParent": "navigation",
+      "originPage": null,
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "trusted-generated-shell",
+      "detail": null
+    },
+    {
+      "id": "settings-guide",
+      "defaultParent": "sidebar",
+      "originPage": null,
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "trusted-generated-shell",
+      "detail": null
+    },
+    {
+      "id": "workspace-header",
+      "defaultParent": "workspace",
+      "originPage": null,
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "trusted-generated-shell",
+      "detail": null
+    },
+    {
+      "id": "appearance",
+      "defaultParent": "workspace",
+      "originPage": "appearance",
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "new-view-not-yet-implemented",
+      "detail": null
+    },
+    {
+      "id": "my-themes",
+      "defaultParent": "appearance",
+      "originPage": "appearance",
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "new-view-not-yet-implemented",
+      "detail": null
+    },
+    {
+      "id": "general-settings",
+      "defaultParent": "workspace",
+      "originPage": "general-settings",
+      "route": null,
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "new-view-not-yet-implemented",
+      "detail": null
+    },
+    {
+      "id": "profile-card",
+      "defaultParent": "dashboard",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "new-view-not-yet-implemented",
+      "detail": null
+    },
+    {
+      "id": "connection-status",
+      "defaultParent": "dashboard",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [],
+      "kind": "new-view-not-yet-implemented",
+      "detail": null
+    },
+    {
+      "id": "dashboard",
+      "defaultParent": "workspace",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/9"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "model-library",
+      "defaultParent": "workspace",
+      "originPage": "model-library",
+      "route": "model",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/8"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "detection-settings",
+      "defaultParent": "workspace",
+      "originPage": "detection-settings",
+      "route": "detection",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/7"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "targeting-settings",
+      "defaultParent": "workspace",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "movement-settings",
+      "defaultParent": "workspace",
+      "originPage": "movement-settings",
+      "route": "output",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/5"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "training-data",
+      "defaultParent": "workspace",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "profiles",
+      "defaultParent": "workspace",
+      "originPage": "profiles",
+      "route": "profiles",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/3"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "shortcuts",
+      "defaultParent": "workspace",
+      "originPage": "shortcuts",
+      "route": "shortcuts",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/2"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "api-suite",
+      "defaultParent": "workspace",
+      "originPage": "api-suite",
+      "route": "automation",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/1"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "diagnostics",
+      "defaultParent": "workspace",
+      "originPage": "diagnostics",
+      "route": "diagnostics",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "readiness",
+      "defaultParent": "dashboard",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/9/0/0/0/1",
+        "root/2/1/0/9/0/0/0/2"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "session-summary",
+      "defaultParent": "dashboard",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/9/0/0/0/3",
+        "root/2/1/0/9/0/0/0/4",
+        "root/2/1/0/9/0/0/0/5",
+        "root/2/1/0/9/0/0/0/6",
+        "root/2/1/0/9/0/0/0/7"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "testing-suite",
+      "defaultParent": "dashboard",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/9/0/0/0/8"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "system-monitor",
+      "defaultParent": "dashboard",
+      "originPage": "dashboard",
+      "route": "overview",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/9/0/0/0/9",
+        "root/2/1/0/9/0/0/0/10",
+        "root/2/1/0/9/0/0/0/11",
+        "root/2/1/0/9/0/0/0/12",
+        "root/2/1/0/9/0/0/0/13"
+      ],
+      "kind": "native-derived-group",
+      "detail": "Session telemetry; no CPU/memory claims"
+    },
+    {
+      "id": "official-models",
+      "defaultParent": "model-library",
+      "originPage": "model-library",
+      "route": "model",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/8/0/0/0/4",
+        "root/2/1/0/8/0/0/0/5",
+        "root/2/1/0/8/0/0/0/6",
+        "root/2/1/0/8/0/0/0/7"
+      ],
+      "kind": "native-derived-group",
+      "detail": "Local/official chooser launcher; actual dialogs are separate"
+    },
+    {
+      "id": "model-inspection",
+      "defaultParent": "model-library",
+      "originPage": "model-library",
+      "route": "model",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/8/0/0/0/8",
+        "root/2/1/0/8/0/0/0/9",
+        "root/2/1/0/8/0/0/0/10",
+        "root/2/1/0/8/0/0/0/11"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "provider-benchmark",
+      "defaultParent": "model-library",
+      "originPage": "model-library",
+      "route": "model",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/8/0/0/0/12"
+      ],
+      "kind": "native-derived-group",
+      "detail": "Canonical benchmark row only; provider selection remains page-owned"
+    },
+    {
+      "id": "target-preview",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": null,
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/0/0/5"
+      ],
+      "kind": "native-derived-group",
+      "detail": "Sole cockpit policy_preview_view canvas plus its existing footer"
+    },
+    {
+      "id": "capture-settings",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": null,
+      "inspector": "Capture",
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/0/1/3/2"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "capture-controls",
+      "defaultParent": "capture-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": null,
+      "inspector": "Capture",
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/0/1/3/2/0/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "movement-tuning",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": null,
+      "inspector": "Tuning",
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/0/1/3/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "target-policy",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Policy",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/7"
+      ],
+      "kind": "native-derived-group",
+      "detail": "Policy inspector is secondary page-owned view, not this ID"
+    },
+    {
+      "id": "tracking-controls",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Tracking",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/6"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "preview",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Preview",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/4"
+      ],
+      "kind": "native-derived-group",
+      "detail": "Tab body; no fabricated preview_view canvas"
+    },
+    {
+      "id": "preview-controls",
+      "defaultParent": "preview",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Preview",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/4/0/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "annotation-controls",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Annotations",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/3"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "overlay-settings",
+      "defaultParent": "targeting-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Desktop overlay",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/2"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "overlay-editor",
+      "defaultParent": "overlay-settings",
+      "originPage": "targeting-settings",
+      "route": "selection",
+      "tab": "Desktop overlay",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/3",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/4",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/5",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/6",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/7",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/8",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/9",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/10",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/11",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/12",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/13",
+        "root/2/1/0/6/0/0/0/2/1/2/0/0/14"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "activation-controls",
+      "defaultParent": "movement-settings",
+      "originPage": "movement-settings",
+      "route": "output",
+      "tab": "Control",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/5/0/0/0/1/1/3"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "transport-controls",
+      "defaultParent": "movement-settings",
+      "originPage": "movement-settings",
+      "route": "output",
+      "tab": "Transport",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/5/0/0/0/1/1/2"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "event-controls",
+      "defaultParent": "movement-settings",
+      "originPage": "movement-settings",
+      "route": "output",
+      "tab": "Events",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/5/0/0/0/1/1/1"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "output-diagnostics",
+      "defaultParent": "movement-settings",
+      "originPage": "movement-settings",
+      "route": "output",
+      "tab": "Diagnostics",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/5/0/0/0/1/1/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "data-collection",
+      "defaultParent": "training-data",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": "Collection",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4/0/0/0/1/1/3"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "data-review",
+      "defaultParent": "training-data",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": "Review",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4/0/0/0/1/1/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "annotation-canvas",
+      "defaultParent": "data-review",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": "Review",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4/0/0/0/1/1/0/0/0/6/1"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "training-tools",
+      "defaultParent": "training-data",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": "Ultralytics",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "local-training",
+      "defaultParent": "training-tools",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": "Ultralytics",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/10",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/11",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/12",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/13",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/14",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/15",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/16",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/17",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/18",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/19",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/20",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/21",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/22",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/23",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/24",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/25",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/26",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/27",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/28",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/29",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/30",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/31",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/32",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/33",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/34",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/35"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    },
+    {
+      "id": "training-status",
+      "defaultParent": "training-tools",
+      "originPage": "training-data",
+      "route": "dataset",
+      "tab": "Ultralytics",
+      "inspector": null,
+      "sourceRoots": [
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/36",
+        "root/2/1/0/4/0/0/0/1/1/1/0/1/0/0/0/37"
+      ],
+      "kind": "native-derived-group",
+      "detail": null
+    }
+  ],
+  "workspaceHeaderAnchors": {
+    "overview": {
+      "slotSource": "root/2/1/0/9/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/9/0/0/0/0/0",
+        "root/2/1/0/9/0/0/0/0/1"
+      ],
+      "sourceOwner": "dashboard",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "model": {
+      "slotSource": "root/2/1/0/8/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/8/0/0/0/0/0",
+        "root/2/1/0/8/0/0/0/0/1"
+      ],
+      "sourceOwner": "model-library",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "detection": {
+      "slotSource": "root/2/1/0/7/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/7/0/0/0/0/0",
+        "root/2/1/0/7/0/0/0/0/1"
+      ],
+      "sourceOwner": "detection-settings",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "selection": {
+      "slotSource": "root/2/1/0/6/0/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/6/0/0/0/0/0/0",
+        "root/2/1/0/6/0/0/0/0/0/1"
+      ],
+      "sourceOwner": "targeting-settings",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "output": {
+      "slotSource": "root/2/1/0/5/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/5/0/0/0/0/0",
+        "root/2/1/0/5/0/0/0/0/1"
+      ],
+      "sourceOwner": "movement-settings",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "dataset": {
+      "slotSource": "root/2/1/0/4/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/4/0/0/0/0/0",
+        "root/2/1/0/4/0/0/0/0/1"
+      ],
+      "sourceOwner": "training-data",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "profiles": {
+      "slotSource": "root/2/1/0/3/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/3/0/0/0/0/0",
+        "root/2/1/0/3/0/0/0/0/1"
+      ],
+      "sourceOwner": "profiles",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "shortcuts": {
+      "slotSource": "root/2/1/0/2/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/2/0/0/0/0/0",
+        "root/2/1/0/2/0/0/0/0/1"
+      ],
+      "sourceOwner": "shortcuts",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "automation": {
+      "slotSource": "root/2/1/0/1/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/1/0/0/0/0/0",
+        "root/2/1/0/1/0/0/0/0/1"
+      ],
+      "sourceOwner": "api-suite",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    },
+    "diagnostics": {
+      "slotSource": "root/2/1/0/0/0/0/0/0",
+      "suppressDefaultTextSources": [
+        "root/2/1/0/0/0/0/0/0/0",
+        "root/2/1/0/0/0/0/0/0/1"
+      ],
+      "sourceOwner": "diagnostics",
+      "headerOwnsSources": false,
+      "descriptionAndTelemetryRemainPageOwned": true,
+      "relocatedFallback": "page-owned primary title returns; global context secondary; one active H1"
+    }
+  },
+  "completeOperationalBindings": false,
+  "newViewsImplemented": false,
+  "mediaCSSLayoutActivation": false
+}

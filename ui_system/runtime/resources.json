@@ -1,0 +1,205 @@
+{
+  "resourceVersion": 1,
+  "resources": [
+    {
+      "url": "vlapp://client/data/component-map.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 22925,
+      "sha256": "673635b43e4899332e957fc7616f2b6910a81c40b445601c5438105c9ac2e1e6",
+      "file": "ui_system/runtime/component-map-014.json"
+    },
+    {
+      "url": "vlapp://client/data/components.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 69500,
+      "sha256": "22a3c761d9afc132e6307c2398cbbcee4b8f57ab783daf67b1f8db53dfe50891",
+      "file": "ui_system/runtime/bundled/components.json"
+    },
+    {
+      "url": "vlapp://client/data/context-contract.json",
+      "file": "ui_system/runtime/bundled/context-contract.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 21454,
+      "sha256": "2f140c2a3cd3bfa71154f579a767fe9fa12c37baa8a6f88c95f2fceb97666f78"
+    },
+    {
+      "url": "vlapp://client/data/context-index.json",
+      "file": "ui_system/runtime/bundled/context-index.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 10197,
+      "sha256": "6f33c470c2070d936b86a1d117bf190a412e9cce8195c13c1a783a24b869b04c"
+    },
+    {
+      "url": "vlapp://client/data/context-relations.json",
+      "file": "ui_system/runtime/bundled/context-relations.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 8648,
+      "sha256": "b2c2d95a383637d2fd52387b5efa0b5b402ea6727d73d8aa5c75ab78fc2e895e"
+    },
+    {
+      "url": "vlapp://client/data/presentation.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 2903577,
+      "sha256": "cca4ea58bd958dce68a128c156f4f21229b85e1548a78da63c5e1cbe0e5e875f",
+      "file": "ui_system/runtime/native-presentation-014.json"
+    },
+    {
+      "url": "vlapp://client/data/translations.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 621716,
+      "sha256": "f5e34691fa581d4b8673f1355ebbfb3367ca84e801cd53d9da4858599c485ea5",
+      "file": "ui_system/runtime/annotation-translations.json"
+    },
+    {
+      "url": "vlapp://client/ui/assets/SmokeyGlass.png",
+      "mime": "image/png",
+      "requestType": "Image",
+      "bytes": 1529613,
+      "sha256": "9e10189ae2c17764e5fd68b8b05be061e4d20595d032b47ced6dd7ac545297a3",
+      "file": "ui_system/runtime/bundled/SmokeyGlass.png"
+    },
+    {
+      "url": "vlapp://client/ui/assets/arrow-down-light.svg",
+      "mime": "image/svg+xml",
+      "requestType": "Image",
+      "bytes": 207,
+      "sha256": "142deeb0286c533bbe637a2ccada50a9dfe87feed91f92ac4b3059d22faae774",
+      "file": "ui_system/runtime/bundled/arrow-down-light.svg"
+    },
+    {
+      "url": "vlapp://client/ui/assets/arrow-up-light.svg",
+      "mime": "image/svg+xml",
+      "requestType": "Image",
+      "bytes": 207,
+      "sha256": "92317e9a4f5675b9d67c4f3ffbe6f2b91a1960ce3744b4d3d2e7c0b672c6e18c",
+      "file": "ui_system/runtime/bundled/arrow-up-light.svg"
+    },
+    {
+      "url": "vlapp://client/ui/assets/check-dark.svg",
+      "mime": "image/svg+xml",
+      "requestType": "Image",
+      "bytes": 186,
+      "sha256": "4676fa9fa30f3ae18fc9096c2b96c662028ccd6aa89f994d4fd82a42e68049be",
+      "file": "ui_system/runtime/bundled/check-dark.svg"
+    },
+    {
+      "url": "vlapp://client/ui/live-adapter.js",
+      "file": "ui_system/runtime/live-adapter.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 139882,
+      "sha256": "a623b94a472606de4a1b6534366ed07b30bfaf6681fd07086d79f003e1da8d68"
+    },
+    {
+      "url": "vlapp://client/ui/live.html",
+      "file": "ui_system/runtime/live.html",
+      "mime": "text/html",
+      "requestType": "MainFrame",
+      "bytes": 2824,
+      "sha256": "e7b09c6afe37d78ec768207e5e2ce603e1d1ff13eb651853cc1a1c449f01ff4a"
+    },
+    {
+      "url": "vlapp://client/ui/native-canvases.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 13000,
+      "sha256": "14c0f3c8f8234b1b080e9ab62893aec9fdc918e7154511ec13e4e96648c852f3",
+      "file": "ui_system/runtime/bundled/native-canvases.js"
+    },
+    {
+      "url": "vlapp://client/ui/native-component-copy.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 13700,
+      "sha256": "1d5b28c1a473088cae5faef294fa6e966fb1680ca707c3c227fbf28453a24e15",
+      "file": "ui_system/runtime/bundled/native-component-copy.json"
+    },
+    {
+      "url": "vlapp://client/ui/native-component-renderer.css",
+      "mime": "text/css",
+      "requestType": "Stylesheet",
+      "bytes": 3719,
+      "sha256": "e42a0b0292cc30c83c595d274518712d3779cebef368150a63ded5fd56f7579f",
+      "file": "ui_system/runtime/bundled/native-component-renderer.css"
+    },
+    {
+      "url": "vlapp://client/ui/native-component-renderer.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 64745,
+      "sha256": "37672626453abea6685fdeaa93e0de1dae879f7773ff8bbb930756b87b1f5c02",
+      "file": "ui_system/runtime/native-component-renderer-014.js"
+    },
+    {
+      "url": "vlapp://client/ui/native-component-views.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 14263,
+      "sha256": "cf5fe0d3507a47550c0ffb2a0177c3c43f224f50195283c2d9b3c9840aad513f",
+      "file": "ui_system/runtime/bundled/native-component-views.js"
+    },
+    {
+      "url": "vlapp://client/ui/native-components.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 7510,
+      "sha256": "572c283fead4873e530c4f8b678803190e95fc609d05cdbd100c3a975674ca94",
+      "file": "ui_system/runtime/native-components-014.js"
+    },
+    {
+      "url": "vlapp://client/ui/native-copy.json",
+      "mime": "application/json",
+      "requestType": "Xhr",
+      "bytes": 217050,
+      "sha256": "2572087788d3c598d6cc5b4fb684d4dba5597cfc36849d82e8c145cf19521569",
+      "file": "ui_system/runtime/annotation-native-copy.json"
+    },
+    {
+      "url": "vlapp://client/ui/native-demo.css",
+      "mime": "text/css",
+      "requestType": "Stylesheet",
+      "bytes": 290,
+      "sha256": "cc99c8944ae1f7319ba5ca9c0f8a958cbaf231a926bdebe08ef19838d24c0dd7",
+      "file": "ui_system/runtime/bundled/native-demo.css"
+    },
+    {
+      "url": "vlapp://client/ui/native-policy.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 4106,
+      "sha256": "7d3de84cabe78f2751bf7696122cac35b7b1280a82398f74f254c53c5bfda2b5",
+      "file": "ui_system/runtime/bundled/native-policy.js"
+    },
+    {
+      "url": "vlapp://client/ui/native-renderer.css",
+      "mime": "text/css",
+      "requestType": "Stylesheet",
+      "bytes": 26999,
+      "sha256": "a5a32e279e3a51665c9c86cd34d05679b6a92f858a92c55564d715b004e2b9e7",
+      "file": "ui_system/runtime/native-renderer-014.css"
+    },
+    {
+      "url": "vlapp://client/ui/qwebchannel.js",
+      "file": "ui_system/runtime/qwebchannel.js",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 16510,
+      "sha256": "0b03bff1a45322862a5fd1567a4b3a73f832b41213cdecdb123c618cca76b0e1"
+    },
+    {
+      "url": "vlapp://client/ui/trusted-context.mjs",
+      "mime": "text/javascript",
+      "requestType": "Script",
+      "bytes": 38348,
+      "sha256": "7d13387ce5f0d7e22fee340ab1b1ad3de8b7f78b65a7289eca4d21b1d89645e9",
+      "file": "ui_system/runtime/bundled/trusted-context.mjs"
+    }
+  ]
+}

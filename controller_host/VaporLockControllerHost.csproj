@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>VaporLockControllerHost</AssemblyName>
+    <RootNamespace>VaporLockControllerHost</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(HIDMaestroDependencyRoot)' == ''">
+    <HIDMaestroDependencyRoot>$(MSBuildThisFileDirectory)..\build\controller-host-deps</HIDMaestroDependencyRoot>
+  </PropertyGroup>
+
+  <!-- The release builder retrieves this pinned, verified dependency. Keeping
+       it outside the source tree makes the normal source checkout small while
+       the Premium portable build remains fully self-contained. -->
+  <ItemGroup>
+    <Compile Remove="hidmaestro_integration\**\*.cs" />
+    <ProjectReference Include="hidmaestro_integration\HIDMaestro.VaporLock.Integration.csproj" />
+    <Reference Include="Microsoft.Windows.SDK.NET">
+      <HintPath>$(HIDMaestroDependencyRoot)\Microsoft.Windows.SDK.NET.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="WinRT.Runtime">
+      <HintPath>$(HIDMaestroDependencyRoot)\WinRT.Runtime.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="profiles\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+  <Import Project="ControllerResources.props" />
+  <!-- A separate acceptance executable, never a production runtime switch. -->
+  <PropertyGroup Condition="'$(ControllerAcceptanceBuild)' == 'true'">
+    <AssemblyName>VaporLockControllerAcceptance</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(ControllerAcceptanceBuild)' == 'true'">
+    <Compile Remove="Program.cs" />
+    <Compile Include="..\tools\ControllerAcceptanceProgram.cs" />
+    <Compile Include="..\tools\ControllerStageRecoveryContract.cs" />
+    <Compile Include="..\tools\ControllerSignedStageRecoveryContract.cs" />
+    <Compile Include="..\tools\ControllerAcceptanceStatus.cs" />
+  </ItemGroup>
+</Project>

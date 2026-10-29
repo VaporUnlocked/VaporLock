@@ -1,0 +1,801 @@
+{
+  "status": "proposal only; descriptive types/matrices, not an executable validator",
+  "revision": "trusted-display-context-v1-r3",
+  "supersedesDirectionIndexSHA256": "d3f009a935088ba75230520dedab7e698aebab4ff20caa2f4c0ff9610c8688c7",
+  "wire": {
+    "encoding": "strict UTF-8 without BOM",
+    "maxBytes": 32768,
+    "maxPrimitiveValues": 512,
+    "input": "private bounded immutable bytes; strict duplicate-key JSON decoder before own closed graph",
+    "rootType": "Snapshot",
+    "types": {
+      "DisplayLabel": {
+        "kind": "string",
+        "minUnicodeScalars": 1,
+        "maxUnicodeScalars": 96,
+        "nullable": true,
+        "wellFormedUnicodeRequired": true,
+        "forbiddenRanges": [
+          [
+            0,
+            31
+          ],
+          [
+            127,
+            159
+          ],
+          [
+            1564,
+            1564
+          ],
+          [
+            8206,
+            8207
+          ],
+          [
+            8232,
+            8238
+          ],
+          [
+            8294,
+            8297
+          ]
+        ],
+        "meaning": "Curated display name only; never private paths, keys, command lines, raw logs or URLs",
+        "normalization": "none; count validated Unicode scalars, not UTF-16 units"
+      },
+      "OpaqueDisplayId": {
+        "kind": "canonical-uuid-v4",
+        "nullable": true,
+        "authority": "none; opaque local display correlation"
+      },
+      "RefState": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "known"
+        ]
+      },
+      "Mode": {
+        "kind": "enum",
+        "values": [
+          "live",
+          "synthetic"
+        ]
+      },
+      "JobState": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "preparing",
+          "running",
+          "stopping",
+          "completed",
+          "cancelled",
+          "failed"
+        ]
+      },
+      "RuntimeState": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "checking",
+          "missing",
+          "installing",
+          "ready",
+          "failed",
+          "stale"
+        ]
+      },
+      "Provider": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "auto",
+          "dml",
+          "cuda",
+          "tensorrt",
+          "cpu"
+        ]
+      },
+      "ComparedProvider": {
+        "kind": "enum",
+        "values": [
+          "dml",
+          "cuda",
+          "tensorrt",
+          "cpu"
+        ]
+      },
+      "CaptureAvailability": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "checking",
+          "available",
+          "unavailable",
+          "stale"
+        ]
+      },
+      "ReviewDecision": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "unreviewed",
+          "accepted",
+          "excluded"
+        ]
+      },
+      "UnsavedState": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "clean",
+          "changed"
+        ]
+      },
+      "PositiveSequence": {
+        "kind": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991,
+        "nullable": false,
+        "booleansAccepted": false
+      },
+      "Ordinal": {
+        "kind": "integer",
+        "minimum": 0,
+        "maximum": 2147483647,
+        "nullable": true,
+        "booleansAccepted": false
+      },
+      "CompletedProviderCount": {
+        "kind": "integer",
+        "minimum": 0,
+        "maximum": 4,
+        "nullable": true,
+        "booleansAccepted": false
+      },
+      "ZoomPercent": {
+        "kind": "integer",
+        "minimum": 100,
+        "maximum": 300,
+        "nullable": true,
+        "booleansAccepted": false
+      },
+      "ComparedProviders": {
+        "kind": "array",
+        "items": "ComparedProvider",
+        "maxItems": 4,
+        "unique": true,
+        "holesAccepted": false
+      },
+      "Version": {
+        "kind": "literal-integer",
+        "value": 1,
+        "booleansAccepted": false
+      },
+      "ModelRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "model"
+      },
+      "DatasetRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "dataset"
+      },
+      "RunRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "run"
+      },
+      "JobRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "job"
+      },
+      "ConfigurationRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "configuration"
+      },
+      "SourceRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "source"
+      },
+      "RuntimeRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "runtime"
+      },
+      "ImageRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "image"
+      },
+      "ClassRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "class"
+      },
+      "Outcome": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "ok",
+          "cancelled",
+          "invalid-model",
+          "invalid-dataset",
+          "runtime-unavailable",
+          "operation-failed"
+        ]
+      },
+      "ResultState": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "pending",
+          "running",
+          "passed",
+          "failed",
+          "cancelled"
+        ]
+      },
+      "Freshness": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "current",
+          "stale"
+        ]
+      },
+      "StaleReason": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "configuration-changed"
+        ]
+      },
+      "Attribution": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "current",
+          "historical"
+        ]
+      },
+      "TrainingOperation": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "train",
+          "dataset-check",
+          "runtime-check",
+          "runtime-install"
+        ]
+      },
+      "DatasetOperation": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "none",
+          "annotate",
+          "archive"
+        ]
+      },
+      "ActualProvider": {
+        "kind": "enum",
+        "values": [
+          "unknown",
+          "dml",
+          "cuda",
+          "tensorrt",
+          "cpu"
+        ]
+      },
+      "InspectOperation": {
+        "kind": "literal-string",
+        "value": "inspect"
+      },
+      "ValidateOperation": {
+        "kind": "literal-string",
+        "value": "validate"
+      },
+      "InspectionScope": {
+        "kind": "literal-string",
+        "value": "model-structure"
+      },
+      "ValidationScope": {
+        "kind": "literal-string",
+        "value": "model-runtime"
+      },
+      "DatasetCheckScope": {
+        "kind": "literal-string",
+        "value": "dataset-check"
+      },
+      "RuntimeFact": {
+        "kind": "closed-object",
+        "fields": {
+          "revision": "RuntimeRef",
+          "state": "RuntimeState"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "ModelConfiguration": {
+        "kind": "closed-object",
+        "fields": {
+          "model": "ModelRef",
+          "configuration": "ConfigurationRef",
+          "inputSettings": "InputConfigurationRef",
+          "captureSettings": "CaptureConfigurationRef",
+          "preferredProvider": "Provider",
+          "runtime": "RuntimeFact"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "InspectionResult": {
+        "kind": "closed-object",
+        "fields": {
+          "operation": "InspectOperation",
+          "scope": "InspectionScope",
+          "operationId": "JobRef",
+          "captured": "ModelConfiguration",
+          "state": "ResultState",
+          "outcome": "Outcome",
+          "freshness": "Freshness",
+          "staleReason": "StaleReason",
+          "actualProvider": "ActualProvider"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "ValidationResult": {
+        "kind": "closed-object",
+        "fields": {
+          "operation": "ValidateOperation",
+          "scope": "ValidationScope",
+          "operationId": "JobRef",
+          "captured": "ModelConfiguration",
+          "state": "ResultState",
+          "outcome": "Outcome",
+          "freshness": "Freshness",
+          "staleReason": "StaleReason",
+          "actualProvider": "ActualProvider"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "ModelInspection": {
+        "kind": "closed-object",
+        "fields": {
+          "current": "ModelConfiguration",
+          "inspectionResult": "InspectionResult",
+          "validationResult": "ValidationResult"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "Preflight": {
+        "kind": "closed-object",
+        "fields": {
+          "scope": "DatasetCheckScope",
+          "requestId": "JobRef",
+          "configuration": "ConfigurationRef",
+          "baseModel": "ModelRef",
+          "dataset": "DatasetRef",
+          "state": "ResultState",
+          "outcome": "Outcome",
+          "freshness": "Freshness",
+          "staleReason": "StaleReason"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "ProspectiveTraining": {
+        "kind": "closed-object",
+        "fields": {
+          "run": "RunRef",
+          "baseModel": "ModelRef",
+          "dataset": "DatasetRef",
+          "configuration": "ConfigurationRef",
+          "requestedDevice": "DeviceRef",
+          "runtimeState": "RuntimeState",
+          "preflight": "Preflight"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "TrainingJob": {
+        "kind": "closed-object",
+        "fields": {
+          "job": "JobRef",
+          "operation": "TrainingOperation",
+          "run": "RunRef",
+          "baseModel": "ModelRef",
+          "dataset": "DatasetRef",
+          "configuration": "ConfigurationRef",
+          "requestedDevice": "DeviceRef",
+          "state": "JobState",
+          "outcome": "Outcome"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "LocalTraining": {
+        "kind": "closed-object",
+        "fields": {
+          "prospective": "ProspectiveTraining",
+          "activeJob": "TrainingJob"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "TrainingResult": {
+        "kind": "closed-object",
+        "fields": {
+          "attribution": "Attribution",
+          "job": "JobRef",
+          "operation": "TrainingOperation",
+          "run": "RunRef",
+          "baseModel": "ModelRef",
+          "dataset": "DatasetRef",
+          "configuration": "ConfigurationRef",
+          "requestedDevice": "DeviceRef",
+          "state": "JobState",
+          "outcome": "Outcome"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "TrainingStatus": {
+        "kind": "closed-object",
+        "fields": {
+          "selected": "TrainingResult"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "ProviderBenchmark": {
+        "kind": "closed-object",
+        "fields": {
+          "current": "ModelConfiguration",
+          "captured": "ModelConfiguration",
+          "benchmark": "JobRef",
+          "comparedProviders": "ComparedProviders",
+          "state": "JobState",
+          "completedCount": "CompletedProviderCount",
+          "successfulCount": "CompletedProviderCount",
+          "outcome": "Outcome",
+          "freshness": "Freshness",
+          "staleReason": "StaleReason"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "OfficialModels": {
+        "kind": "closed-object",
+        "fields": {
+          "current": "ModelConfiguration",
+          "selectedTrainingBaseModel": "ModelRef"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "DatasetJob": {
+        "kind": "closed-object",
+        "fields": {
+          "job": "JobRef",
+          "operation": "DatasetOperation",
+          "dataset": "DatasetRef",
+          "annotationModel": "ModelRef",
+          "configuration": "ConfigurationRef",
+          "state": "JobState",
+          "outcome": "Outcome"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "DataCollection": {
+        "kind": "closed-object",
+        "fields": {
+          "captureSource": "SourceRef",
+          "captureAvailability": "CaptureAvailability",
+          "dataset": "DatasetRef",
+          "annotationModel": "ModelRef",
+          "prospectiveConfiguration": "ConfigurationRef",
+          "activeJob": "DatasetJob"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "SelectedBox": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId",
+          "ordinal": "Ordinal"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "box"
+      },
+      "DataReview": {
+        "kind": "closed-object",
+        "fields": {
+          "dataset": "DatasetRef",
+          "image": "ImageRef",
+          "selectionRevision": "PositiveSequence",
+          "selectedBox": "SelectedBox",
+          "activeClass": "ClassRef",
+          "decision": "ReviewDecision",
+          "unsavedState": "UnsavedState",
+          "zoomPercent": "ZoomPercent"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "Groups": {
+        "kind": "closed-object",
+        "fields": {
+          "local-training": "LocalTraining",
+          "training-status": "TrainingStatus",
+          "model-inspection": "ModelInspection",
+          "provider-benchmark": "ProviderBenchmark",
+          "official-models": "OfficialModels",
+          "data-collection": "DataCollection",
+          "data-review": "DataReview"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "Snapshot": {
+        "kind": "closed-object",
+        "fields": {
+          "contextVersion": "Version",
+          "rendererGeneration": "PositiveSequence",
+          "sequence": "PositiveSequence",
+          "mode": "Mode",
+          "groups": "Groups",
+          "displayProjection": "DisplayProjection"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "InputConfigurationRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "configuration"
+      },
+      "CaptureConfigurationRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "configuration"
+      },
+      "DeviceRef": {
+        "kind": "closed-object",
+        "fields": {
+          "state": "RefState",
+          "displayId": "OpaqueDisplayId"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false,
+        "entityRole": "device"
+      },
+      "InputSettingsDisplay": {
+        "kind": "closed-object",
+        "fields": {
+          "input": "DisplayLabel",
+          "resize": "DisplayLabel",
+          "output": "DisplayLabel",
+          "coordinates": "DisplayLabel"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "CaptureSettingsDisplay": {
+        "kind": "closed-object",
+        "fields": {
+          "source": "DisplayLabel",
+          "region": "DisplayLabel",
+          "frameRate": "DisplayLabel"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "KnownDisplayId": {
+        "kind": "canonical-uuid-v4",
+        "nullable": false,
+        "authority": "none; opaque local display correlation"
+      },
+      "KnownDisplayLabel": {
+        "kind": "string",
+        "minUnicodeScalars": 1,
+        "maxUnicodeScalars": 96,
+        "nullable": false,
+        "wellFormedUnicodeRequired": true,
+        "forbiddenRanges": [
+          [
+            0,
+            31
+          ],
+          [
+            127,
+            159
+          ],
+          [
+            1564,
+            1564
+          ],
+          [
+            8206,
+            8207
+          ],
+          [
+            8232,
+            8238
+          ],
+          [
+            8294,
+            8297
+          ]
+        ],
+        "meaning": "Curated display name only; never private paths, keys, command lines, raw logs or URLs",
+        "normalization": "none; count validated Unicode scalars, not UTF-16 units"
+      },
+      "DisplayLocale": {
+        "kind": "enum",
+        "values": [
+          "en",
+          "zh-CN",
+          "de",
+          "ru",
+          "fr"
+        ]
+      },
+      "EntityRole": {
+        "kind": "enum",
+        "values": [
+          "model",
+          "dataset",
+          "run",
+          "job",
+          "configuration",
+          "source",
+          "runtime",
+          "image",
+          "class",
+          "device"
+        ]
+      },
+      "EntityLabel": {
+        "kind": "closed-object",
+        "fields": {
+          "displayId": "KnownDisplayId",
+          "role": "EntityRole",
+          "label": "KnownDisplayLabel"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "EntityLabels": {
+        "kind": "array",
+        "itemType": "EntityLabel",
+        "minimumItems": 0,
+        "maximumItems": 80,
+        "uniqueBy": "displayId"
+      },
+      "ConfigurationSummary": {
+        "kind": "closed-object",
+        "fields": {
+          "configurationId": "KnownDisplayId",
+          "inputSettings": "InputSettingsDisplay",
+          "captureSettings": "CaptureSettingsDisplay"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      },
+      "ConfigurationSummaries": {
+        "kind": "array",
+        "itemType": "ConfigurationSummary",
+        "minimumItems": 0,
+        "maximumItems": 12,
+        "uniqueBy": "configurationId"
+      },
+      "DisplayProjection": {
+        "kind": "closed-object",
+        "fields": {
+          "locale": "DisplayLocale",
+          "entityLabels": "EntityLabels",
+          "configurationSummaries": "ConfigurationSummaries"
+        },
+        "allFieldsRequired": true,
+        "additionalFields": false
+      }
+    },
+    "semanticDisplaySeparation": "groups contain semantic facts; displayProjection is separate display-only atomic projection"
+  },
+  "relationMatrixFile": "relation-matrices.json",
+  "authorization": "no native authority; inaccessible live/synthetic receipts and per-operation native reauthorization/expected-target fences remain required",
+  "nativeBindingsResolved": 0,
+  "sourceProvenance": {
+    "nativeGui": {
+      "path": "ui\\vapor_lock_gui.py",
+      "sha256": "d0a02d063f020c5f6610f4a495f6dbbb64bf68ca01c6978ed5734de1c6523080",
+      "bytes": 555417
+    },
+    "fixedMapIndex": {
+      "path": "ui_system\\proposals\\native-component-map-v1-r1\\index.json",
+      "sha256": "9adb329b4932c8f93cf7106c5e3dcaf8e2af68f84d2f3d99933b882c627c4710",
+      "bytes": 562
+    },
+    "fixedPresentationIndex": {
+      "path": "ui_system\\handoffs\\native-components-v1-r2\\index.json",
+      "sha256": "3d66cdcc8cf3b8ddbc7e6d709a5a1bc5233f4926311ad55c1f6b1f1ab1c62236",
+      "bytes": 25940
+    }
+  }
+}

@@ -1,0 +1,779 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project>
+  <ItemGroup>
+    <EmbeddedResource Include="resources\resource-0000.bin">
+      <LogicalName>HIDMaestro.Resources.appxpackaging.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0001.bin">
+      <LogicalName>HIDMaestro.Resources.appxsip.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0002.bin">
+      <LogicalName>HIDMaestro.Resources.HIDMaestro.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0003.bin">
+      <LogicalName>HIDMaestro.Resources.HMXInput.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0004.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.Kits.Logger.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0005.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.UniversalStore.HardwareWorkflow.Cabinets.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0006.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.UniversalStore.HardwareWorkflow.Catalogs.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0007.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.UniversalStore.HardwareWorkflow.InfReader.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0008.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.UniversalStore.HardwareWorkflow.SubmissionBuilder.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0009.bin">
+      <LogicalName>HIDMaestro.Resources.mssign32.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0010.bin">
+      <LogicalName>HIDMaestro.Resources.opcservices.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0011.bin">
+      <LogicalName>HIDMaestro.Resources.wintrust.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0013.bin">
+      <LogicalName>HIDMaestro.Resources.hidmaestro.inf</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0014.bin">
+      <LogicalName>HIDMaestro.Resources.hidmaestro_xusb.inf</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0015.bin">
+      <LogicalName>HIDMaestro.Resources.hmswd.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0016.bin">
+      <LogicalName>HIDMaestro.Resources.Inf2Cat.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0017.bin">
+      <LogicalName>HIDMaestro.Resources.signtool.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0019.bin">
+      <LogicalName>HIDMaestro.Resources.inf2cat.exe.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0020.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.Windows.Build.Appx.AppxPackaging.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0021.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.Windows.Build.Appx.AppxSip.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0022.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.Windows.Build.Appx.OpcServices.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0023.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.Windows.Build.Signing.mssign32.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0024.bin">
+      <LogicalName>HIDMaestro.Resources.Microsoft.Windows.Build.Signing.wintrust.dll.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0025.bin">
+      <LogicalName>HIDMaestro.Resources.signtool.exe.manifest</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0026.bin">
+      <LogicalName>HIDMaestro.Resources.THIRD-PARTY-NOTICES.txt</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0027.bin">
+      <LogicalName>HIDMaestro.Resources.WindowsProtectedFiles.xml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0028.bin">
+      <LogicalName>HIDMaestro.Resources.wintrust.dll.ini</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0032.bin">
+      <LogicalName>HIDMaestro.Profiles.8bitdo\pro-2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0033.bin">
+      <LogicalName>HIDMaestro.Profiles.8bitdo\sn30-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0034.bin">
+      <LogicalName>HIDMaestro.Profiles.8bitdo\ultimate-wired.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0035.bin">
+      <LogicalName>HIDMaestro.Profiles.amazon\luna-ble.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0036.bin">
+      <LogicalName>HIDMaestro.Profiles.amazon\luna-usb.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0037.bin">
+      <LogicalName>HIDMaestro.Profiles.asetek\asetek-forte-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0038.bin">
+      <LogicalName>HIDMaestro.Profiles.asetek\asetek-forte.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0039.bin">
+      <LogicalName>HIDMaestro.Profiles.asetek\asetek-invicta-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0040.bin">
+      <LogicalName>HIDMaestro.Profiles.asetek\asetek-invicta.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0041.bin">
+      <LogicalName>HIDMaestro.Profiles.asetek\asetek-la-prima.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0042.bin">
+      <LogicalName>HIDMaestro.Profiles.asetek\asetek-tony-kanaan.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0043.bin">
+      <LogicalName>HIDMaestro.Profiles.cammus\cammus-c12.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0044.bin">
+      <LogicalName>HIDMaestro.Profiles.cammus\cammus-c5.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0045.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\combatstick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0046.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\f16-combat-stick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0047.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\fighterstick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0048.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\flight-sim-yoke.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0049.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\pro-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0050.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\pro-throttle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0051.bin">
+      <LogicalName>HIDMaestro.Profiles.ch-products\throttle-quadrant.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0052.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\clubsport-handbrake.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0053.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\clubsport-pedals-v3.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0054.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\clubsport-shifter.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0055.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\clubsport-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0056.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\clubsport-v25.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0057.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csl-dd.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0058.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csl-elite-pedals-lc.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0059.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csl-elite-pedals-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0060.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csl-elite-ps4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0061.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csl-elite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0062.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csl-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0063.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\csr-elite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0064.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\podium-dd1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0065.bin">
+      <LogicalName>HIDMaestro.Profiles.fanatec\podium-dd2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0066.bin">
+      <LogicalName>HIDMaestro.Profiles.flydigi\vader-4-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0067.bin">
+      <LogicalName>HIDMaestro.Profiles.google\stadia-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0068.bin">
+      <LogicalName>HIDMaestro.Profiles.google\stadia-usb.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0069.bin">
+      <LogicalName>HIDMaestro.Profiles.heusinkveld\handbrake-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0070.bin">
+      <LogicalName>HIDMaestro.Profiles.heusinkveld\sequential-shifter.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0071.bin">
+      <LogicalName>HIDMaestro.Profiles.heusinkveld\sprint-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0072.bin">
+      <LogicalName>HIDMaestro.Profiles.heusinkveld\ultimate-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0073.bin">
+      <LogicalName>HIDMaestro.Profiles.honeycomb\alpha.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0074.bin">
+      <LogicalName>HIDMaestro.Profiles.honeycomb\bravo.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0075.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\fighting-stick-alpha.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0076.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\horipad-steam.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0077.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\horipad-switch.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0078.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\pcengine-mini.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0079.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\pokken-controller.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0080.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\racing-wheel-apex.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0081.bin">
+      <LogicalName>HIDMaestro.Profiles.hori\rap-v-kai.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0082.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\driving-force-gt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0083.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\driving-force-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0084.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\driving-force.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0085.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\extreme-3d-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0086.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\f310.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0087.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\f710.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0088.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\formula-vibration.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0089.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g-pro-ps.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0090.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g-pro-xbox.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0091.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g25.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0092.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g27.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0093.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g29-ps4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0094.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g29.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0095.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g920.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0096.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g923-ps.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0097.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\g923-xbox.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0098.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\gt-force.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0099.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\momo-force.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0100.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\momo-racing.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0101.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\rs-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0102.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\speed-force-wireless.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0103.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\wingman-formula-gp.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0104.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\x52-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0105.bin">
+      <LogicalName>HIDMaestro.Profiles.logitech\x52.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0106.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\sidewinder-force-feedback-2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0107.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-arcade-stick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0108.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-dance-pad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0109.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-flight-stick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0110.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-guitar-v1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0111.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-guitar-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0112.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-type2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0113.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-wheel-v1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0114.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-wheel-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0115.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-wired.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0116.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-360-wireless.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0117.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-adaptive.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0118.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-elite-v1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0119.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-elite-v2-bt-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0120.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-elite-v2-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0121.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-elite-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0122.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-one-original.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0123.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-one-rev1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0124.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-one-s-bt-djm00n.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0125.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-one-s-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0126.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-one-s.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0127.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-series-xs-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0128.bin">
+      <LogicalName>HIDMaestro.Profiles.microsoft\xbox-series-xs.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0129.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\circuitpython-gamepad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0130.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\daemonbite-genesis.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0131.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\daemonbite-nes.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0132.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\daemonbite-snes.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0133.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\dragonrise-0006-twin-shock.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0134.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\dragonrise-0006.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0135.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\dragonrise-js19.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0136.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\ffbeast-joystick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0137.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\ffbeast-rudder.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0138.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\ffbeast-wheel.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0139.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\generic-dinput-gamepad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0140.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\ibuffalo-snes.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0141.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\joypad-gc-adapter.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0142.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\joypad-generic-hid.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0143.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\joypad-steam-input.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0144.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\joypad-xac.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0145.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\leo-bodnar-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0146.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\mmos-ffb.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0147.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\mpg-hid-gamepad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0148.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\nicohood-arduino-gamepad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0149.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\oddor-handbrake.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0150.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\openffboard.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0151.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\p5general-activtor.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0152.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\phoenixrc.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0153.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\ps3-alt-gamepad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0154.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\retrolink-snes-0011.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0155.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\shanwan-gioteck.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0156.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\tinyusb-gamepad-noid.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0157.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\tinyusb-gamepad.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0158.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\vrc2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0159.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\vrs-dfp-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0160.bin">
+      <LogicalName>HIDMaestro.Profiles.misc\vrs-dfp-wheel.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0161.bin">
+      <LogicalName>HIDMaestro.Profiles.moza\moza-r12.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0162.bin">
+      <LogicalName>HIDMaestro.Profiles.moza\moza-r16.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0163.bin">
+      <LogicalName>HIDMaestro.Profiles.moza\moza-r3.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0164.bin">
+      <LogicalName>HIDMaestro.Profiles.moza\moza-r5.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0165.bin">
+      <LogicalName>HIDMaestro.Profiles.moza\moza-r9.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0166.bin">
+      <LogicalName>HIDMaestro.Profiles.nacon\bigben-ps4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0167.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\gamecube-adapter-hid.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0168.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\gamecube-adapter.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0169.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\genesis-nso.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0170.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\joycon-charging-grip.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0171.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\joycon-l.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0172.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\joycon-r.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0173.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\n64-nso.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0174.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\snes-nso.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0175.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\switch-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0176.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\switch2-joycon-l.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0177.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\switch2-joycon-r.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0178.bin">
+      <LogicalName>HIDMaestro.Profiles.nintendo\switch2-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0179.bin">
+      <LogicalName>HIDMaestro.Profiles.pxn\litestar-gt987.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0180.bin">
+      <LogicalName>HIDMaestro.Profiles.pxn\pxn-v10.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0181.bin">
+      <LogicalName>HIDMaestro.Profiles.pxn\pxn-v12-lite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0182.bin">
+      <LogicalName>HIDMaestro.Profiles.pxn\pxn-v12.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0183.bin">
+      <LogicalName>HIDMaestro.Profiles.pxn\pxn-vd6.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0184.bin">
+      <LogicalName>HIDMaestro.Profiles.razer\panthera-ps4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0185.bin">
+      <LogicalName>HIDMaestro.Profiles.razer\wolverine-v3-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0186.bin">
+      <LogicalName>HIDMaestro.Profiles.sega\astro-city-mini.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0187.bin">
+      <LogicalName>HIDMaestro.Profiles.sega\mega-drive-mini.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0188.bin">
+      <LogicalName>HIDMaestro.Profiles.simagic\simagic-alpha.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0189.bin">
+      <LogicalName>HIDMaestro.Profiles.simagic\simagic-gt-neo.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0190.bin">
+      <LogicalName>HIDMaestro.Profiles.simucube\simucube-1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0191.bin">
+      <LogicalName>HIDMaestro.Profiles.simucube\simucube-2-pro.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0192.bin">
+      <LogicalName>HIDMaestro.Profiles.simucube\simucube-2-sport.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0193.bin">
+      <LogicalName>HIDMaestro.Profiles.simucube\simucube-2-ultimate.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0194.bin">
+      <LogicalName>HIDMaestro.Profiles.snk\neogeo-mini.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0195.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense-bt-full.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0196.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0197.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense-composite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0198.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense-edge-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0199.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense-edge-composite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0200.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense-edge.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0201.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualsense.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0202.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualshock-3.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0203.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualshock-4-v1-full.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0204.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualshock-4-v1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0205.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualshock-4-v2-bt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0206.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualshock-4-v2-composite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0207.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\dualshock-4-v2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0208.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\ps-classic.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0209.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\ps-move.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0210.bin">
+      <LogicalName>HIDMaestro.Profiles.sony\ps3-remote.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0211.bin">
+      <LogicalName>HIDMaestro.Profiles.steelseries\srws1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0212.bin">
+      <LogicalName>HIDMaestro.Profiles.taito\egret-ii-mini.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0213.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-flight-hotas-4.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0214.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-flight-hotas-one.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0215.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-flight-hotas-x.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0216.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-flight-rudder-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0217.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-gt.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0218.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-lcm-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0219.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t-rudder-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0220.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t150.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0221.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t16000m.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0222.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t248.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0223.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t300rs-ps3-adv.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0224.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t300rs-ps3.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0225.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t300rs.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0226.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t500rs.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0227.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\t80.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0228.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\th8a-shifter.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0229.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\tpr-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0230.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\ts-pc-racer.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0231.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\ts-xw.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0232.bin">
+      <LogicalName>HIDMaestro.Profiles.thrustmaster\tx-xbox.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0233.bin">
+      <LogicalName>HIDMaestro.Profiles.turtle-beach\flightstick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0234.bin">
+      <LogicalName>HIDMaestro.Profiles.turtle-beach\race.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0235.bin">
+      <LogicalName>HIDMaestro.Profiles.turtle-beach\throttle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0236.bin">
+      <LogicalName>HIDMaestro.Profiles.valve\steam-controller-2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0237.bin">
+      <LogicalName>HIDMaestro.Profiles.valve\steam-controller-composite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0238.bin">
+      <LogicalName>HIDMaestro.Profiles.valve\steam-controller.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0239.bin">
+      <LogicalName>HIDMaestro.Profiles.valve\steam-deck-composite.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0240.bin">
+      <LogicalName>HIDMaestro.Profiles.valve\steam-deck.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0241.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\constellation-alpha-cm2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0242.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\constellation-alpha-cm3.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0243.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\constellation-alpha-warbrd.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0244.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\control-panel-1.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0245.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\control-panel-2.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0246.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\mongoost-50cm2-throttle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0247.bin">
+      <LogicalName>HIDMaestro.Profiles.virpil\mongoost-50cm3-throttle.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0248.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gladiator-evo-l.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0249.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gladiator-evo-r.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0250.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gladiator-k-l.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0251.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gladiator-k-r.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0252.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gladiator-mcp.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0253.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gunfighter-sce-l.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0254.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gunfighter-sce-r.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0255.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\gunfighter.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0256.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\sem-thq.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0257.bin">
+      <LogicalName>HIDMaestro.Profiles.vkbsim\stecs.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0258.bin">
+      <LogicalName>HIDMaestro.Profiles.winwing\orion2-f16ex.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0259.bin">
+      <LogicalName>HIDMaestro.Profiles.winwing\orion2-f18.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0260.bin">
+      <LogicalName>HIDMaestro.Profiles.winwing\orion2-joystick.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0261.bin">
+      <LogicalName>HIDMaestro.Profiles.winwing\skywalker-pedals.json</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="resources\resource-0262.bin">
+      <LogicalName>HIDMaestro.Profiles.winwing\ursa-minor.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>

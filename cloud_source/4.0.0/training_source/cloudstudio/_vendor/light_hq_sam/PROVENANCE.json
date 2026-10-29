@@ -1,0 +1,144 @@
+{
+  "component": "Light HQ-SAM prompted segmentation inference subset",
+  "upstream_repository": "https://github.com/SysCV/sam-hq",
+  "upstream_commit": "e696978d60352dc9a26b12631cd91781502c6546",
+  "retrieved_utc": "2026-10-18",
+  "source_license": "Apache-2.0; original LICENSE retained",
+  "checkpoint": {
+    "filename": "sam_hq_vit_tiny.pth",
+    "repository": "https://huggingface.co/lkeab/hq-sam",
+    "revision": "09b02a333b37772133eff3997bdba997867374b7",
+    "url": "https://huggingface.co/lkeab/hq-sam/resolve/09b02a333b37772133eff3997bdba997867374b7/sam_hq_vit_tiny.pth",
+    "sha256": "0f32c075ccdd870ae54db2f7630e7a0878ede5a2b06d05d6fe02c65a82fb7196",
+    "bytes": 42526881,
+    "license": "apache-2.0"
+  },
+  "files": [
+    {
+      "upstream_path": "segment_anything/__init__.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/__init__.py",
+      "sha256": "9ce11508e49e2390fbaee599153473787eb267f7a1bae07c91d1afd175722bda",
+      "bundled_relative_path": "__init__.py",
+      "bundled_sha256": "840433d3cc5f2c328f3c89422a14756f93f6099cd766c20108e7dc60633d848f",
+      "modification": "Omit automatic mask generator and alternate baseline registry; this subset performs prompted HQ inference."
+    },
+    {
+      "upstream_path": "segment_anything/build_sam.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/build_sam.py",
+      "sha256": "e3c254fd9123ac01cbdf6caf6d67978ca215397ebce9a63e75bc0ca3f7a1cf49",
+      "bundled_relative_path": "build_sam.py",
+      "bundled_sha256": "e25ab6a31f1de1dd1f9442b8cf07b6fb7ee7bb9928b7736ed0e30e973f33fedd",
+      "modification": "Strict CPU weights-only checkpoint loading; refresh TinyViT evaluation attention caches after installing learned tensors; omit construction print output."
+    },
+    {
+      "upstream_path": "segment_anything/modeling/__init__.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/__init__.py",
+      "sha256": "bcceda10c3ac65d2a2249620b8abca08dad41dd1f538e66d5a1977c58a1c59ac",
+      "bundled_relative_path": "modeling/__init__.py",
+      "bundled_sha256": "bcceda10c3ac65d2a2249620b8abca08dad41dd1f538e66d5a1977c58a1c59ac",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/common.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/common.py",
+      "sha256": "59a53bfa5d0a4d446df7f2bb57d2e95808b130601592b934600fb663d256ce17",
+      "bundled_relative_path": "modeling/common.py",
+      "bundled_sha256": "59a53bfa5d0a4d446df7f2bb57d2e95808b130601592b934600fb663d256ce17",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/image_encoder.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/image_encoder.py",
+      "sha256": "4e363b929ef5099e4ca63fef376ee569930a438c10a9c96044594f83b970da38",
+      "bundled_relative_path": "modeling/image_encoder.py",
+      "bundled_sha256": "4e363b929ef5099e4ca63fef376ee569930a438c10a9c96044594f83b970da38",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/mask_decoder.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/mask_decoder.py",
+      "sha256": "64d955ea491c58893c3bab671f33b9d8f9fa750f3f84bbebc952acea70b416e8",
+      "bundled_relative_path": "modeling/mask_decoder.py",
+      "bundled_sha256": "64d955ea491c58893c3bab671f33b9d8f9fa750f3f84bbebc952acea70b416e8",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/mask_decoder_hq.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/mask_decoder_hq.py",
+      "sha256": "0a94dd931d905803ed15f8492d1f1fdf359553ae364d3d677be87bc342327013",
+      "bundled_relative_path": "modeling/mask_decoder_hq.py",
+      "bundled_sha256": "0a94dd931d905803ed15f8492d1f1fdf359553ae364d3d677be87bc342327013",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/prompt_encoder.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/prompt_encoder.py",
+      "sha256": "bd8f2f5903f0647f55c21c608bcbb334eec2901ebe76aa41061b1c513df4a06f",
+      "bundled_relative_path": "modeling/prompt_encoder.py",
+      "bundled_sha256": "bd8f2f5903f0647f55c21c608bcbb334eec2901ebe76aa41061b1c513df4a06f",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/sam.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/sam.py",
+      "sha256": "edf1720501d410c63167ffcfa3d0170bef4adf39d5ebb459cac9dbc09104a749",
+      "bundled_relative_path": "modeling/sam.py",
+      "bundled_sha256": "edf1720501d410c63167ffcfa3d0170bef4adf39d5ebb459cac9dbc09104a749",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/modeling/tiny_vit_sam.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/tiny_vit_sam.py",
+      "sha256": "f06a5a3bb7078d6cd3b6af8f89d7f82fbcaf194cd642cefeaa642173dbf03585",
+      "bundled_relative_path": "modeling/tiny_vit_sam.py",
+      "bundled_sha256": "71d9e64e4e972cc7565ef5f91ebde47d693b7d1dddd860a43a0c5e434720581a",
+      "modification": "Use the existing locally written DropPath and dimension helpers, plus torch initialization, instead of timm; remove unused classifier factories and network download functions."
+    },
+    {
+      "upstream_path": "segment_anything/modeling/transformer.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/modeling/transformer.py",
+      "sha256": "566a8f6db8b608398de939548bd0f485b21752fda2bdda36900e6444ef938d11",
+      "bundled_relative_path": "modeling/transformer.py",
+      "bundled_sha256": "566a8f6db8b608398de939548bd0f485b21752fda2bdda36900e6444ef938d11",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/predictor.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/predictor.py",
+      "sha256": "d2660684f385dc28da5a08b002347479459e1dbd58d758a3e006d7d0847fa93f",
+      "bundled_relative_path": "predictor.py",
+      "bundled_sha256": "d2660684f385dc28da5a08b002347479459e1dbd58d758a3e006d7d0847fa93f",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/utils/__init__.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/utils/__init__.py",
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa",
+      "bundled_relative_path": "utils/__init__.py",
+      "bundled_sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa",
+      "modification": null
+    },
+    {
+      "upstream_path": "segment_anything/utils/transforms.py",
+      "url": "https://raw.githubusercontent.com/SysCV/sam-hq/e696978d60352dc9a26b12631cd91781502c6546/segment_anything/utils/transforms.py",
+      "sha256": "26a649f2bca8a4a24b4d56617487a9a54c4279e559b2b813c9de38f58a60107c",
+      "bundled_relative_path": "utils/transforms.py",
+      "bundled_sha256": "fc6c6751d445dbe5cab0b4e19f1fff653f6a141a30c778c06cf0e6a986607dd2",
+      "modification": "Use direct Pillow conversion and bilinear resize for HxWx3 uint8 inputs instead of torchvision."
+    }
+  ],
+  "additional_local_files": [
+    {
+      "path": "modeling/_layers.py",
+      "sha256": "d4c7834d70f750464453d872de2f75199890b8e1238c6d3ab0d7c2c14066dd1c",
+      "description": "Existing locally written drop-path and dimension helpers; torch.nn.init.trunc_normal_ supplies initialization. No timm code copied."
+    }
+  ],
+  "weights_modified": false,
+  "network_behavior": "No runtime downloads. Bundled checkpoint is verified against the pinned official Hugging Face LFS SHA256 before safe tensor-only loading.",
+  "runtime_dependencies": [
+    "torch>=2.6",
+    "numpy",
+    "Pillow"
+  ]
+}

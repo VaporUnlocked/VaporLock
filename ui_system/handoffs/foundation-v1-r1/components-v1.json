@@ -1,0 +1,2174 @@
+{
+  "status": "Design READY for foundation registry semantics; full workflows, composition/CSS, client bridge and release review pending",
+  "componentRegistryVersion": 1,
+  "components": [
+    {
+      "id": "workspace",
+      "label": "Workspace",
+      "defaultParent": null,
+      "role": "root",
+      "minimumWidth": 240,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        null
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Workspace",
+      "originPage": null,
+      "visibilityScope": "global",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "sidebar",
+      "label": "Navigation",
+      "defaultParent": "workspace",
+      "role": "navigation-container",
+      "minimumWidth": 160,
+      "minimumHeight": 200,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Navigation",
+      "originPage": null,
+      "visibilityScope": "global",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null,
+      "owns": [
+        "navigation",
+        "settings-guide"
+      ],
+      "dockPresentation": {
+        "left": "vertical",
+        "right": "vertical",
+        "top": "horizontal scrollable with guide",
+        "bottom": "horizontal scrollable with guide"
+      },
+      "horizontalDockMinimumHeight": 64
+    },
+    {
+      "id": "navigation",
+      "label": "Navigation",
+      "defaultParent": "sidebar",
+      "role": "navigation",
+      "minimumWidth": 160,
+      "minimumHeight": 160,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "sidebar"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Navigation",
+      "originPage": null,
+      "visibilityScope": "global",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null,
+      "relocation": "move sidebar as a unit; navigation cannot detach or duplicate"
+    },
+    {
+      "id": "workspace-header",
+      "label": "Workspace header",
+      "defaultParent": "workspace",
+      "role": "workspace-header",
+      "minimumWidth": 240,
+      "minimumHeight": 80,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Workspace header",
+      "originPage": null,
+      "visibilityScope": "global",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "settings-guide",
+      "label": "Settings guide",
+      "defaultParent": "sidebar",
+      "role": "guide-action",
+      "minimumWidth": 160,
+      "minimumHeight": 44,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "sidebar"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Settings guide",
+      "originPage": null,
+      "visibilityScope": "global",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "dashboard",
+      "label": "Overview",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Overview",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "model-library",
+      "label": "Model Library",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Model Library",
+      "originPage": "model-library",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "detection-settings",
+      "label": "Detection",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Detection",
+      "originPage": "detection-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "targeting-settings",
+      "label": "Targeting",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Targeting",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "movement-settings",
+      "label": "Movement",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Movement",
+      "originPage": "movement-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "training-data",
+      "label": "Training Data",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Training Data",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "profiles",
+      "label": "Profiles",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Profiles",
+      "originPage": "profiles",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "defaultParent": "navigation",
+      "role": "navigation-group",
+      "minimumWidth": 160,
+      "minimumHeight": 44,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "navigation"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Settings",
+      "originPage": null,
+      "visibilityScope": "global",
+      "pinAcrossPages": false,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "shortcuts",
+      "label": "Shortcuts",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Shortcuts",
+      "originPage": "shortcuts",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": "settings",
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "api-suite",
+      "label": "API Suite",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "API Suite",
+      "originPage": "api-suite",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": "settings",
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "diagnostics",
+      "label": "Status & Diagnostics",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Status & Diagnostics",
+      "originPage": "diagnostics",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": "settings",
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "appearance",
+      "label": "Appearance",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 200,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Appearance",
+      "originPage": "appearance",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": "settings",
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "readiness",
+      "label": "Readiness",
+      "defaultParent": "dashboard",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 110,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "dashboard",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Readiness",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> readiness in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "profile-card",
+      "label": "Active profile summary",
+      "defaultParent": "dashboard",
+      "role": "panel",
+      "minimumWidth": 240,
+      "minimumHeight": 100,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "dashboard",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Active profile summary",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> profile-card in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "system-monitor",
+      "label": "System monitor",
+      "defaultParent": "dashboard",
+      "role": "panel",
+      "minimumWidth": 240,
+      "minimumHeight": 100,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "dashboard",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "System monitor",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> system-monitor in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "connection-status",
+      "label": "Connection status",
+      "defaultParent": "dashboard",
+      "role": "panel",
+      "minimumWidth": 240,
+      "minimumHeight": 90,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "dashboard",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Connection status",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> connection-status in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "session-summary",
+      "label": "Session summary",
+      "defaultParent": "dashboard",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 110,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "dashboard",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Session summary",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> session-summary in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "testing-suite",
+      "label": "Testing suite",
+      "defaultParent": "dashboard",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 90,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "dashboard",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Testing suite",
+      "originPage": "dashboard",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> testing-suite in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "official-models",
+      "label": "Official models",
+      "defaultParent": "model-library",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 220,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "model-library",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Official models",
+      "originPage": "model-library",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "model-inspection",
+      "label": "Model inspection",
+      "defaultParent": "model-library",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 160,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "model-library",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Model inspection",
+      "originPage": "model-library",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> model-inspection in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "provider-benchmark",
+      "label": "Provider benchmark",
+      "defaultParent": "model-library",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 160,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "model-library",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Provider benchmark",
+      "originPage": "model-library",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> provider-benchmark in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "target-preview",
+      "label": "Target preview",
+      "defaultParent": "targeting-settings",
+      "role": "panel",
+      "minimumWidth": 320,
+      "minimumHeight": 220,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "targeting-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Target preview",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "internal pan/zoom plus accessible controls",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> target-preview in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "capture-settings",
+      "label": "Capture",
+      "defaultParent": "targeting-settings",
+      "role": "panel",
+      "minimumWidth": 296,
+      "minimumHeight": 216,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "targeting-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Capture",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "capture-controls",
+      "label": "Capture controls",
+      "defaultParent": "capture-settings",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 150,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "capture-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Capture controls",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "target-policy",
+      "label": "Target policy",
+      "defaultParent": "targeting-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "targeting-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Target policy",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "tracking-controls",
+      "label": "Tracking controls",
+      "defaultParent": "targeting-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 160,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "targeting-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Tracking controls",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "movement-tuning",
+      "label": "Movement tuning",
+      "defaultParent": "targeting-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 160,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "targeting-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Movement tuning",
+      "originPage": "targeting-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "preview",
+      "label": "Preview",
+      "defaultParent": "detection-settings",
+      "role": "panel",
+      "minimumWidth": 320,
+      "minimumHeight": 220,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "detection-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Preview",
+      "originPage": "detection-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "internal pan/zoom plus accessible controls",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> preview in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "preview-controls",
+      "label": "Preview controls",
+      "defaultParent": "detection-settings",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 150,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "detection-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Preview controls",
+      "originPage": "detection-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "annotation-controls",
+      "label": "Annotation controls",
+      "defaultParent": "detection-settings",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 150,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "detection-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Annotation controls",
+      "originPage": "detection-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "overlay-settings",
+      "label": "Desktop overlay",
+      "defaultParent": "detection-settings",
+      "role": "panel",
+      "minimumWidth": 316,
+      "minimumHeight": 246,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "detection-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Desktop overlay",
+      "originPage": "detection-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "overlay-editor",
+      "label": "Overlay editor",
+      "defaultParent": "overlay-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "overlay-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Overlay editor",
+      "originPage": "detection-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "activation-controls",
+      "label": "Activation",
+      "defaultParent": "movement-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "movement-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Activation",
+      "originPage": "movement-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "transport-controls",
+      "label": "Transport",
+      "defaultParent": "movement-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "movement-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Transport",
+      "originPage": "movement-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "event-controls",
+      "label": "Events",
+      "defaultParent": "movement-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "movement-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Events",
+      "originPage": "movement-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "output-diagnostics",
+      "label": "Output diagnostics",
+      "defaultParent": "movement-settings",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 160,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "movement-settings",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Output diagnostics",
+      "originPage": "movement-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> output-diagnostics in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "data-collection",
+      "label": "Collection",
+      "defaultParent": "training-data",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "training-data",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Collection",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "data-review",
+      "label": "Review",
+      "defaultParent": "training-data",
+      "role": "panel",
+      "minimumWidth": 396,
+      "minimumHeight": 306,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "training-data",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Review",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "annotation-canvas",
+      "label": "Annotation canvas",
+      "defaultParent": "data-review",
+      "role": "panel",
+      "minimumWidth": 360,
+      "minimumHeight": 240,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "data-review",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Annotation canvas",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "internal pan/zoom plus accessible controls",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "training-tools",
+      "label": "Training",
+      "defaultParent": "training-data",
+      "role": "panel",
+      "minimumWidth": 316,
+      "minimumHeight": 358,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "training-data",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Training",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "local-training",
+      "label": "Local training",
+      "defaultParent": "training-tools",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "training-tools",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Local training",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "training-status",
+      "label": "Training status",
+      "defaultParent": "training-tools",
+      "role": "panel",
+      "minimumWidth": 260,
+      "minimumHeight": 100,
+      "move": true,
+      "resize": true,
+      "hide": true,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "training-tools",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "Training status",
+      "originPage": "training-data",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": null,
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": "trusted All controls -> training-status in default presentation, ignoring theme layout/CSS"
+    },
+    {
+      "id": "general-settings",
+      "label": "General",
+      "defaultParent": "workspace",
+      "role": "page",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": false,
+      "resize": false,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": false,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [],
+      "allowedLayoutParents": [
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "General",
+      "originPage": "general-settings",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": false,
+      "navigationParent": "settings",
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    },
+    {
+      "id": "my-themes",
+      "label": "My Themes",
+      "defaultParent": "appearance",
+      "role": "panel",
+      "minimumWidth": 280,
+      "minimumHeight": 180,
+      "move": true,
+      "resize": true,
+      "hide": false,
+      "repeat": false,
+      "panelMedia": {
+        "allowed": true,
+        "layer": "decorative behind content",
+        "cannotCover": [
+          "canvas",
+          "annotations",
+          "authoritative state",
+          "controls"
+        ]
+      },
+      "iconSlot": true,
+      "layoutEntitlement": "premium",
+      "appearanceEntitlement": "free",
+      "allowedDockEdges": [
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "allowedLayoutParents": [
+        "appearance",
+        "workspace"
+      ],
+      "responsiveFallback": "flow; temporary clamp within workspace; never rewrite archive",
+      "languageKey": "My Themes",
+      "originPage": "appearance",
+      "visibilityScope": "origin-page",
+      "pinAcrossPages": true,
+      "navigationParent": "appearance",
+      "resetPlacement": "return to defaultParent/originPage and clear pin/geometry; original package unchanged",
+      "overflow": "wrap controls and vertical scroll; no clipping or target shrink",
+      "emptyWrapper": "collapse empty body while page/navigation remains reachable",
+      "reopenRoute": null
+    }
+  ],
+  "protectedChrome": "outside themeable workspace and preview CSS document",
+  "breakpointsWorkspacePixels": {
+    "wide": 1100,
+    "compact": 760
+  },
+  "coordinates": "CSS pixels at scale1; anchors use inward signed offsets; resizing never changes package",
+  "navigation": [
+    {
+      "label": "OBSERVE",
+      "pages": [
+        "dashboard",
+        "model-library",
+        "detection-settings"
+      ]
+    },
+    {
+      "label": "TRACK",
+      "pages": [
+        "targeting-settings",
+        "movement-settings"
+      ]
+    },
+    {
+      "label": "MANAGE",
+      "pages": [
+        "training-data",
+        "profiles",
+        "settings"
+      ]
+    }
+  ],
+  "settingsChildren": [
+    "general-settings",
+    "appearance",
+    "shortcuts",
+    "api-suite",
+    "diagnostics"
+  ],
+  "appearanceTabs": [
+    "Style",
+    "Media",
+    "My Themes"
+  ],
+  "dockingScope": "movable panels default origin-page; explicit Premium pin keeps one same-context instance across pages; reset returns it to default parent; empty wrappers collapse",
+  "navigationOwnership": "sidebar moves as unit with navigation and guide; horizontal top/bottom dock has scrollable navigation; detached navigation unsupported in version1",
+  "guideOwnership": "sidebar footer; no independent guide detachment; trusted recovery also opens fixed bundled guide",
+  "pinAcrossPagesMeaning": "registry capability only; default remains origin-page unless valid Premium layout explicitly pins component",
+  "hidingRecovery": "trusted All controls opens an unthemed default presentation for that component/actions/status; native full-workspace recovery also remains available",
+  "registryStage": "layout capabilities are proposed semantic contract, not implemented in preview-foundation"
+}

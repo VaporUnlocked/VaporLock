@@ -1,0 +1,179 @@
+{
+  "component": "MobileSAM prompt-based segmentation inference subset",
+  "upstream_repository": "https://github.com/ChaoningZhang/MobileSAM",
+  "upstream_commit": "f706ad9c4eb7f219c00d9050e46328518ffb65d2",
+  "upstream_commit_date": "2026-05-05T11:00:12Z",
+  "retrieved_utc": "2026-10-17",
+  "source_license": "Apache-2.0 (upstream LICENSE retained unchanged)",
+  "source_license_url": "https://github.com/ChaoningZhang/MobileSAM/blob/f706ad9c4eb7f219c00d9050e46328518ffb65d2/LICENSE",
+  "checkpoint": {
+    "path": "weights/mobile_sam.pt",
+    "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/weights/mobile_sam.pt",
+    "bytes": 40728226,
+    "git_blob_sha1": "7ef2d090979fd9853adf17b7a99c8b94a1c5a6a7",
+    "sha256": "6dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f"
+  },
+  "checkpoint_license_context": "The checkpoint is a tracked blob in the same pinned official repository whose root declares Apache-2.0. No separate checkpoint license or checkpoint-specific terms were present in the pinned weights directory or README. The upstream repository license is included with the checkpoint.",
+  "tiny_vit_notice": {
+    "copyright": "Copyright (c) 2022 Microsoft; original adapted-source header retained.",
+    "license_file": "LICENSE-TinyViT.txt",
+    "source_url": "https://raw.githubusercontent.com/microsoft/Cream/main/TinyViT/LICENSE",
+    "sha256": "a6fd7405fa1855dda8e6333a46bb47e1c78a98a7414b9be20f8bbe90d35be1f6"
+  },
+  "additional_local_file": {
+    "file": "modeling/_layers.py",
+    "sha256": "d4c7834d70f750464453d872de2f75199890b8e1238c6d3ab0d7c2c14066dd1c",
+    "description": "Locally written per-sample drop-path and two-dimension helpers; torch.nn.init.trunc_normal_ supplies initialization. No timm source was copied. Supplied under Apache-2.0."
+  },
+  "files": [
+    {
+      "path": "mobile_sam/__init__.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/__init__.py",
+      "bytes": 448,
+      "git_blob_sha1": "a5bdc4226bbe7831d7a25ae3ea95c81632dbbc59",
+      "sha256": "fea49857574bb02cd690f8d39c339fe808d953795cec793f36be6681ce3a56b9",
+      "bundled_relative_path": "__init__.py",
+      "bundled_sha256": "4fd84c1c8db06a68861807b7393649a12ab7c0100e265210fdbbcc24bf10db61",
+      "modification": "Omit automatic mask generator from this prompt-inference subset."
+    },
+    {
+      "path": "mobile_sam/build_sam.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/build_sam.py",
+      "bytes": 4695,
+      "git_blob_sha1": "9a52c506b69d29ee2356cc0e62274fe6f6ee075b",
+      "sha256": "bc195e97cdb20286b7312421f790cbb943659ca4bf5babb60dbebc6400cf32ed",
+      "bundled_relative_path": "build_sam.py",
+      "bundled_sha256": "33d23a31ba85b8a6d998b4afb6a88a6441ce00aa03071f333b55bc501665c644",
+      "modification": "Load local checkpoints with map_location=cpu and weights_only=True; refresh TinyViT eval attention caches after pretrained tensor load."
+    },
+    {
+      "path": "mobile_sam/modeling/__init__.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/__init__.py",
+      "bytes": 419,
+      "git_blob_sha1": "7aa261b8356b8c1174139c19782657abca0cfec2",
+      "sha256": "6f9d091c722036a33eac2ae767eea2a5fdf940c6f47a5710f9b044a64067f252",
+      "bundled_relative_path": "modeling/__init__.py",
+      "bundled_sha256": "6f9d091c722036a33eac2ae767eea2a5fdf940c6f47a5710f9b044a64067f252",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/modeling/common.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/common.py",
+      "bytes": 1479,
+      "git_blob_sha1": "2bf15236a3eb24d8526073bc4fa2b274cccb3f96",
+      "sha256": "59a53bfa5d0a4d446df7f2bb57d2e95808b130601592b934600fb663d256ce17",
+      "bundled_relative_path": "modeling/common.py",
+      "bundled_sha256": "59a53bfa5d0a4d446df7f2bb57d2e95808b130601592b934600fb663d256ce17",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/modeling/image_encoder.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/image_encoder.py",
+      "bytes": 14420,
+      "git_blob_sha1": "66351d9d7c589be693f4b3485901d3bdfed54d4a",
+      "sha256": "1665ada2902722c9a8cd566c840e324d623ef2b12f7d9ae9f38b24aed0e39886",
+      "bundled_relative_path": "modeling/image_encoder.py",
+      "bundled_sha256": "1665ada2902722c9a8cd566c840e324d623ef2b12f7d9ae9f38b24aed0e39886",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/modeling/mask_decoder.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/mask_decoder.py",
+      "bytes": 6615,
+      "git_blob_sha1": "5d2fdb03d535a91fa725d1ec4e92a7a1f217dfe0",
+      "sha256": "6a2455e990515c67a061187c92c236b879b189f21ef6ebfce1627cae9a6b2f93",
+      "bundled_relative_path": "modeling/mask_decoder.py",
+      "bundled_sha256": "6a2455e990515c67a061187c92c236b879b189f21ef6ebfce1627cae9a6b2f93",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/modeling/prompt_encoder.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/prompt_encoder.py",
+      "bytes": 8594,
+      "git_blob_sha1": "c3143f4f8e02ddd7ca8587b40ff5d47c3a6b7ef3",
+      "sha256": "bd8f2f5903f0647f55c21c608bcbb334eec2901ebe76aa41061b1c513df4a06f",
+      "bundled_relative_path": "modeling/prompt_encoder.py",
+      "bundled_sha256": "bd8f2f5903f0647f55c21c608bcbb334eec2901ebe76aa41061b1c513df4a06f",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/modeling/sam.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/sam.py",
+      "bytes": 7283,
+      "git_blob_sha1": "45b9e7c56d10cc47e7ed0739e35d850bfccbb257",
+      "sha256": "8abefaefd5a1c0edf06c9749bd746a93002d929b390f8c95cee498657102238d",
+      "bundled_relative_path": "modeling/sam.py",
+      "bundled_sha256": "8abefaefd5a1c0edf06c9749bd746a93002d929b390f8c95cee498657102238d",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/modeling/tiny_vit_sam.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/tiny_vit_sam.py",
+      "bytes": 24809,
+      "git_blob_sha1": "93fa9f5f3013baac0b91d5037901daa0ed05471e",
+      "sha256": "e6432ce8eee4727e921ab5b0530631fd71453f760247734f8fe63604cff4d303",
+      "bundled_relative_path": "modeling/tiny_vit_sam.py",
+      "bundled_sha256": "692eee6ac91464c8498f080b744e28fb23848d22503dac3e8cbd02a0bd81c136",
+      "modification": "Use small local helper implementations instead of timm; remove unused classifier factory registration and checkpoint download functions."
+    },
+    {
+      "path": "mobile_sam/modeling/transformer.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/modeling/transformer.py",
+      "bytes": 8397,
+      "git_blob_sha1": "28fafea52288603fea275f3a100790471825c34a",
+      "sha256": "566a8f6db8b608398de939548bd0f485b21752fda2bdda36900e6444ef938d11",
+      "bundled_relative_path": "modeling/transformer.py",
+      "bundled_sha256": "566a8f6db8b608398de939548bd0f485b21752fda2bdda36900e6444ef938d11",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/predictor.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/predictor.py",
+      "bytes": 11680,
+      "git_blob_sha1": "72c7bb9e07e0f5cf62b12909f93665c0ce7f6fe4",
+      "sha256": "6dafa1d20430f6c4e0d37c53bfa80a8241619abb4264d26ca30d843991b760ff",
+      "bundled_relative_path": "predictor.py",
+      "bundled_sha256": "c36f83c97727b48673425e48ed6552cb1d503e32ed26112f1faef0436082f03d",
+      "modification": "Use package-relative modeling import."
+    },
+    {
+      "path": "mobile_sam/utils/__init__.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/utils/__init__.py",
+      "bytes": 197,
+      "git_blob_sha1": "5277f46157403e47fd830fc519144b97ef69d4ae",
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa",
+      "bundled_relative_path": "utils/__init__.py",
+      "bundled_sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa",
+      "modification": null
+    },
+    {
+      "path": "mobile_sam/utils/transforms.py",
+      "url": "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/f706ad9c4eb7f219c00d9050e46328518ffb65d2/mobile_sam/utils/transforms.py",
+      "bytes": 3972,
+      "git_blob_sha1": "c08ba1e3db751f3a5483a003be38c69c2cf2df85",
+      "sha256": "26a649f2bca8a4a24b4d56617487a9a54c4279e559b2b813c9de38f58a60107c",
+      "bundled_relative_path": "utils/transforms.py",
+      "bundled_sha256": "62d639e216536cd63d6f8f299614b7c9b711240df275aa10c9c0db9b7c41053b",
+      "modification": "Replace torchvision PIL conversion and bilinear PIL resizing with direct, equivalent Pillow operations for HxWx3 uint8 input."
+    }
+  ],
+  "runtime_dependencies": [
+    "torch>=2.6",
+    "numpy",
+    "Pillow"
+  ],
+  "network_behavior": "No automatic downloads in this vendored subset. The assistant loads the bundled, hash-verified local checkpoint.",
+  "weights_modified": false,
+  "included_features": [
+    "RGB image embedding cache",
+    "box prompts",
+    "positive and negative point prompts",
+    "single or three ambiguity mask outputs",
+    "optional low-resolution mask refinement input"
+  ],
+  "not_included": [
+    "Automatic full-image mask generator",
+    "TinyViT classification checkpoint downloader",
+    "SAM 3.1 weights or text-prompt segmentation"
+  ]
+}

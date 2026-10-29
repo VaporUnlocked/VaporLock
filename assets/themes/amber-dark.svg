@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+<defs><radialGradient id="sky"><stop stop-color="#634822"/><stop offset="1" stop-color="#171008"/></radialGradient>
+<linearGradient id="vapor" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#171008" stop-opacity="0"/><stop offset=".5" stop-color="#634822"/><stop offset="1" stop-color="#171008" stop-opacity="0"/></linearGradient></defs>
+<rect width="1600" height="1000" fill="#171008"/><ellipse cx="975" cy="750" rx="1100" ry="850" fill="url(#sky)"/><path d="M-200 870 C500 500 1050 1100 1800 620" fill="none" stroke="url(#vapor)" stroke-width="100" opacity="0.38"/><path d="M-200 1000 C400 700 1200 1200 1750 850" fill="none" stroke="url(#vapor)" stroke-width="140" opacity="0.38"/></svg>

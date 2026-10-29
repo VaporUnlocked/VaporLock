@@ -1,0 +1,28 @@
+VAPOR LOCK | AIM TESTING SUITE
+CUSTOM CHARACTER MODELS
+
+Put your .glb character files in this models folder beside the EXE.
+Open the Esc menu to refresh the list, then use its character arrows.
+The built-in SWAT character is inside the EXE; there is no
+need to download or extract them. Give custom characters unique filenames.
+A custom file with a built-in name takes priority for character selection.
+The view-only range prop is generated from original C++ geometry.
+
+This folder accepts 3D characters, not .onnx detection networks.
+The suite supplies the rendered targets for your separate detector tests;
+it does not run or connect to an aiming-assistance program.
+
+Supported format:
+- Self-contained glTF 2.0 binary (.glb), up to 256 MB.
+- Embedded geometry and PNG/JPEG textures; opaque triangle meshes.
+- Vertex normals, at most 65,535 vertices per mesh primitive.
+- First UV set for base color; no texture-transform extension.
+- Up to four bone influences per vertex and one shared skeleton.
+- Linear/step animation clips can supply a frozen pose.
+- No external files, required extensions, Draco compression, morph targets,
+  transparent/cutout materials or cubic-spline animation.
+
+Subfolders, shortcuts and linked files are not searched. Unsupported models
+show an error and leave the current character loaded when selected in Esc.
+Choose only models you are permitted to use. The shipped character credits
+and all bundled notices are in LICENSES.txt beside the EXE.

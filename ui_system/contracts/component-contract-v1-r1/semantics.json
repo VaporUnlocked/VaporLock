@@ -1,0 +1,108 @@
+{
+  "status": "PROPOSAL ONLY: review before validator implementation or format freeze",
+  "registrySHA256": "6b502e69a6763a23abb0f04eaeaaf896b5f108e97daedb92f6f9771defa0cd4b",
+  "manifest": [
+    "Exact Python types: booleans never accepted as numeric values; finite numbers only.",
+    "Name/author are Unicode scalar text <=96 scalars/384 UTF8 bytes; name non-whitespace. Description <=2048 UTF8 bytes.",
+    "Reject C0/C1 controls, bidi override/isolate controls and lone surrogates in metadata; newline/tab permitted only in description. No HTML interpretation.",
+    "UUID lower canonical RFC4122 variant/version4; never path, entitlement or overwrite authority.",
+    "SemVer <=64 chars, core values0..9999, no leading zeros on numeric prerelease IDs; correct SemVer ordering, metadata ignored.",
+    "style true; media iff any raster inclpreview; layout iff nonempty valid layout file; CSS iff nonempty UTF8 custom.css. Exact flags agree with archive.",
+    "Supported newer minimumVersion yields incompatible state; never activate, keep original bytes. Naming/requirements cannot invoke updater."
+  ],
+  "style": [
+    "All omitted tokens/media properties use trusted defaults. Empty style object is valid foundation.",
+    "RGBA integer channels0..255; alpha0..1. Token lengths numeric part must satisfy x-vl bounds; no CSS functions or URLs in tokens.",
+    "Media asset or import-only source alias exactly one; normalize copy to asset, never mutate original archive.",
+    "Canonical asset name must exist in same snapshot; extension/signature/frame decode still pending and required for EVERY asset, including unused ones.",
+    "At most49 panelMedia slots and only registry-enabled iconSlots; appearance cannot position/hide/move any component.",
+    "Decorative media stays behind functional content; no foreign HTML, raw style strings, arbitrary fonts or SVG. Accessible reduced-motion preference wins."
+  ],
+  "layout": [
+    "Every rule names registry.move=true component; unknown/structural/root/navigation/guide/page IDs rejected.",
+    "Parent defaults to registry.defaultParent; supplied parent must be registry.allowedLayoutParents. Effective graph includes all default relationships and must be acyclic.",
+    "hidden=true only registry.hide=true; pinned=true only pinAcrossPages=true. A supplied parent must be workspace when pinned; an omitted parent normalizes effective parent to workspace. No repeated instance.",
+    "A hide/pin-only rule omits mode and geometry, retaining trusted default placement. Pinning uses that default geometry in the workspace; unpin/reset restores origin parent, no file rewrite.",
+    "Supplied dimensions >=registry minimum; sidebar top/bottom dock uses minHeight64, minWidth160; nested containers maintain reviewed content minimums.",
+    "Dock edge must be registry.allowedDockEdges; currently all movable panels and sidebar permit four edges.",
+    "Grid column+span-1 <=workspace.columns (default12); row+span-1 <=64. Flow columnSpan<=columns. Stable ties order then registry index.",
+    "Control context remains origin workflow; explicit pin allows single same-context instance across pages. Children inherit pinned parent's visibility unless moved.",
+    "Grid collisions resolve deterministically by placing later registry instance in next free row, max64, otherwise temporary flow. No file rewrite.",
+    "Freeform stacking uses optional order0..1023 then registry index; keyboard focus raises that single panel temporarily. All controls lists every panel and can focus/bring forward an obscured panel, with native move/resize controls; no global shortcut replaces existing bindings.",
+    "Narrow form containers use viewport-bounded outer width, labels above controls and vertical scroll; authored minima stay saved but never force workspace horizontal scrolling. Canvases keep internal pan/zoom within viewport-bounded containers.",
+    "Freeform clamp/reflow on resize; negative right/bottom offsets represent inward distances. Temporary collision/clamp/flow fallback is visible in the builder, never rewrites package.",
+    "Optional hides retain native All controls unthemed reopen route; Start/Stop/policy/licensing/recovery remain native, never affected by layout."
+  ],
+  "validationStages": [
+    "container + strict JSON",
+    "exact schemas + semantic CSS",
+    "bounded isolated raster decode",
+    "accepted snapshot"
+  ],
+  "appearanceCompositing": [
+    "Canvas base is --vl-background. Background raster has fit/position, brightness/saturation/blur then raster-only opacity. Overlay is a separate layer with effective alpha colorAlpha*overlay.opacity.",
+    "Panel decorative raster lies behind its surface and functional content. Solid panel surface uses --vl-panel RGBA as sole alpha authority. When any gradient token is authored, a two-stop gradient REPLACES the solid surface, retaining each stop's own alpha; no doubled surface painting.",
+    "--vl-glass-strength controls backdrop blur effect, not alpha: effectiveBlur=min(40, --vl-blur*strength/0.68); default0.68 preserves authored blur. CSS backdrop-filter may replace a local surface blur but never stacks the same surface twice.",
+    "Functional content/focus/canvas coordinates are outside decorative opacity and transform. CSS font-family emits the chosen approved font PLUS Microsoft YaHei UI, Noto Sans, sans-serif fallback stack.",
+    "Native personal text size/reduced-motion preferences win. Theme font sizes are multiplied by personal text scale; focused/selected/disabled essentials retain trusted visible state outlines/markers and minimum44px targets."
+  ],
+  "noRuntimeConsumer": true,
+  "wireTypes": {
+    "integer": "finite mathematical integral JSON number, including1/1.0/1e0; bool rejected. Normalize integral values and negative zero to integer in effective copy; limits small enough for exact browser representation.",
+    "number": "finite mathematical JSON number; bool rejected; negative zero normalizes0",
+    "strings": "Unicode scalar text; exact ASCII grammar for colors/units/versions/paths/IDs. Full-string matching with no trailing newline accepted. Patterns use[0-9], literal ASCIIspace only, never Python\\d/\\s.",
+    "defaults": "Schema default and x-vl annotations are not validation. Cross-file semantic checks are mandatory and defaults apply to effective copy only; original archive unchanged."
+  },
+  "metadataText": {
+    "forbiddenCodepoints": [
+      "U+0000..U+001F",
+      "U+007F..U+009F",
+      "U+061C",
+      "U+200E..U+200F",
+      "U+202A..U+202E",
+      "U+2066..U+2069",
+      "U+D800..U+DFFF"
+    ],
+    "descriptionExceptions": [
+      "U+0009 TAB",
+      "U+000A LF"
+    ],
+    "name": "1..96 scalar values, <=384UTF8bytes, at least one visible non-whitespace non-format character",
+    "author": "0..96 scalar values, <=384UTF8bytes",
+    "description": "<=2048UTF8bytes; text only"
+  },
+  "effectiveDefaults": {
+    "media": {
+      "fit": "cover",
+      "position": "center",
+      "opacity": 1,
+      "brightness": 1,
+      "saturation": 1,
+      "blur": 0,
+      "overlay": {
+        "color": "#000000",
+        "opacity": 0
+      }
+    },
+    "omittedBackground": "separately bundled trusted Smokey Glass background; never an unvalidated archive member",
+    "omittedPanelMediaOrIcon": "no override; trusted foundation presentation",
+    "layout": {
+      "workspaceColumns": 12,
+      "hidden": false,
+      "pinned": false,
+      "width": null,
+      "height": null,
+      "flowColumnSpan": 1,
+      "freeformOrder": 0,
+      "parent": "registry defaultParent, or workspace when explicitly pinned and no parent supplied",
+      "modeAbsent": "trusted default placement: flow, registry index order, automatic size; hide/pin-only override retains it",
+      "automaticSize": "null width/height means foundation autosizing, with reviewed minima and narrow fallback; never zero or unbounded author override"
+    }
+  },
+  "filePresence": {
+    "layout": "layout.json present iff feature true; must pass nonempty schema (>=1component rule or workspace.columns)",
+    "customCSS": "custom.css present iff feature true; strictUTF8 and at least1non-ASCII-whitespace character. Comments-only nonempty CSS counts as present and compiles to empty CSS, kept in original.",
+    "media": "any assets raster or preview.webp member counts, including unused members; ALL must pass media stage",
+    "incompatibleMinimumVersion": "schema result records compatible=false with update-required reason; no activation or asset serving, original bytes retained; metadata cannot request/install an update"
+  }
+}

@@ -1,0 +1,77 @@
+VaporLock public source export scope — 2026-10-28
+
+Use tools/export_public_source.py only after Main has reviewed the final source.
+It creates a source ZIP and a separate verified.json receipt, without executing
+the product, installing components, contacting a service or publishing anywhere.
+Main is owner-authorized to publish only the verified source and latest
+unrestricted community release. This exporter itself never publishes.
+
+The public archive uses Development-relative paths as its repository root.
+Main supplies the community license, README, build instructions, fresh build
+helper and requirements. Active client C++/Python/UI/cloud/controller source,
+static UI assets, public guides, focused tests and exact necessary UI contract
+files are allowlisted. Normal user-safety protections remain client source.
+
+The UI allowlist consists of the 25 payloads named by runtime/resources.json,
+that resource manifest, the seven contract-v1-r5 schema/default documents and
+their index, the eight component-contract-v1-r1 documents and their index, and
+the foundation components-v1.json registry loaded by the schema consumer.
+Index payload paths, sizes and SHA-256 identities are checked against the exact
+selected closure. A modified index cannot expand the allowlist. Historical UI
+renderer, handoff, proposal, proof and review directories are not swept in.
+The bundled context-index JSON is an active resource, but its descriptive
+historical references are not followed or exported as extra dependencies.
+
+Excluded wholesale: website, API, admin suite, Discord bot, licensing service,
+installer, hosted distribution, deployment scripts, internal handovers, review
+receipts, private references, credentials, customer data, databases, models,
+saved profiles, datasets, generated builds, SDK/runtime binaries, caches and
+version-control metadata. Only explicitly named tools are exported; historical
+build/cutover/announcement scripts are not copied.
+
+One explicit exception to the saved-profile exclusion is authored component
+source: controller_host/profiles/vapor-lock-xbox-one-windows.json. This is the
+controller compatibility template, not an existing user's saved configuration.
+No other file below controller_host/profiles is selected.
+
+Tests are an exact allowlist of current CMake native test sources, their directly
+included test headers and the public-transition Python tests. Old licensing,
+worker-lease, Start-policy, private evidence and proof-helper tests are excluded
+even when their names do not contain an obvious retirement keyword. Synthetic
+ONNX binary fixtures are not included by this source-only policy, so native
+OnnxCacheEligibility and InferenceMetadata tests need their fixture generation
+step before they can run. Export verification does not certify those fixtures.
+
+The cloud source has architecture packages named models; those source packages
+remain included. User model weights and model/training checkpoints do not.
+Cloud IMPORT_MANIFEST.json is required by runtime; Main refreshes it into a
+source-local file/path/hash inventory without private intake metadata.
+
+Third-party notices remain under their own licenses. SDK directories are not
+walked: only explicitly named top-level license/notice texts are considered.
+Monocypher source and its license are separately allowlisted.
+
+Sanitized Aim Testing Suite source is exported as aim-testing-suite/. The
+Ghost-MW2019.glb asset is excluded because existing notices do not establish
+redistribution rights in the underlying game assets. The community source uses
+its retained SWAT (CC0) model and original procedural view prop. Interface.ttf
+(OFL), raylib and retained dependencies keep their notices. Generated suite builds,
+executables, settings and user model directories are excluded.
+
+Controller resource-*.bin blobs and dependency DLLs are excluded. The existing
+controller resource project therefore needs lawful reconstruction/acquisition
+before its optional build can succeed. Export verification does not certify
+that unfinished dependency integration or controller runtime behavior.
+
+The exporter rejects selected symlink/reparse and multi-link inputs, unsafe
+archive paths, duplicate case-insensitive names, source changes between its
+inventory/copy/reinventory passes, and an existing output filename. It checks
+conservative secret-risk patterns before writing and again during copy; reports
+identify only the source path and risk type, never the matched value. Every ZIP
+member is read back and hashed. The generated SOURCE_MANIFEST.json records each
+source member's bytes and SHA-256, plus these dependency/review limitations.
+
+Pattern scans cannot prove the absence of every possible credential, private
+fact or licensing conflict. Human review of the source inventory and terms is
+required before publication. Source export verification is not a product test,
+security approval, public release or deployment.
