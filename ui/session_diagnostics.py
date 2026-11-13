@@ -13,12 +13,17 @@ METRICS = frozenset({
     'output_failed_total','output_observation_age_ms','observe_only','motion_compensation_active',
     'event_action_reason','configured_capture_fps','configured_inference_fps',
     'configured_frame_skip','capture_width','capture_height','uptime_seconds',
+    'model_input_width','model_input_height',
     'inference_obsolete_total','high_resolution_pacing',
     'capture_backend','capture_recovery_reason','capture_recovery_probes',
     'capture_recovery_transitions','capture_dxgi_timeouts','capture_dxgi_frames',
+    'capture_dxgi_coalesced_frames','capture_dxgi_update_fps','capture_dxgi_coalesced_fps',
+    'cuda_graph_replay_active',
 })
 STAGES = ('capture','preprocess','model','postprocess','tracking','loop_interval',
           'observation_interval','completion_interval','observation_age')
+OPTIONAL_STAGES = ('capture_wall','capture_acquire','capture_dxgi_readback','capture_dxgi_cpu_copy','capture_rate_wait',
+                   'capture_rate_overshoot','post_tracking_work')
 VALUES = ('mean_ms','p50_ms','p95_ms','p99_ms','max_ms')
 
 def timing_summary(value):
@@ -28,7 +33,7 @@ def timing_summary(value):
     result = dict(schema_version=1,scope='session-after-2s',bucket_ms=.25)
     if value.get('percentiles') == 'bucket-upper-bound' and value.get('overflow_from_ms') == 127.75:
         result.update(percentiles='bucket-upper-bound',overflow_from_ms=127.75)
-    for stage in (*STAGES,*(name for name in ('capture_wall','capture_acquire') if name in value)):
+    for stage in (*STAGES,*(name for name in OPTIONAL_STAGES if name in value)):
         item=value.get(stage)
         if type(item) is not dict or type(item.get('count')) is not int or not 0 <= item['count'] <= 2**53-1:
             return None

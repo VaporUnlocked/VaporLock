@@ -7,9 +7,6 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QHBoxLayout, QLabe
 import weakref
 from vlui_live_ui_state import LiveUIHistory
 
-from vlui_qt_host import FixedDocumentSession
-
-
 _NOTICE_CODES = frozenset(('NAVIGATION_REJECTED', 'LOAD_REJECTED', 'FACADE_METAOBJECT_REJECTED',
     'BOOTSTRAP_TIMEOUT', 'BOOTSTRAP_REJECTED', 'CONTEXT_REJECTED', 'RENDERER_TERMINATED',
     'NATIVE_COMMAND_FAILED', 'FACADE_RENAMED', 'FACADE_DESTROYED', 'FACADE_DELETE_REQUESTED',
@@ -120,6 +117,8 @@ class NativeLiveCoordinator:
         root = center.centralWidget()
         self._layout = root.layout()
         self.deck = center.command_bar
+        self.navigation = center.navigation_deck
+        self._layout.insertWidget(0, self.navigation)
         self.deck.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.start = center.start_button  # original callback and Start gates
         old_stop = center.stop_button
@@ -140,15 +139,15 @@ class NativeLiveCoordinator:
         legacy_layout = QVBoxLayout(self._legacy)
         legacy_layout.setContentsMargins(0, 0, 0, 0)
         legacy_layout.setSpacing(0)
-        while self._layout.count() > 1:
-            item = self._layout.takeAt(1)
+        while self._layout.count() > 3:
+            item = self._layout.takeAt(2)
             widget = item.widget()
             if widget is None:
                 raise RuntimeError('NATIVE_WORKSPACE_LAYOUT_REQUIRED')
             legacy_layout.addWidget(widget, 1 if widget.objectName() == 'workspaceShell' else 0)
         self._stack = QStackedWidget(root)
         self._stack.addWidget(self._legacy)
-        self._layout.addWidget(self._stack, 1)
+        self._layout.insertWidget(2, self._stack, 1)
 
         # Overflow scrolls within the existing row. Start, Stop and recovery
         # stay pinned at the right at compact widths and 200% text size.
@@ -186,7 +185,7 @@ class NativeLiveCoordinator:
         header_layout.insertWidget(0, self._header_scroll, 1)
 
         self.menu_button = QToolButton(self.deck)
-        self.menu_button.setText('⋯')
+        self.menu_button.setIcon(center.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.menu = QMenu(self.menu_button)
@@ -225,7 +224,7 @@ class NativeLiveCoordinator:
         self.notice.setWordWrap(True)
         self.notice.setTextFormat(Qt.TextFormat.PlainText)
         self.notice.setContentsMargins(16, 6, 16, 6)
-        self._layout.insertWidget(2, self.notice)
+        self._layout.insertWidget(3, self.notice)
         self.notice.hide()
         self._details = QDialog(center)
         self._details.setObjectName('nativeSessionDetails')
@@ -265,25 +264,6 @@ class NativeLiveCoordinator:
         self._refresh_timer.start()
         owner.bind_display_notifier(self.publish)
         QApplication.instance().focusChanged.connect(self._native_focus_changed)
-        if not self._html_workspace_enabled:
-            # Keep the native sidebar beside the complete command/workspace
-            # column. Move the existing widgets; callbacks and ownership stay
-            # attached to the same instances, including the emergency controls.
-            column = QWidget(root)
-            column_layout = QVBoxLayout(column)
-            column_layout.setContentsMargins(0, 0, 0, 0)
-            column_layout.setSpacing(0)
-            while self._layout.count():
-                item = self._layout.takeAt(0)
-                column_layout.addWidget(item.widget(), 1 if item.widget() is self._stack else 0)
-            body = QWidget(root)
-            body_layout = QHBoxLayout(body)
-            body_layout.setContentsMargins(0, 0, 0, 0)
-            body_layout.setSpacing(0)
-            body_layout.addWidget(center.navigation_deck)
-            body_layout.addWidget(column, 1)
-            self._layout.addWidget(body, 1)
-            self._layout = column_layout
         self.apply_scale(owner._scale)
         self.refresh_theme()
         self._stack.setCurrentWidget(self._legacy)
@@ -378,19 +358,16 @@ class NativeLiveCoordinator:
             combo.setFixedWidth(desired.width())
             combo.setMinimumHeight(desired.height())
             combo.view().setMinimumWidth(desired.width())
-        mission=center.ui_appearance.layout=='mission-control'
-        # Utilities remain the same guarded controls, reachable through the menu.
-        # Give the profile/model/mode/save controls the requested row priority.
-        for widget in (center.settings_search_button,center.undo_button,center.status):widget.setVisible(not mission)
+        compact = center.width() < 960 * float(self._owner._scale)
+        center.settings_search_button.setVisible(not compact)
+        center.undo_button.setVisible(not compact)
         self.search_settings.setText(center.t('Search settings'))
         self.search_settings.setEnabled(center.settings_search_button.isEnabled())
         self.undo_tuning.setText(center.t('Undo last tuning change'))
         self.undo_tuning.setEnabled(center.undo_button.isEnabled())
-        self.search_settings.setVisible(mission);self.undo_tuning.setVisible(mission)
+        self.search_settings.setVisible(compact)
+        self.undo_tuning.setVisible(compact)
         center.save_button.ensurePolished()
-        if mission:
-            center.save_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-            center.save_button.setText(center.t('Save profile'))
         center.save_button.setMinimumWidth(center.save_button.sizeHint().width())
         content = scroll.widget()
         for widget in content.findChildren(QWidget):
@@ -497,6 +474,8 @@ class NativeLiveCoordinator:
             # One disposing owner retained. Recovery needs an explicit retry once
             # it actually closes; never reset Settings, undo or native jobs.
             return False
+        from vlui_qt_host import FixedDocumentSession
+
         self._failed = False
         self.notice.hide()
         session = FixedDocumentSession(resources=self._resources, producer=self._owner.producer,
@@ -541,6 +520,10 @@ class NativeLiveCoordinator:
             self._last_focus = None
         self._center.header_page.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._center.header_page.setFocus()
+
+    def show_native_page(self):
+        if self._stack.currentWidget() is not self._legacy:
+            self._stack.setCurrentWidget(self._legacy)
 
     def _native_focus_changed(self, _old, current):
         if not self._closing and current is not None:

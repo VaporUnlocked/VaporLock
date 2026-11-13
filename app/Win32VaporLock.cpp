@@ -20,6 +20,7 @@
 #include "app/InferenceCadence.h"
 #include "app/PipelineTiming.h"
 #include "app/PipelineScheduler.h"
+#include "app/FrameRate.h"
 #include "app/CloudCapturePacing.h"
 #include "app/CaptureRecovery.h"
 #include "app/ControllerTrigger.h"
@@ -32,6 +33,7 @@
 #if VAPORLOCK_HAS_ONNXRUNTIME
 #define ORT_API_MANUAL_INIT
 #include <onnxruntime_cxx_api.h>
+#include "app/DmlSession.h"
 #include "app/InferenceRuntime.h"
 #if VAPORLOCK_HAS_DML
 #include <dml_provider_factory.h>
@@ -65,6 +67,7 @@
 #include <deque>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <locale>
 #include <map>
 #include <memory>
@@ -93,7 +96,6 @@ double legacyDurationMs(int frames, int explicitMs) {
     return explicitMs >= 0 ? explicitMs : std::max(0, frames) * 1000.0 / kLegacyResponseHz;
 }
 
-constexpr int kFrameTimer = 1001;
 constexpr COLORREF kWindow = RGB(13, 18, 27);
 constexpr COLORREF kSidebar = RGB(17, 25, 38);
 constexpr COLORREF kPanel = RGB(23, 33, 48);
@@ -413,6 +415,7 @@ struct AppConfig {
     bool previewEnabled = false;
     int previewFps = 5;
     int previewQuality = 80;
+    bool previewLossless = false;
     bool datasetEnabled = false;
     bool datasetCaptureConfidenceEnabled = false;
     std::wstring datasetDirectory;
@@ -792,6 +795,37 @@ bool encodeJpeg(int width, int height, const std::vector<unsigned char>& bgra, i
     return true;
 }
 
+bool encodePreviewPng(int width, int height, const std::vector<unsigned char>& bgra, std::vector<unsigned char>& encoded) {
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf())))) return false;
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    // Desktop alpha is undefined. Treat the fourth byte as padding to preserve opaque RGB.
+    if (FAILED(factory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGR, width * 4,
+                                               static_cast<UINT>(bgra.size()), const_cast<BYTE*>(bgra.data()), bitmap.GetAddressOf()))) return false;
+    Microsoft::WRL::ComPtr<IWICFormatConverter> rgb;
+    if (FAILED(factory->CreateFormatConverter(rgb.GetAddressOf()))
+        || FAILED(rgb->Initialize(bitmap.Get(), GUID_WICPixelFormat24bppBGR, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom))) return false;
+    Microsoft::WRL::ComPtr<IStream> stream;
+    if (FAILED(CreateStreamOnHGlobal(nullptr, TRUE, stream.GetAddressOf()))) return false;
+    Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
+    if (FAILED(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf()))
+        || FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache))) return false;
+    Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
+    WICPixelFormatGUID format = GUID_WICPixelFormat24bppBGR;
+    if (FAILED(encoder->CreateNewFrame(frame.GetAddressOf(), nullptr))
+        || FAILED(frame->Initialize(nullptr)) || FAILED(frame->SetSize(width, height))
+        || FAILED(frame->SetPixelFormat(&format)) || !IsEqualGUID(format, GUID_WICPixelFormat24bppBGR)
+        || FAILED(frame->WriteSource(rgb.Get(), nullptr)) || FAILED(frame->Commit()) || FAILED(encoder->Commit())) return false;
+    STATSTG stats{};
+    if (FAILED(stream->Stat(&stats, STATFLAG_NONAME)) || stats.cbSize.QuadPart == 0
+        || stats.cbSize.QuadPart > vaporlock::io::AsyncTelemetry::maxLineBytes) return false;
+    encoded.resize(static_cast<std::size_t>(stats.cbSize.QuadPart));
+    ULONG bytesRead = 0;
+    return SUCCEEDED(stream->Seek({}, STREAM_SEEK_SET, nullptr))
+        && SUCCEEDED(stream->Read(encoded.data(), static_cast<ULONG>(encoded.size()), &bytesRead))
+        && bytesRead == encoded.size();
+}
+
 void drawLine(std::vector<unsigned char>& bgra, int width, int height, int x0, int y0, int x1, int y1, const std::array<unsigned char, 3>& color) {
     if (width <= 0 || height <= 0 || bgra.size() != static_cast<std::size_t>(width) * height * 4U
         || std::max(x0, x1) < 0 || std::min(x0, x1) >= width
@@ -945,6 +979,40 @@ std::pair<int, int> captureSourcePoint(int x, int y, int sourceWidth, int source
 
 class DesktopCapture {
 public:
+    struct Frame {
+        CaptureFrameIdentity identity{};
+        AimTime observed{}, acquired{};
+        int frameWidth = 1, frameHeight = 1, frameLeft = 0, frameTop = 0;
+        bool fresh = false, attempted = false;
+        int sourceBackend = 0;
+        const char* recovery = "none";
+        std::int64_t capturedAt = 0;
+        std::uint64_t probes = 0, transitions = 0, timeouts = 0, dxgiImages = 0, dxgiCombined = 0;
+        double captureMs = 0, acquireMs = 0, readbackMs = 0, cpuCopyMs = 0;
+        std::vector<unsigned char> pixels;
+
+        int width() const { return frameWidth; }
+        int height() const { return frameHeight; }
+        int left() const { return frameLeft; }
+        int top() const { return frameTop; }
+        bool freshFrame() const { return fresh; }
+        bool hasCommittedFrame() const { return observed != AimTime{} && !pixels.empty(); }
+        AimTime observedAt() const { return observed; }
+        std::int64_t capturedAtMs() const { return capturedAt; }
+        const std::vector<unsigned char>& bgra() const { return pixels; }
+        CaptureFrameIdentity frameIdentity(std::uint64_t revision) const {
+            return {identity.session, identity.sourceGeneration, identity.frameId, revision};
+        }
+        const char* backend() const { return sourceBackend == 1 ? "dxgi" : sourceBackend == 2 ? "gdi" : "none"; }
+        const char* recoveryReason() const { return recovery; }
+        std::uint64_t recoveryProbes() const { return probes; }
+        std::uint64_t recoveryTransitions() const { return transitions; }
+        std::uint64_t dxgiTimeouts() const { return timeouts; }
+        std::uint64_t dxgiFrames() const { return dxgiImages; }
+        std::uint64_t dxgiCoalescedFrames() const { return dxgiCombined; }
+        double workMilliseconds() const { return std::max(0., captureMs - acquireMs); }
+    };
+
     DesktopCapture() : m_session(++s_sessionCounter) {}
     static HMONITOR sourceMonitor(int index) { return monitorFromIndex(index); }
     DesktopCapture(const DesktopCapture&) = delete;
@@ -966,7 +1034,7 @@ public:
         m_maskedContent = false; m_recoveryReason = "none";
         m_recovery = vaporlock::CaptureRecovery{};
         m_recovery.reset(AimClock::now());
-        m_dxgiFrames = m_dxgiTimeouts = 0;
+        m_dxgiFrames = m_dxgiTimeouts = m_dxgiCoalescedFrames = 0;
         ++m_sourceGeneration; // Frame IDs remain monotonic on this object.
     }
 
@@ -979,6 +1047,8 @@ public:
         const auto started = std::chrono::steady_clock::now();
         m_frameUpdated = false;
         m_presentedAt = {}; m_acquiredAt = {}; m_acquisitionMs = 0;
+        m_dxgiReadbackMs = m_dxgiCpuCopyMs = 0.0;
+        m_dxgiAttempted = false;
         if(cancelled()){m_captureMs=0;return true;}
         const auto geometry = std::make_tuple(config.captureMonitor, config.captureRegion.xOffset,
             config.captureRegion.yOffset, config.captureRegion.width, config.captureRegion.height);
@@ -1012,7 +1082,10 @@ public:
     }
 
     AimTime acquiredAt() const { return m_acquiredAt; }
+    bool dxgiAttempted() const { return m_dxgiAttempted; }
     double acquisitionMilliseconds() const { return m_acquisitionMs; }
+    double dxgiReadbackMilliseconds() const { return m_dxgiReadbackMs; }
+    double dxgiCpuCopyMilliseconds() const { return m_dxgiCpuCopyMs; }
     double workMilliseconds() const { return std::max(0.,m_captureMs-m_acquisitionMs); }
     HBITMAP bitmap() const { return m_bitmap; }
     int width() const { return m_width; }
@@ -1027,11 +1100,35 @@ public:
     std::uint64_t recoveryTransitions() const { return m_recovery.transitions; }
     std::uint64_t dxgiTimeouts() const { return m_dxgiTimeouts; }
     std::uint64_t dxgiFrames() const { return m_dxgiFrames; }
+    std::uint64_t dxgiCoalescedFrames() const { return m_dxgiCoalescedFrames; }
     AimTime observedAt() const { return m_observedAt; }
     std::int64_t capturedAtMs() const { return m_capturedAtMs; }
     const std::vector<unsigned char>& bgra() const { return m_bgra; }
     CaptureFrameIdentity frameIdentity(std::uint64_t revision) const {
         return {m_session, m_sourceGeneration, m_frameId, revision};
+    }
+
+    void takeFrame(Frame& frame, std::uint64_t revision) {
+        frame.identity = frameIdentity(revision);
+        frame.observed = m_observedAt;
+        frame.acquired = m_acquiredAt;
+        frame.frameWidth = m_width; frame.frameHeight = m_height;
+        frame.frameLeft = m_left; frame.frameTop = m_top;
+        frame.fresh = m_frameUpdated;
+        frame.attempted = m_dxgiAttempted;
+        frame.sourceBackend = m_committedBackend;
+        frame.recovery = m_recoveryReason;
+        frame.capturedAt = m_capturedAtMs;
+        frame.probes = m_recovery.probes;
+        frame.transitions = m_recovery.transitions;
+        frame.timeouts = m_dxgiTimeouts;
+        frame.dxgiImages = m_dxgiFrames;
+        frame.dxgiCombined = m_dxgiCoalescedFrames;
+        frame.captureMs = m_captureMs;
+        frame.acquireMs = m_acquisitionMs;
+        frame.readbackMs = dxgiReadbackMilliseconds();
+        frame.cpuCopyMs = dxgiCpuCopyMilliseconds();
+        if (m_frameUpdated) frame.pixels.swap(m_bgra);
     }
 
 private:
@@ -1110,7 +1207,7 @@ private:
         // Keep the last DXGI mask observation visible in recovery diagnostics.
         if (m_maskedContent) reason = "dxgi-stalled-after-masked-frame";
         const auto now = AimClock::now();
-        const bool first = m_bgra.empty();
+        const bool first = m_observedAt == AimTime{};
         // An empty startup buffer is not evidence that DXGI is unavailable.
         // It may initially report only a pointer event or an old idle desktop.
         // Give image delivery the same bounded probe policy used mid-session.
@@ -1178,12 +1275,13 @@ private:
             resetDxgi();
             return recoverGdi(monitor, region, "dxgi-release-failed", true);
         }
-        // Only the fresh-image-paced Cloud caller supplies a finite wait;
-        // other model paths keep their existing zero-wait polling behavior.
+        // Native desktop ONNX uses a nonblocking poll and schedules retries
+        // with a high-resolution timer. The Cloud worker can request a wait.
         if(cancelled())return true;
         const auto acquiring=AimClock::now();
         const HRESULT acquired = m_duplication->AcquireNextFrame(waitMs, &frameInfo, resource.GetAddressOf());
         const auto acquiredAt=AimClock::now();
+        m_dxgiAttempted = true;
         m_acquisitionMs=std::chrono::duration<double,std::milli>(acquiredAt-acquiring).count();
         // AcquireNextFrame cannot be cancelled. Retire an intervening config,
         // shutdown or revocation before copying/committing any image.
@@ -1250,7 +1348,10 @@ private:
         if (!ensureStagingSurface(source, cropWidth, cropHeight)) { release(); return false; }
         m_context->CopySubresourceRegion(m_staging.Get(), 0, 0, 0, 0, desktopTexture.Get(), 0, &crop);
         D3D11_MAPPED_SUBRESOURCE mapped{};
+        const auto mapStarted = AimClock::now();
         const HRESULT mappedResult = m_context->Map(m_staging.Get(), 0, D3D11_MAP_READ, 0, &mapped);
+        const auto mapFinished = AimClock::now();
+        m_dxgiReadbackMs = std::chrono::duration<double, std::milli>(mapFinished - mapStarted).count();
         if (FAILED(mappedResult)) { release(); return false; }
         m_width = width;
         m_height = height;
@@ -1270,11 +1371,13 @@ private:
                 }
             }
         }
+        m_dxgiCpuCopyMs = std::chrono::duration<double, std::milli>(AimClock::now() - mapFinished).count();
         m_context->Unmap(m_staging.Get(), 0);
         m_frameUpdated = true;
         m_acquiredBackend = 1;
         m_maskedContent = frameInfo.ProtectedContentMaskedOut != FALSE;
         ++m_dxgiFrames;
+        if (frameInfo.AccumulatedFrames > 1) m_dxgiCoalescedFrames += frameInfo.AccumulatedFrames - 1;
         m_recovery.presented(AimClock::now());
         m_recoveryReason = "none";
         return true;
@@ -1373,14 +1476,15 @@ private:
     int m_width = 1, m_height = 1;
     int m_left = 0, m_top = 0;
     double m_captureMs = 0.0, m_acquisitionMs=0.0;
+    double m_dxgiReadbackMs = 0.0, m_dxgiCpuCopyMs = 0.0;
     bool m_frameUpdated = false;
-    bool m_frameAcquired = false;
+    bool m_frameAcquired = false, m_dxgiAttempted = false;
     int m_acquiredBackend = 0, m_committedBackend = 0;
     bool m_maskedContent = false;
     int m_requestedMonitor = 0;
     AimTime m_nextDxgiAttempt{};
     vaporlock::CaptureRecovery m_recovery;
-    std::uint64_t m_dxgiTimeouts = 0, m_dxgiFrames = 0;
+    std::uint64_t m_dxgiTimeouts = 0, m_dxgiFrames = 0, m_dxgiCoalescedFrames = 0;
     const char* m_recoveryReason = "none";
     std::vector<unsigned char> m_bgra;
     Microsoft::WRL::ComPtr<IDXGIAdapter1> m_adapter;
@@ -1393,6 +1497,8 @@ private:
     DXGI_FORMAT m_stagingFormat = DXGI_FORMAT_UNKNOWN;
     int m_captureMonitor = 0;
 };
+
+#include "app/DesktopCaptureWorker.h"
 
 void drawSegmentationMask(std::vector<unsigned char>& bgra, int width, int height, const Detection& detection,
                           const std::array<unsigned char, 3>& color) {
@@ -1528,6 +1634,9 @@ public:
             auto environment = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "VaporLock");
             m_cpuPlacement.configure(requestedProvider==InferenceProvider::Cpu ? cpuSets : L"");
             Ort::SessionOptions options;
+#if VAPORLOCK_HAS_CUDA
+            bool tryCudaReplay = false;
+#endif
             options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
             if (intraOpThreads > 0) options.SetIntraOpNumThreads(intraOpThreads);
             if (interOpThreads > 0) options.SetInterOpNumThreads(interOpThreads);
@@ -1567,12 +1676,8 @@ public:
 #else
 #if VAPORLOCK_HAS_CUDA
             if (requestedProvider == InferenceProvider::Cuda) {
-                Ort::CUDAProviderOptions cudaOptions;
-                // Session::Run below does not bind persistent CUDA outputs. ORT
-                // graph replay requires stable device addresses via I/O binding.
-                cudaOptions.Update({{"device_id", std::to_string(m_inferenceDevice)}, {"do_copy_in_default_stream", "1"}, {"enable_cuda_graph", "0"}});
-                options.AppendExecutionProvider_CUDA_V2(*cudaOptions);
-                providerName = cudaGraphReplay ? L"CUDA (graph replay unavailable)" : L"CUDA";
+                tryCudaReplay = cudaGraphReplay;
+                providerName = L"CUDA";
             } else if (requestedProvider == InferenceProvider::DirectMl) {
                 error = L"DirectML uses the VaporLockDml engine. Choose DirectML from the control center so it launches that engine.";
                 return false;
@@ -1587,7 +1692,37 @@ public:
 #endif
 #endif
 #endif
-            auto session = std::make_unique<Ort::Session>(*environment, path.c_str(), options);
+            constexpr int defaultImageSize = 640;
+#if VAPORLOCK_FORCE_DML
+            auto session = std::make_unique<Ort::Session>(
+                vaporlock::inference::openSpecializedImageSession(*environment, path.c_str(), options, defaultImageSize));
+#else
+            std::unique_ptr<Ort::Session> session;
+#if VAPORLOCK_HAS_CUDA
+            if (requestedProvider == InferenceProvider::Cuda) {
+                auto regularOptions = options.Clone();
+                vaporlock::inference::appendCudaProvider(regularOptions, m_inferenceDevice, false);
+                if (tryCudaReplay) {
+                    try {
+                        auto graphOptions = options.Clone();
+#if ORT_API_VERSION >= 22 && !defined(ORT_MINIMAL_BUILD)
+                        vaporlock::inference::specializeImageInput(*environment, path.c_str(), defaultImageSize, graphOptions);
+#endif
+                        vaporlock::inference::appendCudaProvider(graphOptions, m_inferenceDevice, true);
+                        session = std::make_unique<Ort::Session>(*environment, path.c_str(), graphOptions);
+                    } catch (const Ort::Exception&) {
+                        tryCudaReplay = false;
+                    }
+                }
+                if (!session) {
+                    session = std::make_unique<Ort::Session>(vaporlock::inference::openSpecializedImageSession(
+                        *environment, path.c_str(), regularOptions, defaultImageSize));
+                    if (cudaGraphReplay) providerName += L" (graph replay unavailable for this model)";
+                }
+            }
+#endif
+            if (!session) session = std::make_unique<Ort::Session>(*environment, path.c_str(), options);
+#endif
             if (session->GetInputCount() < 1 || session->GetOutputCount() < 1) {
                 error = L"A supported detector must expose at least one image input and one output (found "
                         + std::to_wstring(session->GetInputCount()) + L" input(s), "
@@ -1708,8 +1843,8 @@ public:
                 error = L"This detector supports float or uint8 image inputs. This model uses an unsupported input type.";
                 return false;
             }
-            const int inputHeight = static_cast<int>((nchw ? shape[2] : shape[1]) > 0 ? (nchw ? shape[2] : shape[1]) : 640);
-            const int inputWidth = static_cast<int>((nchw ? shape[3] : shape[2]) > 0 ? (nchw ? shape[3] : shape[2]) : 640);
+            const int inputHeight = static_cast<int>((nchw ? shape[2] : shape[1]) > 0 ? (nchw ? shape[2] : shape[1]) : defaultImageSize);
+            const int inputWidth = static_cast<int>((nchw ? shape[3] : shape[2]) > 0 ? (nchw ? shape[3] : shape[2]) : defaultImageSize);
             if (inputWidth <= 0 || inputHeight <= 0) {
                 error = L"The model input dimensions could not be resolved.";
                 return false;
@@ -1758,6 +1893,20 @@ public:
             m_runtime = std::make_unique<vaporlock::inference::Runtime>(
                 std::move(environment), std::move(session), m_inputName,
                 m_outputNames, m_inputShape, m_inputType,&m_cpuPlacement);
+#if VAPORLOCK_HAS_CUDA
+            if (tryCudaReplay) {
+                try {
+                    m_runtime->enableCudaGraph(ortRuntimeState().module, m_inferenceDevice);
+                } catch (const std::exception&) {
+                    // Unsupported graph capture must not block ordinary CUDA.
+                    if (!loadModel(path, requestedProvider, intraOpThreads, interOpThreads,
+                                   false, cudaPreprocess, error, deviceIndex, cpuSets, cloudPipe, cloudWorkerPid))
+                        return false;
+                    m_providerName += L" (graph replay unavailable for this model)";
+                    return true;
+                }
+            }
+#endif
 #if VAPORLOCK_FORCE_TENSORRT_RTX
             if (m_tensorRt) {
                 m_runtime->retireMetadataSession();
@@ -1843,6 +1992,7 @@ public:
             std::wstring layout = m_prototypeOutputIndex >= 0 ? L"; instance segmentation" : m_semanticOutputIndex >= 0 ? L"; semantic segmentation" : L"";
             if (m_modelEndToEnd) layout += L"; end-to-end xyxy output";
             return L"Model ready: " + std::filesystem::path(m_modelPath).filename().wstring() + L" (" + m_providerName
+                   + (cudaGraphActive() ? L" + CUDA Graph replay" : L"")
                    + L"; input " + std::to_wstring(m_inputWidth) + L" x " + std::to_wstring(m_inputHeight)
                    + (m_inputNhwc ? L" NHWC" : L" NCHW")
                    + (shape.empty() ? L"; non-tensor output" : L"; output " + shape) + classes + layout + L")";
@@ -1856,6 +2006,19 @@ public:
     double postprocessMilliseconds() const { return m_postprocessMs; }
     const std::wstring& deviceName() const noexcept { return m_deviceName; }
     int deviceIndex() const noexcept { return m_inferenceDevice; }
+    std::pair<int, int> onnxInputSize() const noexcept {
+#if VAPORLOCK_HAS_ONNXRUNTIME
+        if (m_runtime) return {m_inputWidth, m_inputHeight};
+#endif
+        return {0, 0};
+    }
+    bool cudaGraphActive() const noexcept {
+#if VAPORLOCK_HAS_ONNXRUNTIME && VAPORLOCK_HAS_CUDA
+        return m_runtime && m_runtime->cudaGraphActive();
+#else
+        return false;
+#endif
+    }
     int cpuPlacementCount() const noexcept {
 #if VAPORLOCK_HAS_ONNXRUNTIME
         return static_cast<int>(m_cpuPlacement.ids.size());
@@ -3499,8 +3662,8 @@ bool applyLiveSetting(AppConfig& config, const std::wstring& field, const std::w
     if (field == L"region_y") return integer(config.captureRegion.yOffset, -1000000, 1000000);
     if (field == L"region_width") return integer(config.captureRegion.width, 1, 1000000);
     if (field == L"region_height") return integer(config.captureRegion.height, 1, 1000000);
-    if (field == L"capture_fps") return integer(config.captureFps, 1, 1000000);
-    if (field == L"inference_fps") return integer(config.inferenceFps, 1, 1000000);
+    if (field == L"capture_fps") return vaporlock::pipeline::parseFrameRate(value, config.captureFps);
+    if (field == L"inference_fps") return vaporlock::pipeline::parseFrameRate(value, config.inferenceFps);
     if (field == L"frame_skip") return integer(config.frameSkip, 0, 600);
 
     if (field == L"match_iou") return decimal(config.matchIou, 0.01, 1.0);
@@ -3662,6 +3825,7 @@ bool applyLiveSetting(AppConfig& config, const std::wstring& field, const std::w
     if (field == L"preview_enabled") return boolean(config.previewEnabled);
     if (field == L"preview_fps") return integer(config.previewFps, 1, 120);
     if (field == L"preview_quality") return integer(config.previewQuality, 30, 100);
+    if (field == L"preview_lossless") return boolean(config.previewLossless);
     if (field == L"overlay_enabled") return boolean(config.overlayEnabled);
     if (field == L"overlay_boxes") return boolean(config.overlayBoxes);
     if (field == L"overlay_motion") return boolean(config.overlayMotion);
@@ -4015,7 +4179,8 @@ private:
 
 #include "app/AimOutput.h"
 
-void updateFrameReference(AppConfig& config, const DesktopCapture& capture,
+template<class Capture>
+void updateFrameReference(AppConfig& config, const Capture& capture,
                           vaporlock::crosshair::Matcher& matcher, std::uint64_t generation) {
     int sx=GetSystemMetrics(SM_XVIRTUALSCREEN),sy=GetSystemMetrics(SM_YVIRTUALSCREEN);
     int sw=GetSystemMetrics(SM_CXVIRTUALSCREEN),sh=GetSystemMetrics(SM_CYVIRTUALSCREEN);
@@ -4053,6 +4218,12 @@ int runHeadless(int argc, wchar_t* argv[]) {
     if (argc == 3 && std::wstring_view(argv[1]) == L"--headless" && std::wstring_view(argv[2]) == L"--capabilities") {
         std::cout << "{\"type\":\"capabilities\",\"protocol_version\":1,\"cuda_preprocess\":"
 #if VAPORLOCK_HAS_ONNXRUNTIME && (VAPORLOCK_HAS_CUDA || VAPORLOCK_FORCE_TENSORRT_RTX) && VAPORLOCK_HAS_CUDA_PREPROCESS && !VAPORLOCK_FORCE_DML
+                  << "true"
+#else
+                  << "false"
+#endif
+                  << ",\"cuda_graph_replay\":"
+#if VAPORLOCK_HAS_ONNXRUNTIME && VAPORLOCK_HAS_CUDA && !VAPORLOCK_FORCE_DML && !VAPORLOCK_FORCE_TENSORRT_RTX
                   << "true"
 #else
                   << "false"
@@ -4247,8 +4418,13 @@ int runHeadless(int argc, wchar_t* argv[]) {
                 std::cout << "{\"type\":\"error\",\"message\":\"Invalid crosshair calibration\"}" << std::endl;return 2;
             }
         }
-        else if (argument == L"--capture-fps") config.captureFps = std::max(1, _wtoi(next().c_str()));
-        else if (argument == L"--inference-fps") config.inferenceFps = std::max(1, _wtoi(next().c_str()));
+        else if (argument == L"--capture-fps" || argument == L"--inference-fps") {
+            auto& rate = argument == L"--capture-fps" ? config.captureFps : config.inferenceFps;
+            if (!vaporlock::pipeline::parseFrameRate(next(), rate)) {
+                std::cout << "{\"type\":\"error\",\"message\":\"Capture and inference rates must be positive native integers.\"}" << std::endl;
+                return 2;
+            }
+        }
         else if (argument == L"--frame-skip") config.frameSkip = std::clamp(_wtoi(next().c_str()), 0, 60);
         else if (argument == L"--predict-lost") config.predictLost = true;
         else if (argument == L"--no-predict-lost") config.predictLost = false;
@@ -4377,6 +4553,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         else if (argument == L"--no-preview") config.previewEnabled = false;
         else if (argument == L"--preview-fps") config.previewFps = std::clamp(_wtoi(next().c_str()), 1, 120);
         else if (argument == L"--preview-quality") config.previewQuality = std::clamp(_wtoi(next().c_str()), 30, 100);
+        else if (argument == L"--preview-lossless") config.previewLossless = true;
         else if (argument == L"--overlay") config.overlayEnabled = true;
         else if (argument == L"--no-overlay") config.overlayEnabled = false;
         else if (argument == L"--overlay-boxes") config.overlayBoxes = true;
@@ -4408,6 +4585,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
 
     OnnxDetector detector;
     if (!config.modelPath.empty()) {
+        const bool requestedCudaGraph = config.provider == InferenceProvider::Cuda && config.cudaGraphReplay
+            && std::filesystem::path(config.modelPath).extension() == L".onnx";
+        if (requestedCudaGraph && !inspectModel)
+            std::cout << "{\"type\":\"notice\",\"message\":\"Preparing CUDA Graph replay for this model.\"}" << std::endl;
         std::wstring error;
         if (!detector.loadModel(config.modelPath, config.provider, config.ortIntraOpThreads, config.ortInterOpThreads, config.cudaGraphReplay, config.cudaPreprocess, error, config.inferenceDevice, config.cpuSets, config.cloudPipe, config.cloudWorkerPid)) {
             std::cout << "{\"type\":\"error\",\"message\":\"" << wideToUtf8(jsonEscape(error)) << "\"}" << std::endl;
@@ -4417,6 +4598,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
             std::cout << "{\"type\":\"model\",\"message\":\"" << wideToUtf8(jsonEscape(detector.status())) << "\"}" << std::endl;
             return 0;
         }
+        if (requestedCudaGraph && !detector.cudaGraphActive())
+            std::cout << "{\"type\":\"notice\",\"message\":\"CUDA Graph replay is unavailable for this model. Standard CUDA inference will be used.\"}" << std::endl;
     } else if (inspectModel) {
         std::cout << "{\"type\":\"error\",\"message\":\"Choose an ONNX model before inspecting it\"}" << std::endl;
         return 2;
@@ -4460,7 +4643,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
     }
 
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    DesktopCapture capture;
+    DesktopCapture desktopCapture;
+    DesktopCapture::Frame capture;
     IoUTracker tracker;
     TargetSelector selector;
     MotionCompensationState motionCompensation;
@@ -4474,15 +4658,18 @@ int runHeadless(int argc, wchar_t* argv[]) {
     AimTime previousLoop{}, previousObservation{}, previousCompletion{};
     const auto started = std::chrono::steady_clock::now();
     auto lastReport = started;
-    long long frames = 0;
     long long explicitSkippedFrames = 0, rateLimitedFrames = 0, noFreshFramePolls = 0;
     long long completedInferences = 0;
     long long syntheticInferences = 0;
     long long obsoleteInferences = 0;
     std::uint64_t trackingGeneration = 0, trackingSource = 0;
     long long freshCaptures = 0;
-    struct RateSample { AimTime time; long long captures, inferences; std::uint64_t outputs; };
-    std::deque<RateSample> rateSamples{{started, 0, 0, 0}};
+    struct RateSample {
+        AimTime time;
+        long long captures, inferences;
+        std::uint64_t outputs, sourceGeneration, dxgiFrames, dxgiCoalesced;
+    };
+    std::deque<RateSample> rateSamples{{started, 0, 0, 0, 0, 0, 0}};
     double inferenceWorkMs = 0.0, modelWorkMs = 0.0;
     double captureMs = 0.0;
     double inferenceMs = 0.0;
@@ -4562,10 +4749,25 @@ int runHeadless(int argc, wchar_t* argv[]) {
                 telemetry.publish(Telemetry::Kind::Preview, std::move(line));
             });
         });
+    const bool cloudCapturePaced = !config.cloudPipe.empty();
+    std::optional<DesktopCaptureWorker> captureWorker;
+    if (!cloudCapturePaced && !config.modelPath.empty())
+        captureWorker.emplace([&](std::uint64_t revision) {
+            return telemetry.failed() || !liveConfig.current(revision);
+        }, [&](CaptureFrameIdentity identity) {
+            // The encoder acquires the config lock when publishing.
+            previewWorker.configure(false);
+            telemetry.clear(Telemetry::Kind::Preview);
+            liveConfig.withCurrent(identity.configRevision, [&] {
+                output.observeSource(identity, identity.configRevision);
+                datasetWriter.observeSource(identity);
+            });
+        });
 
     output.start();
     const auto fail = [&](std::string line, int code) {
         output.stop();
+        if (captureWorker) captureWorker->stop();
         if (!datasetWriter.stop()) {
             telemetry.publish(Telemetry::Kind::Notice, "{\"type\":\"notice\",\"message\":\"Collection is still finishing cleanup.\"}");
             while (!datasetWriter.stop()) {} // remain closing; no freed graph/detach
@@ -4582,36 +4784,66 @@ int runHeadless(int argc, wchar_t* argv[]) {
 
     vaporlock::crosshair::Matcher crosshairMatcher;
     vaporlock::crosshair::Reference previousReference;
+    DesktopCaptureWorker::Progress captureProgress;
     while (running) {
+        if (telemetry.failed()) return fail("{\"type\":\"error\",\"message\":\"The control center connection was closed.\"}", 1);
         const auto frameStarted = std::chrono::steady_clock::now();
         const auto now = frameStarted;
         const bool timingReady = now - started >= std::chrono::seconds(2);
+        const auto waitForCaptureRate = [&](AimTime deadline) {
+            const auto waitStarted = AimClock::now();
+            const bool reached = frameWait.until(deadline, liveConfig.changedEvent(),
+                [&] { return telemetry.failed(); });
+            // Only count completed positive rate waits. Source polling and
+            // interrupted waits do not measure this rate deadline.
+            if (timingReady && reached && waitStarted < deadline) {
+                const auto woke = AimClock::now();
+                pipelineTiming.captureRateWait.record(std::chrono::duration<double, std::milli>(woke - waitStarted).count());
+                pipelineTiming.captureRateOvershoot.record(std::chrono::duration<double, std::milli>(woke - deadline).count());
+            }
+            return reached;
+        };
         if (timingReady && previousLoop >= started + std::chrono::seconds(2))
             pipelineTiming.loopInterval.record(std::chrono::duration<double,std::milli>(now-previousLoop).count());
         previousLoop = now;
         const auto outputGeneration = liveConfig.read(config);
         if(trackingGeneration==outputGeneration)config.frameReference=previousReference;
-        const bool cloudCapturePaced=!config.cloudPipe.empty();
-        auto frameDeadline = cloudCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
-        if(cloudCapturePaced && cloudCaptureSchedule.hasFresh()) {
-            if(!frameWait.until(cloudCaptureSchedule.next(config.captureFps),liveConfig.changedEvent(),
-                               [&]{return telemetry.failed();}))continue;
+        const bool desktopModelCapture = captureWorker && config.captureMonitor > 0;
+        const bool freshCapturePaced = cloudCapturePaced || desktopModelCapture;
+        auto frameDeadline = freshCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
+        if (cloudCapturePaced && cloudCaptureSchedule.hasFresh()) {
+            if (!waitForCaptureRate(cloudCaptureSchedule.next(config.captureFps))) continue;
             if(!liveConfig.current(outputGeneration))continue;
         }
         previewWorker.configure(config.previewEnabled);
         if (!config.previewEnabled) telemetry.clear(Telemetry::Kind::Preview);
         if (!config.overlayMetadata && !config.previewEnabled) telemetry.clear(Telemetry::Kind::Overlay);
-        if (telemetry.failed()) return fail("{\"type\":\"error\",\"message\":\"The control center connection was closed.\"}", 1);
-        const auto captureStarted = std::chrono::steady_clock::now();
+        const auto captureStarted = AimClock::now();
         const auto captureCancelled=[&] {
             return telemetry.failed() || !liveConfig.current(outputGeneration);
         };
-        const bool captureOk=cloudCapturePaced ? capture.capture(config,4,captureCancelled) : capture.capture(config);
+        bool captureOk = true;
+        bool rateViolation = false;
+        const DesktopCaptureWorker::Request captureRequest{config.captureMonitor, config.captureRegion,
+            config.captureFps, outputGeneration};
+        capture.fresh = capture.attempted = false;
+        if (captureWorker) {
+            captureWorker->submit(captureRequest);
+            const auto result = captureWorker->take(capture, outputGeneration, std::chrono::milliseconds(8), &captureProgress);
+            captureOk = result != DesktopCaptureWorker::Result::Failed;
+            rateViolation = result == DesktopCaptureWorker::Result::RateViolation;
+        } else {
+            captureOk = cloudCapturePaced ? desktopCapture.capture(config, 4, captureCancelled)
+                                          : desktopCapture.capture(config);
+            desktopCapture.takeFrame(capture, outputGeneration);
+        }
+        const auto afterCapture = AimClock::now();
+        if (cloudCapturePaced && capture.freshFrame() && !cloudCaptureSchedule.commit(capture.acquired, config.captureFps))
+            return fail("{\"type\":\"error\",\"message\":\"Capture violated its fresh-frame rate boundary.\"}",1);
+        if ((freshCapturePaced || captureWorker) && captureCancelled()) {++retiredCaptureAttempts;continue;}
+        if (rateViolation) return fail("{\"type\":\"error\",\"message\":\"Capture violated its fresh-frame rate boundary.\"}", 1);
         if(!captureOk)return fail("{\"type\":\"error\",\"message\":\"Desktop capture failed\"}",1);
-        const auto afterCapture=std::chrono::steady_clock::now();
-        if(cloudCapturePaced && capture.freshFrame() && !cloudCaptureSchedule.commit(capture.acquiredAt(),config.captureFps))
-            return fail("{\"type\":\"error\",\"message\":\"Cloud capture violated its fresh-frame rate boundary.\"}",1);
-        if(cloudCapturePaced && captureCancelled()) {++retiredCaptureAttempts;continue;}
+        if (timingReady && capture.attempted) pipelineTiming.captureAcquire.record(capture.acquireMs);
         const auto sourceIdentity = capture.frameIdentity(outputGeneration);
         const bool sourceChanged = capture.freshFrame() && (trackingSource != sourceIdentity.sourceGeneration
             || trackingGeneration != outputGeneration);
@@ -4634,19 +4866,24 @@ int runHeadless(int argc, wchar_t* argv[]) {
         }
         if (capture.freshFrame()) {
             if (timingReady) {
-                const double wall=std::chrono::duration<double,std::milli>(afterCapture-captureStarted).count();
-                pipelineTiming.capture.record(cloudCapturePaced?capture.workMilliseconds():wall);
-                pipelineTiming.captureWall.record(wall);
-                pipelineTiming.captureAcquire.record(cloudCapturePaced?capture.acquisitionMilliseconds():0.);
+                pipelineTiming.capture.record(capture.workMilliseconds());
+                pipelineTiming.captureWall.record(capture.captureMs);
+                if (capture.sourceBackend == 1) {
+                    pipelineTiming.captureDxgiReadback.record(capture.readbackMs);
+                    pipelineTiming.captureDxgiCpuCopy.record(capture.cpuCopyMs);
+                }
+                if (captureWorker && captureProgress.capturePacingWaitMs > 0) {
+                    pipelineTiming.captureRateWait.record(captureProgress.capturePacingWaitMs);
+                    pipelineTiming.captureRateOvershoot.record(captureProgress.capturePacingOvershootMs);
+                }
                 if (previousObservation >= started + std::chrono::seconds(2))
                     pipelineTiming.observationInterval.record(std::chrono::duration<double,std::milli>(capture.observedAt()-previousObservation).count());
             }
             previousObservation = capture.observedAt();
         }
         if (capture.freshFrame()) datasetWriter.observeSource(capture.frameIdentity(outputGeneration));
-        ++frames;
         if (capture.freshFrame()) ++freshCaptures;
-        else ++noFreshFramePolls;
+        else if (!captureWorker) ++noFreshFramePolls;
         const bool needsController = config.activationSource != 0
                                       || (config.manualTargetLockEnabled && config.manualLockSource != 0)
                                       || (usingVirtualXbox && config.virtualControllerMode == 1);
@@ -4680,6 +4917,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
             const auto captureIdentity = capture.frameIdentity(outputGeneration);
             updateFrameReference(config,capture,crosshairMatcher,outputGeneration);
             output.observeReference(config.frameReference,captureIdentity,outputGeneration);
+            if (desktopModelCapture) captureWorker->submit(captureRequest);
             try {
                 detectionBatch = detector.detectBatch(capture.width(), capture.height(), capture.bgra(), config, captureIdentity);
                 currentDetections = std::move(detectionBatch.targeting);
@@ -4695,7 +4933,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
             }
             // Serialize only the stateful CPU commit with config changes.
             // Session::Run and preview encoding never hold this lock.
-            const bool accepted = liveConfig.withCurrent(outputGeneration, [&] {
+            const auto commitTracking = [&] {
                 if (trackingGeneration != outputGeneration || trackingSource != captureIdentity.sourceGeneration) {
                     tracker = IoUTracker{}; selector = TargetSelector{};
                     motionCompensation = MotionCompensationState{};
@@ -4711,13 +4949,22 @@ int runHeadless(int argc, wchar_t* argv[]) {
                 selected = config.frameReference.usable(AimClock::now()) ? selector.select(tracks, capture.width(), capture.height(), config) : std::optional<Track>{};
                 output.publish(selected, capture.width(), capture.height(), capture.observedAt(), outputGeneration,
                                motionCompensation.update(tracks, config, capture.observedAt()), captureIdentity, config.frameReference);
-            });
+            };
+            const auto withCurrentCapture = [&](auto action) {
+                bool sourceCurrent = true;
+                const bool configCurrent = liveConfig.withCurrent(outputGeneration, [&] {
+                    if (captureWorker) sourceCurrent = captureWorker->withCurrentSource(captureIdentity, action);
+                    else action();
+                });
+                return configCurrent && sourceCurrent;
+            };
+            const bool accepted = withCurrentCapture(commitTracking);
             if (!accepted) ++obsoleteInferences;
             const auto afterTracking = std::chrono::steady_clock::now();
             detections = static_cast<int>(currentDetections.size());
-            captureWallMs=std::chrono::duration<double,std::milli>(afterCapture-captureStarted).count();
-            captureAcquireMs=cloudCapturePaced?capture.acquisitionMilliseconds():0.;
-            captureMs=cloudCapturePaced?capture.workMilliseconds():captureWallMs;
+            captureWallMs=capture.captureMs;
+            captureAcquireMs=capture.acquireMs;
+            captureMs=capture.workMilliseconds();
             inferenceMs = std::chrono::duration<double, std::milli>(afterInference - afterCapture).count();
             preprocessMs = detector.preprocessMilliseconds();
             modelMs = detector.modelMilliseconds();
@@ -4742,7 +4989,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
                 auto line = overlayMetadata(capture.width(), capture.height(), tracks, selected,
                     selector.manuallyLocked(), config, capture.left(), capture.top(), capture.observedAt(),
                     captureIdentity, output.visualSnapshot(captureIdentity));
-                liveConfig.withCurrent(outputGeneration, [&] { telemetry.publish(Telemetry::Kind::Overlay, std::move(line)); });
+                withCurrentCapture([&] { telemetry.publish(Telemetry::Kind::Overlay, std::move(line)); });
             }
 
             if (accepted && config.datasetEnabled && capture.freshFrame())
@@ -4780,7 +5027,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
                                     && controller.connected
                                     && controller.slot != 0;
             std::ostringstream report;
-            rateSamples.push_back({reportNow, freshCaptures, completedInferences, outputStatus.sent});
+            rateSamples.push_back({reportNow, freshCaptures, completedInferences, outputStatus.sent,
+                sourceIdentity.sourceGeneration, capture.dxgiFrames(), capture.dxgiCoalescedFrames()});
             while (rateSamples.size() > 2 && reportNow - rateSamples[1].time >= std::chrono::seconds(1)) rateSamples.pop_front();
             const auto& previousRate = rateSamples.front();
             const double rateSeconds = std::max(0.001, std::chrono::duration<double>(reportNow - previousRate.time).count());
@@ -4797,11 +5045,12 @@ int runHeadless(int argc, wchar_t* argv[]) {
                       << ",\"inference_obsolete_total\":" << obsoleteInferences
                       << ",\"inference_device\":\"" << wideToUtf8(jsonEscape(detector.deviceName())) << "\""
                       << ",\"inference_device_index\":" << detector.deviceIndex()
+                      << ",\"cuda_graph_replay_active\":" << (detector.cudaGraphActive() ? "true" : "false")
                       << ",\"cpu_placement_count\":" << detector.cpuPlacementCount()
-                      << ",\"high_resolution_pacing\":" << (frameWait.highResolution() ? "true" : "false")
+                      << ",\"high_resolution_pacing\":" << ((desktopModelCapture ? captureProgress.highResolutionPacing : frameWait.highResolution()) ? "true" : "false")
                       << ",\"inference_explicit_skip_total\":" << explicitSkippedFrames
                       << ",\"inference_rate_limited_total\":" << rateLimitedFrames
-                      << ",\"capture_no_fresh_poll_total\":" << noFreshFramePolls
+                      << ",\"capture_no_fresh_poll_total\":" << (captureWorker ? captureProgress.noFreshPolls : noFreshFramePolls)
                       << ",\"uptime_seconds\":" << uptime
                       << ",\"inference_work_ms\":" << inferenceWorkMs
                       << ",\"model_work_ms\":" << modelWorkMs
@@ -4809,8 +5058,9 @@ int runHeadless(int argc, wchar_t* argv[]) {
                       << ",\"inference_ms\":" << inferenceMs
                       << ",\"capture_wall_ms\":" << captureWallMs
                       << ",\"capture_acquire_ms\":" << captureAcquireMs
-                      << ",\"capture_config_retired_total\":" << retiredCaptureAttempts
+                      << ",\"capture_config_retired_total\":" << (retiredCaptureAttempts + captureProgress.retiredAttempts)
                       << ",\"cloud_fresh_capture_pacing\":" << (cloudCapturePaced?"true":"false")
+                      << ",\"fresh_capture_pacing\":" << (freshCapturePaced?"true":"false")
                       << ",\"preprocess_ms\":" << preprocessMs
                       << ",\"model_ms\":" << modelMs
                       << ",\"postprocess_ms\":" << postprocessMs
@@ -4886,25 +5136,46 @@ int runHeadless(int argc, wchar_t* argv[]) {
                    << ",\"capture_recovery_reason\":\"" << capture.recoveryReason() << "\""
                    << ",\"capture_recovery_probes\":" << capture.recoveryProbes()
                    << ",\"capture_recovery_transitions\":" << capture.recoveryTransitions()
-                   << ",\"capture_dxgi_timeouts\":" << capture.dxgiTimeouts()
+                   << ",\"capture_dxgi_timeouts\":" << (captureWorker ? captureProgress.dxgiTimeouts : capture.dxgiTimeouts())
                    << ",\"capture_dxgi_frames\":" << capture.dxgiFrames()
-                   << ",\"timing\":";
+                   << ",\"capture_dxgi_coalesced_frames\":" << capture.dxgiCoalescedFrames();
+            const auto& currentRate = rateSamples.back();
+            const auto previousSourceRate = std::find_if(rateSamples.begin(), rateSamples.end(), [&](const RateSample& sample) {
+                return sample.sourceGeneration == currentRate.sourceGeneration;
+            });
+            if (capture.hasCommittedFrame() && std::string_view(capture.backend()) == "dxgi"
+                    && previousSourceRate != std::prev(rateSamples.end())) {
+                const double sourceSeconds = std::chrono::duration<double>(reportNow - previousSourceRate->time).count();
+                const auto captured = currentRate.dxgiFrames - previousSourceRate->dxgiFrames;
+                const auto coalesced = currentRate.dxgiCoalesced - previousSourceRate->dxgiCoalesced;
+                report << ",\"capture_dxgi_update_fps\":" << (captured + coalesced) / sourceSeconds
+                       << ",\"capture_dxgi_coalesced_fps\":" << coalesced / sourceSeconds;
+            } else {
+                report << ",\"capture_dxgi_update_fps\":null,\"capture_dxgi_coalesced_fps\":null";
+            }
+            if (const auto [inputWidth, inputHeight] = detector.onnxInputSize(); inputWidth > 0 && inputHeight > 0)
+                report << ",\"model_input_width\":" << inputWidth << ",\"model_input_height\":" << inputHeight;
+            report << ",\"timing\":";
             pipelineTiming.json(report);
             report << ",\"model\":\"" << (config.modelPath.empty() ? "test signal" : "loaded") << "\"}";
             telemetry.publish(Telemetry::Kind::Stats, report.str());
             lastReport = reportNow;
         }
 
-        if(cloudCapturePaced) {
-            // A zero/pointer-only return must neither consume a fresh-frame
-            // rate slot nor cause a spin. A normal 4ms source wait needs no
-            // extra delay; a very short unsuccessful call gets a bounded retry.
+        if (timingReady && decision == InferenceDecision::Run)
+            pipelineTiming.postTrackingWork.record(
+                std::chrono::duration<double, std::milli>(AimClock::now() - previousCompletion).count());
+
+        if (desktopModelCapture) continue;
+        if (cloudCapturePaced) {
+            // Keep waiting for the next desktop image without spending another
+            // rate slot. Back off only when the source returned immediately.
             if(!capture.freshFrame() && afterCapture-captureStarted<std::chrono::milliseconds(1))
                 frameWait.until(AimClock::now()+std::chrono::milliseconds(1),liveConfig.changedEvent(),[&]{return telemetry.failed();});
             continue;
         }
         int pacingFps = config.captureFps;
-        while (!frameWait.until(frameDeadline, liveConfig.changedEvent(), [&] { return telemetry.failed(); })) {
+        while (!waitForCaptureRate(frameDeadline)) {
             if (telemetry.failed()) break;
             const int updatedFps = liveConfig.captureFps();
             if (updatedFps != pacingFps) {
@@ -4918,6 +5189,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         }
     }
     output.stop();
+    if (captureWorker) captureWorker->stop();
     if (!datasetWriter.stop()) {
         telemetry.publish(Telemetry::Kind::Notice, "{\"type\":\"notice\",\"message\":\"Collection is still finishing cleanup.\"}");
         while (!datasetWriter.stop()) {} // owner and callbacks remain alive
@@ -4944,8 +5216,40 @@ public:
             CW_USEDEFAULT, CW_USEDEFAULT, 1480, 920, nullptr, nullptr, instance, this);
         ShowWindow(m_hwnd, show);
         UpdateWindow(m_hwnd);
+        HANDLE frameTimer = CreateWaitableTimerExW(nullptr, nullptr,
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
         MSG message{};
-        while (GetMessageW(&message, nullptr, 0, 0)) { TranslateMessage(&message); DispatchMessageW(&message); }
+        while (true) {
+            if (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+                if (message.message == WM_QUIT) break;
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+            const auto now = AimClock::now();
+            if (m_running && now >= m_nextFrame) {
+                m_nextFrame = now + vaporlock::pipeline::FreshFrameSchedule::period(m_config.captureFps);
+                step();
+                continue;
+            }
+            DWORD timeout = INFINITE;
+            bool armed = false;
+            if (m_running) {
+                const double remainingMs = std::chrono::duration<double, std::milli>(m_nextFrame - now).count();
+                LARGE_INTEGER due{};
+                due.QuadPart = -std::max<LONGLONG>(1, static_cast<LONGLONG>(std::ceil(remainingMs * 10'000.0)));
+                armed = frameTimer && SetWaitableTimer(frameTimer, &due, 0, nullptr, nullptr, FALSE);
+                timeout = static_cast<DWORD>(std::ceil(remainingMs)) + 1;
+            }
+            const DWORD waitResult = MsgWaitForMultipleObjectsEx(armed ? 1 : 0,
+                armed ? &frameTimer : nullptr, timeout, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            if (waitResult == WAIT_FAILED) {
+                if (frameTimer) CloseHandle(frameTimer);
+                frameTimer = nullptr;
+                if (MsgWaitForMultipleObjectsEx(0, nullptr, timeout, QS_ALLINPUT, MWMO_INPUTAVAILABLE) == WAIT_FAILED)
+                    break;
+            }
+        }
+        if (frameTimer) CloseHandle(frameTimer);
         return static_cast<int>(message.wParam);
     }
 
@@ -4968,13 +5272,12 @@ private:
         case WM_SIZE: layout(); return 0;
         case WM_GETMINMAXINFO: reinterpret_cast<MINMAXINFO*>(lparam)->ptMinTrackSize = {1100, 700}; return 0;
         case WM_COMMAND: command(LOWORD(wparam), HIWORD(wparam)); return 0;
-        case WM_TIMER: if (wparam == kFrameTimer) step(); return 0;
         case WM_DRAWITEM: drawButton(reinterpret_cast<DRAWITEMSTRUCT*>(lparam)); return TRUE;
         case WM_CTLCOLORSTATIC: return controlColor(reinterpret_cast<HDC>(wparam), false);
         case WM_CTLCOLOREDIT: return controlColor(reinterpret_cast<HDC>(wparam), true);
         case WM_CTLCOLORLISTBOX: return controlColor(reinterpret_cast<HDC>(wparam), true);
         case WM_PAINT: paint(); return 0;
-        case WM_DESTROY: KillTimer(m_hwnd, kFrameTimer); destroyResources(); PostQuitMessage(0); return 0;
+        case WM_DESTROY: m_running = false; destroyResources(); PostQuitMessage(0); return 0;
         default: return DefWindowProcW(m_hwnd, message, wparam, lparam);
         }
     }
@@ -5204,14 +5507,12 @@ private:
         m_output.stop();
         if (!m_running) return;
         m_running = false;
-        KillTimer(m_hwnd, kFrameTimer);
         m_stats.outputActive = false;
         appendLog(L"Capture pipeline stopped");
         InvalidateRect(m_hwnd, nullptr, FALSE);
     }
     void refreshTimer() {
-        KillTimer(m_hwnd, kFrameTimer);
-        SetTimer(m_hwnd, kFrameTimer, static_cast<UINT>(std::max(1, 1000 / std::max(1, m_config.captureFps))), nullptr);
+        m_nextFrame = AimClock::now();
     }
 
     std::wstring chooseFile(const wchar_t* title, const wchar_t* filter, bool save) {
@@ -5276,8 +5577,8 @@ private:
         m_config.iou = number(m_nmsIou, m_config.iou, 0.01, 1.0);
         m_config.classFilter = value(m_classFilter);
         m_config.captureMonitor = SendMessageW(m_captureSource, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
-        m_config.captureFps = integer(m_captureFps, m_config.captureFps, 1, 240);
-        m_config.inferenceFps = integer(m_inferenceFps, m_config.inferenceFps, 1, 240);
+        vaporlock::pipeline::parseFrameRate(value(m_captureFps), m_config.captureFps);
+        vaporlock::pipeline::parseFrameRate(value(m_inferenceFps), m_config.inferenceFps);
         m_config.frameSkip = integer(m_frameSkip, m_config.frameSkip, 0, 60);
         m_config.matchIou = number(m_trackIou, m_config.matchIou, 0.01, 1.0);
         m_config.smoothing = number(m_smoothing, m_config.smoothing, 0.0, 0.95);
@@ -5430,8 +5731,17 @@ private:
             std::array<int*, 4> targets{&loaded.captureRegion.xOffset, &loaded.captureRegion.yOffset, &loaded.captureRegion.width, &loaded.captureRegion.height};
             for (auto* target : targets) if (std::getline(values, value, L',')) *target = _wtoi(value.c_str());
         }
-        loaded.captureFps = static_cast<int>(jsonNumber(capture, L"fps", loaded.captureFps));
-        loaded.inferenceFps = static_cast<int>(jsonNumber(performance, L"inferenceFps", loaded.inferenceFps));
+        const double captureRate = jsonNumber(capture, L"fps", loaded.captureFps);
+        const double inferenceRate = jsonNumber(performance, L"inferenceFps", loaded.inferenceFps);
+        const auto validFrameRate = [](double fps) {
+            return fps >= 1 && fps <= vaporlock::pipeline::kMaximumFrameRate && std::trunc(fps) == fps;
+        };
+        if (!validFrameRate(captureRate) || !validFrameRate(inferenceRate == 0 ? 1 : inferenceRate)) {
+            MessageBoxW(m_hwnd, L"Capture and inference rates must be positive native integers.", L"Profile error", MB_ICONWARNING);
+            return;
+        }
+        loaded.captureFps = static_cast<int>(captureRate);
+        loaded.inferenceFps = inferenceRate == 0 ? 1 : static_cast<int>(inferenceRate);
         loaded.frameSkip = static_cast<int>(jsonNumber(performance, L"frameSkipping", loaded.frameSkip));
         loaded.ortIntraOpThreads = static_cast<int>(jsonNumber(performance, L"ortIntraOpThreads", loaded.ortIntraOpThreads));
         loaded.ortInterOpThreads = static_cast<int>(jsonNumber(performance, L"ortInterOpThreads", loaded.ortInterOpThreads));
@@ -5740,6 +6050,7 @@ private:
     std::uint64_t m_outputGeneration = 0;
     long long m_frames = 0;
     vaporlock::InferenceCadence m_inferenceCadence;
+    AimTime m_nextFrame{};
     std::chrono::steady_clock::time_point m_started = std::chrono::steady_clock::now();
 };
 

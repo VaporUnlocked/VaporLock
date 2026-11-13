@@ -50,6 +50,8 @@ private:
 
 struct PipelineTiming {
     TimingHistogram captureWall,captureAcquire;
+    TimingHistogram captureDxgiReadback, captureDxgiCpuCopy;
+    TimingHistogram captureRateWait, captureRateOvershoot, postTrackingWork;
     TimingHistogram capture, preprocess, model, postprocess, tracking;
     TimingHistogram loopInterval, observationInterval, completionInterval, observationAge;
     void json(std::ostream& stream) const {
@@ -59,6 +61,9 @@ struct PipelineTiming {
             stream << ",\"" << name << "\":"; histogram.json(stream);
         };
         emit("capture_wall",captureWall); emit("capture_acquire",captureAcquire);
+        emit("capture_dxgi_readback",captureDxgiReadback); emit("capture_dxgi_cpu_copy",captureDxgiCpuCopy);
+        emit("capture_rate_wait",captureRateWait); emit("capture_rate_overshoot",captureRateOvershoot);
+        emit("post_tracking_work",postTrackingWork);
         emit("capture",capture); emit("preprocess",preprocess); emit("model",model);
         emit("postprocess",postprocess); emit("tracking",tracking);
         emit("loop_interval",loopInterval); emit("observation_interval",observationInterval);

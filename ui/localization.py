@@ -434,6 +434,19 @@ _ROWS: dict[str, tuple[str, str, str, str]] = {
     "Live preview": ("实时预览", "Live-Vorschau", "Предпросмотр в реальном времени", "Aperçu en direct"),
     "Preview rate": ("预览速率", "Vorschaurate", "Частота предпросмотра", "Fréquence d'aperçu"),
     "JPEG quality": ("JPEG 质量", "JPEG-Qualität", "Качество JPEG", "Qualité JPEG"),
+    "Lossless preview": ("无损预览", "Verlustfreie Vorschau", "Предпросмотр без потерь", "Aperçu sans perte"),
+    "Send PNG frames to preserve source colors. This can use more CPU and bandwidth. It only affects the preview.": (
+        "发送 PNG 帧以保留源图像色彩。这可能增加 CPU 和带宽用量，仅影响预览。",
+        "PNG-Bilder erhalten die Quellfarben. Das kann mehr CPU-Leistung und Bandbreite erfordern und betrifft nur die Vorschau.",
+        "Кадры PNG сохраняют исходные цвета. Это может увеличить нагрузку на процессор и канал связи и влияет только на предпросмотр.",
+        "Les images PNG préservent les couleurs d’origine. Cela peut augmenter la charge du processeur et le débit utilisé. Seul l’aperçu est concerné.",
+    ),
+    "Inspect the source capture with optional tracks, anchor, and projected motion.": (
+        "查看原始捕获画面，可选择显示轨迹、锚点和预测运动。",
+        "Das Aufnahmebild mit optionalen Spuren, Anker und vorhergesagter Bewegung prüfen.",
+        "Просмотр исходного кадра с возможностью отображения траекторий, опорной точки и прогнозируемого движения.",
+        "Examiner la capture source et afficher, au choix, les suivis, le point d’ancrage et le mouvement prévu.",
+    ),
     "Save annotated PNG": ("保存标注 PNG", "Annotiertes PNG speichern", "Сохранить аннотированный PNG", "Enregistrer le PNG annoté"),
     "Detection overlay": ("检测叠加层", "Erkennungs-Overlay", "Наложение обнаружения", "Superposition de détection"),
     "Show annotations": ("显示标注", "Anmerkungen anzeigen", "Показывать аннотации", "Afficher les annotations"),
@@ -1306,6 +1319,78 @@ _ROWS.update({
     'Local performance history': ('本地性能历史', 'Lokaler Leistungsverlauf', 'Локальная история производительности', 'Historique local des performances'),
     'Configure the display language, theme and setup preferences.': ('配置显示语言、主题和设置偏好。', 'Anzeigesprache, Design und Einrichtung konfigurieren.', 'Настройте язык интерфейса, тему и параметры установки.', 'Configurez la langue, le thème et les préférences de configuration.'),
     'Configure the shared calibration shortcut and Windows-wide controls stored with the current profile.': ('配置通用校准快捷键以及随当前配置保存的 Windows 全局控制。', 'Gemeinsames Kalibrierungskürzel und profilgebundene Windows-weite Steuerung konfigurieren.', 'Настройте общий ярлык калибровки и глобальные команды Windows, сохраняемые в текущем профиле.', 'Configurez le raccourci de calibration commun et les commandes globales de Windows enregistrées dans le profil actuel.'),
+})
+_ROWS.update({
+    "Fresh frame interval": ("新帧间隔", "Abstand neuer Bilder", "Интервал между новыми кадрами", "Intervalle entre nouvelles images"),
+    "Capture wait": ("采集等待", "Wartezeit der Erfassung", "Ожидание захвата", "Attente de capture"),
+    "Capture pacing wait": ("采集限速等待", "Wartezeit durch Erfassungslimit", "Ожидание по лимиту захвата", "Attente de cadence de capture"),
+    "Capture timer overshoot": ("采集计时器超时量", "Verzögerung des Erfassungstimers", "Задержка таймера захвата", "Retard du minuteur de capture"),
+    "Post-tracking work": ("跟踪后的处理", "Verarbeitung nach der Verfolgung", "Обработка после отслеживания", "Traitement après le suivi"),
+    "DXGI readback wait": ("DXGI 读回等待", "DXGI-Wartezeit beim Rücklesen", "Ожидание чтения DXGI", "Attente de lecture DXGI"),
+    "DXGI CPU pixel copy": ("DXGI CPU 像素复制", "DXGI-Pixelkopie durch CPU", "Копирование пикселей DXGI процессором", "Copie des pixels DXGI par le processeur"),
+    "Capture: {capture} · Model input: {input}": (
+        "采集：{capture} · 模型输入：{input}", "Erfassung: {capture} · Modelleingabe: {input}",
+        "Захват: {capture} · Вход модели: {input}", "Capture : {capture} · Entrée du modèle : {input}",
+    ),
+    "Inference completion interval": ("推理完成间隔", "Abstand zwischen Inferenzabschlüssen", "Интервал между завершениями вывода", "Intervalle entre inférences terminées"),
+    "Frame age after tracking": ("跟踪后的帧龄", "Bildalter nach der Verfolgung", "Возраст кадра после отслеживания", "Âge de l’image après le suivi"),
+    "{stage}: {median} ms median · {p95} ms p95": (
+        "{stage}：中位数 {median} 毫秒 · 第 95 百分位 {p95} 毫秒",
+        "{stage}: {median} ms Median · {p95} ms 95. Perzentil",
+        "{stage}: медиана {median} мс · 95-й процентиль {p95} мс",
+        "{stage} : médiane {median} ms · 95e percentile {p95} ms",
+    ),
+    "DXGI updates combined since start: {count}": (
+        "启动以来合并的 DXGI 更新：{count}",
+        "Seit dem Start zusammengefasste DXGI-Updates: {count}",
+        "Обновления DXGI, объединённые с начала сеанса: {count}",
+        "Mises à jour DXGI regroupées depuis le démarrage : {count}",
+    ),
+    "Configured limits: {capture} capture fps · {inference} inference fps": (
+        "设定上限：采集 {capture} 帧/秒 · 推理 {inference} 帧/秒",
+        "Eingestellte Obergrenzen: {capture} FPS Erfassung · {inference} FPS Inferenz",
+        "Заданные ограничения: захват {capture} кадр/с · вывод {inference} кадр/с",
+        "Limites configurées : capture {capture} i/s · inférence {inference} i/s",
+    ),
+    "DXGI desktop updates: {rate}/s": (
+        "DXGI 桌面更新：{rate} 次/秒", "DXGI-Desktopaktualisierungen: {rate}/s",
+        "Обновления рабочего стола DXGI: {rate}/с", "Mises à jour du bureau DXGI : {rate}/s",
+    ),
+    "DXGI updates combined before acquisition: {rate}/s": (
+        "采集前合并的 DXGI 更新：{rate} 次/秒",
+        "Vor der Erfassung zusammengefasste DXGI-Updates: {rate}/s",
+        "Обновления DXGI, объединённые до захвата: {rate}/с",
+        "Mises à jour DXGI regroupées avant la capture : {rate}/s",
+    ),
+    "Inference skips: {explicit} by frame skip · {limited} by FPS limit": (
+        "推理跳过：跳帧设置 {explicit} · 帧率限制 {limited}",
+        "Übersprungene Inferenzen: {explicit} durch Bildsprung · {limited} durch FPS-Limit",
+        "Пропуски вывода: {explicit} по настройке пропуска · {limited} по лимиту FPS",
+        "Inférences ignorées : {explicit} par saut d’image · {limited} par limite de débit",
+    ),
+    "CUDA Graph replay active": ("CUDA 图重放已启用", "CUDA-Graph-Wiedergabe aktiv", "Повтор CUDA-графа активен", "Relecture de graphe CUDA active"),
+    "Standard CUDA inference": ("标准 CUDA 推理", "Standard-CUDA-Inferenz", "Стандартный вывод CUDA", "Inférence CUDA standard"),
+    "Select CUDA to use CUDA Graph replay.": ("选择 CUDA 以使用 CUDA 图重放。", "CUDA für die CUDA-Graph-Wiedergabe auswählen.", "Выберите CUDA для повтора CUDA-графа.", "Sélectionnez CUDA pour utiliser la relecture de graphe CUDA."),
+    "Checking this engine's CUDA Graph replay support...": ("正在检查引擎是否支持 CUDA 图重放…", "Unterstützung für CUDA-Graph-Wiedergabe wird geprüft…", "Проверяется поддержка повтора CUDA-графа…", "Vérification de la prise en charge de la relecture de graphe CUDA…"),
+    "CUDA Graph replay is unavailable in this engine.": ("此引擎不支持 CUDA 图重放。", "Diese Engine unterstützt keine CUDA-Graph-Wiedergabe.", "Этот движок не поддерживает повтор CUDA-графа.", "Ce moteur ne prend pas en charge la relecture de graphe CUDA."),
+    "Reduces launch overhead on compatible CUDA models. Changes take effect on the next start.": (
+        "减少兼容 CUDA 模型的启动开销。更改在下次启动时生效。",
+        "Verringert den Ausführungsaufwand für kompatible CUDA-Modelle. Änderungen greifen beim nächsten Start.",
+        "Снижает издержки запуска для совместимых моделей CUDA. Изменения вступят в силу при следующем запуске.",
+        "Réduit le coût de lancement sur les modèles CUDA compatibles. Le changement prend effet au prochain démarrage.",
+    ),
+    "Compatible models use CUDA Graph replay after restart. Other models use standard CUDA.": (
+        "重启后，兼容模型使用 CUDA 图重放。其他模型使用标准 CUDA。",
+        "Kompatible Modelle nutzen nach dem Neustart CUDA-Graph-Wiedergabe. Andere Modelle nutzen Standard-CUDA.",
+        "После перезапуска совместимые модели используют повтор CUDA-графа, а остальные — стандартный вывод CUDA.",
+        "Après redémarrage, les modèles compatibles utilisent la relecture de graphe CUDA. Les autres utilisent CUDA standard.",
+    ),
+    "Loading the selected model and preparing CUDA Graph replay.": (
+        "正在加载所选模型并准备 CUDA 图重放。",
+        "Das ausgewählte Modell wird geladen und die CUDA-Graph-Wiedergabe vorbereitet.",
+        "Загружается выбранная модель и подготавливается повтор CUDA-графа.",
+        "Chargement du modèle sélectionné et préparation de la relecture de graphe CUDA.",
+    ),
 })
 _CASEFOLDED_ROWS = {source.casefold(): row for source, row in _ROWS.items()}
 

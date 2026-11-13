@@ -41,6 +41,109 @@ static void verifyLines() {
     std::cout << "Visible-pixel parity cases: " << cases << "; extreme endpoints passed\n";
 }
 
+struct CaptureLookaheadFixture {
+    std::mutex mutex;
+    std::condition_variable wake;
+    int attempts = 0, allowed = 0;
+    std::uint64_t source = 1;
+
+    bool reached(int count) {
+        std::unique_lock lock(mutex);
+        return wake.wait_for(lock, std::chrono::seconds(2), [&] { return attempts >= count; });
+    }
+    void release(int count, std::uint64_t generation) {
+        std::lock_guard lock(mutex);
+        allowed = count;
+        source = generation;
+        wake.notify_all();
+    }
+};
+
+struct CaptureLookaheadSource {
+    using Frame = DesktopCapture::Frame;
+    static inline CaptureLookaheadFixture* fixture = nullptr;
+
+    template<class Cancelled>
+    bool capture(const AppConfig& config, unsigned, Cancelled cancelled) {
+        frame.fresh = false;
+        std::unique_lock lock(fixture->mutex);
+        const int attempt = ++fixture->attempts;
+        fixture->wake.notify_all();
+        if (!fixture->wake.wait_for(lock, std::chrono::seconds(2), [&] { return fixture->allowed >= attempt; }))
+            return false;
+        if (cancelled()) return true;
+        frame.identity = {1, fixture->source, static_cast<std::uint64_t>(attempt), 0};
+        lock.unlock();
+        frame.observed = frame.acquired = AimClock::now();
+        frame.frameWidth = config.captureRegion.width;
+        frame.frameHeight = config.captureRegion.height;
+        frame.pixels.assign(static_cast<std::size_t>(frame.frameWidth) * frame.frameHeight * 4U,
+                            static_cast<unsigned char>(attempt));
+        frame.fresh = true;
+        return true;
+    }
+
+    bool freshFrame() const { return frame.fresh; }
+    AimTime acquiredAt() const { return frame.acquired; }
+    AimTime observedAt() const { return frame.observed; }
+    std::uint64_t dxgiTimeouts() const { return 0; }
+    void takeFrame(Frame& destination, std::uint64_t revision) {
+        frame.identity.configRevision = revision;
+        std::swap(destination, frame);
+    }
+    Frame frame;
+};
+
+static void verifyCaptureLookahead() {
+    using namespace std::chrono_literals;
+    using Worker = DesktopCaptureWorkerFor<CaptureLookaheadSource>;
+    CaptureLookaheadFixture fixture;
+    CaptureLookaheadSource::fixture = &fixture;
+    std::atomic<std::uint64_t> liveRevision{1}, observedSource{0};
+    Worker worker([&](std::uint64_t revision) { return liveRevision != revision; },
+                  [&](CaptureFrameIdentity identity) { observedSource = identity.sourceGeneration; });
+    const Worker::Request request{1, {0, 0, 640, 640}, 256, 1};
+    Worker::Progress progress;
+    DesktopCapture::Frame frame;
+    worker.submit(request);
+    fixture.release(1, 1);
+    require(worker.take(frame, 1, 2s, &progress) == Worker::Result::Frame && observedSource == 1,
+            "Initial capture or source notification did not arrive");
+    require(frame.width() == 640 && frame.height() == 640 && frame.pixels.front() == 1,
+            "Capture did not preserve the default crop and its pixels");
+    const auto original = frame.identity;
+
+    worker.submit(request); // Start lookahead while the first frame remains in inference.
+    worker.submit(request);
+    require(fixture.reached(2), "Next capture did not start during inference");
+    require(worker.take(frame, 1, 0ms) == Worker::Result::Pending
+                && frame.identity == original && frame.pixels.front() == 1,
+            "Pending capture changed the consumer's committed frame");
+    require(worker.withCurrentSource(original, [] {}), "An in-progress read retired the current source");
+    fixture.release(2, 2);
+    require(worker.take(frame, 1, 2s) == Worker::Result::Frame
+                && frame.identity.frameId == 2 && frame.pixels.front() == 2 && observedSource == 2,
+            "The one-slot lookahead did not commit the next source");
+    require(!worker.withCurrentSource(original, [] {}), "A previous capture source could still publish");
+
+    worker.submit(request);
+    require(fixture.reached(3), "The next read was not scheduled");
+    liveRevision = 2;
+    auto revised = request;
+    revised.revision = 2;
+    worker.submit(revised);
+    fixture.release(4, 2);
+    require(worker.take(frame, 1, 0ms) == Worker::Result::Pending,
+            "A superseded capture escaped its configuration revision");
+    require(worker.take(frame, 2, 2s, &progress) == Worker::Result::Frame
+                && frame.identity.frameId == 4 && frame.identity.configRevision == 2 && frame.pixels.front() == 4,
+            "A new request did not replace obsolete in-flight capture");
+    require(progress.retiredAttempts == 1, "An obsolete capture attempt was not counted");
+    worker.stop();
+    CaptureLookaheadSource::fixture = nullptr;
+    std::cout << "640x640 capture lookahead, source transition and config cancellation passed\n";
+}
+
 static void verifyPreviewQueue(bool cancel) {
     std::promise<void> started, release;
     auto released = release.get_future();
@@ -77,24 +180,67 @@ static void verifyPreviewQueue(bool cancel) {
     std::cout << "Preview latest-only queue cancel=" << cancel << "; 1999 submissions ms=" << ms << '\n';
 }
 
-static void verifyThreadedEncoding() {
+static void verifyThreadedEncoding(bool lossless) {
     std::promise<std::pair<bool, std::string>> result;
     auto future = result.get_future();
     PreviewWorker worker([&](std::string data) { result.set_value({true, std::move(data)}); },
                          [&](std::string error) { result.set_value({false, std::move(error)}); });
     worker.configure(true);
     PreviewWorker::Frame frame;
-    frame.width = 32; frame.height = 16;
-    frame.pixels.resize(32 * 16 * 4, 255);
+    constexpr int width = 31, height = 16;
+    frame.width = width;
+    frame.height = height;
+    frame.pixels.resize(width * height * 4);
+    for (int pixel = 0; pixel < width * height; ++pixel) {
+        frame.pixels[pixel * 4] = static_cast<unsigned char>(pixel * 17);
+        frame.pixels[pixel * 4 + 1] = static_cast<unsigned char>(pixel * 23);
+        frame.pixels[pixel * 4 + 2] = static_cast<unsigned char>(pixel * 61);
+        frame.pixels[pixel * 4 + 3] = 0;
+    }
+    const auto original = frame.pixels;
     frame.config.overlayEnabled = false;
+    frame.config.previewLossless = lossless;
     worker.publish(std::move(frame));
     const bool completed = future.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
     worker.stop();
     require(completed, "Actual preview encoding stalled");
     const auto [success, text] = future.get();
-    require(success && text.starts_with("{\"type\":\"preview\",\"width\":32,\"height\":16,")
-            && text.find("\"jpeg\":\"/9j/") != std::string::npos && text.find("\"schema\":2") != std::string::npos,
+    require(success && text.starts_with("{\"type\":\"preview\",\"width\":31,\"height\":16,")
+            && text.find("\"schema\":2") != std::string::npos,
             "Preview worker did not initialize its own image-encoding context");
+    if (!lossless) {
+        require(text.find("\"jpeg\":\"/9j/") != std::string::npos && text.find("\"png\"") == std::string::npos,
+                "Default preview did not use the JPEG wire format");
+        return;
+    }
+
+    std::vector<unsigned char> png;
+    require(encodePreviewPng(width, height, original, png)
+            && text.ends_with("\"png\":\"" + base64Encode(png) + "\"}") && text.find("\"jpeg\"") == std::string::npos,
+            "Threaded preview did not send the lossless PNG bytes");
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    require(SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf()))),
+            "Cannot create PNG test decoder factory");
+    Microsoft::WRL::ComPtr<IWICStream> stream;
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> decodedFrame;
+    require(SUCCEEDED(factory->CreateStream(stream.GetAddressOf()))
+            && SUCCEEDED(stream->InitializeFromMemory(png.data(), static_cast<DWORD>(png.size())))
+            && SUCCEEDED(factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf()))
+            && SUCCEEDED(decoder->GetFrame(0, decodedFrame.GetAddressOf())), "Cannot decode lossless preview PNG");
+    UINT decodedWidth = 0, decodedHeight = 0;
+    require(SUCCEEDED(decodedFrame->GetSize(&decodedWidth, &decodedHeight)) && decodedWidth == width && decodedHeight == height,
+            "Lossless preview changed the captured dimensions");
+    Microsoft::WRL::ComPtr<IWICFormatConverter> bgra;
+    std::vector<unsigned char> decoded(original.size());
+    require(SUCCEEDED(factory->CreateFormatConverter(bgra.GetAddressOf()))
+            && SUCCEEDED(bgra->Initialize(decodedFrame.Get(), GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0., WICBitmapPaletteTypeCustom))
+            && SUCCEEDED(bgra->CopyPixels(nullptr, width * 4, static_cast<UINT>(decoded.size()), decoded.data())),
+            "Cannot read the decoded lossless preview pixels");
+    for (std::size_t pixel = 0; pixel < decoded.size(); pixel += 4) {
+        require(std::equal(decoded.begin() + pixel, decoded.begin() + pixel + 3, original.begin() + pixel)
+                && decoded[pixel + 3] == 255, "Lossless preview changed RGB or reused undefined capture alpha");
+    }
 }
 
 static void verifyOutputDuringBackpressure() {
@@ -233,9 +379,11 @@ int main(int argc, char** argv) {
         }
     }
     verifyLines();
+    verifyCaptureLookahead();
     verifyPreviewQueue(false);
     verifyPreviewQueue(true);
-    verifyThreadedEncoding();
+    verifyThreadedEncoding(false);
+    verifyThreadedEncoding(true);
     verifyPreviewRecovery();
     verifyOutputDuringBackpressure();
     for (const auto [width, height] : {std::pair{640, 640}, std::pair{1024, 1024}, std::pair{1920, 1080}}) {

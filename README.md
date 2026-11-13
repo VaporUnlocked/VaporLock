@@ -32,8 +32,11 @@ A noncommercial label cannot remove AGPL obligations.
 - Local annotation/training and explicit optional Ultralytics integration.
 
 Hardware/backend dependencies determine what can run. No model weights, private
-profiles, datasets or external account credentials are included. The client
-creates new user settings; existing private settings are not build seeds.
+profiles, datasets or external account credentials are included. On first launch,
+the bundled default uses DirectML and looks for `models\nanoparticle-003-c.onnx`.
+Download it from [VaporLock Models](https://github.com/VaporUnlocked/VaporLock/releases/tag/Vaporlock-Models)
+and place it in the `models` folder beside `RunGui.bat`. The default annotation
+configuration also references `models\nanoparticle-003.onnx` from the same release.
 
 ## Build from source
 
@@ -48,25 +51,47 @@ exceed Windows path-length limits in deeply nested checkout/virtualenv folders.
 .\RunGui.bat
 ```
 
-`-CloudDML` installs the `.cloud` Python worker. `-NativeDirectML` restores
-the pinned Microsoft.ML.OnnxRuntime.DirectML and
-Microsoft.AI.DirectML NuGet packages into `build/dependencies` and produces
-`build/windows-release/Release/dml/VaporLockDml.exe` with its matching DLLs.
-To prepare Python without compiling C++, use `-SkipNativeBuild` in place of
-`-NativeDirectML`. A native engine built without an ONNX SDK can exercise its
-synthetic testing path. For real ONNX inference, choose a configured backend.
-For an offline build, supply both extracted NuGet packages:
+`BuildCommunity.ps1` restores the pinned ONNX Runtime 1.29.0 Windows SDK and
+builds the native CPU/CUDA executable. CPU runs with its adjacent ONNX Runtime
+DLL. Install or refresh CUDA from Model Library to use the NVIDIA provider
+and its runtime libraries. The build reuses a verified CUDA download cache
+when it already contains the matching ONNX Runtime package.
+
+Capture and inference FPS settings are independent ceilings. The sliders cover
+common rates and the numeric fields accept higher values. Status & Diagnostics
+shows the configured limits, fresh captures, completed inferences, and desktop
+updates reported by DXGI. The source, model, and hardware determine the actual
+rate.
+
+CUDA Graph replay uses persistent GPU buffers for compatible ONNX models.
+The engine can use standard CUDA inference when replay is unavailable, and
+the CUDA Graph replay setting controls whether the engine attempts replay.
+Preparing replay can add model startup time.
+
+`-CloudDML` installs the `.cloud` Python worker. `-NativeDirectML` also builds
+`build/windows-release/Release/dml/VaporLockDml.exe` from the pinned
+Microsoft.ML.OnnxRuntime.DirectML and Microsoft.AI.DirectML packages. Use
+`-SkipNativeBuild` to prepare Python only or `-SyntheticOnly` for a base
+executable intended for test signals.
+
+For an offline native build, point the build at the extracted SDKs:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\build_public_client.py --dml-root C:\SDKs\onnxruntime-directml --directml-root C:\SDKs\directml
+.\BuildCommunity.ps1 -OnnxRoot C:\SDKs\onnxruntime -DirectMlOrtRoot C:\SDKs\onnxruntime-directml -DirectMlRoot C:\SDKs\directml
 ```
 
-Use `--onnx-root` for the separate native CPU/CUDA ONNX Runtime SDK.
 The CMake cache variables `ONNXRUNTIME_ROOT`, `ONNXRUNTIME_DML_ROOT`, `VAPORLOCK_DIRECTML_ROOT`,
 `VAPORLOCK_TENSORRT_RTX_ROOT`, `CUDAToolkit_ROOT` and
-`VAPORLOCK_CUDA_RUNTIME_ROOT` configure external SDKs. TensorRT RTX needs its
-compatible CUDA toolkit, compiler and supported NVIDIA GPU. Provider support
-is retained in source; a CPU-only build does not certify GPU execution.
+`VAPORLOCK_CUDA_RUNTIME_ROOT` configure external SDKs. To build TensorRT RTX,
+use Model Library's TensorRT RTX setup to stage the SDK, then run the build
+with its SDK path and a compatible local CUDA Toolkit:
+
+```powershell
+.\BuildCommunity.ps1 -TensorRtRoot .\build\dependencies\TensorRT-RTX-1.6.1.120 -CudaToolkit 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2'
+```
+
+Use the CUDA Toolkit path installed on your system. If you want DirectML in
+the same build, also pass `-NativeDirectML` or the two extracted DirectML roots.
 
 `.cloud` worker dependencies are isolated in `.venv-cloud-cpu`,
 `.venv-cloud-dml` and `.venv-cloud-cuda`. CUDA users must select a compatible
@@ -74,7 +99,8 @@ official PyTorch CUDA build and driver. Do not mix CPU and CUDA/DML runtime DLLs
 in one folder. Ultralytics and other optional training integrations have their
 own setup and license requirements.
 
-After editing `.cloud` implementation files or UI browser resources, run:
+After editing `.cloud` implementation files or UI browser resources, pass
+`-RefreshManifests` to `BuildCommunity.ps1` or run:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\refresh_public_manifests.py

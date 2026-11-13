@@ -29,6 +29,8 @@ from batch3_settings import FIELDS as BATCH3_FIELDS, validate as validate_batch3
 from guide_links import add_guide_button, guide_topic
 from vlui_live_context import validated_native_settings
 from vlui_c014_settings import CAPTURE_FIELDS, validated_capture_field, validated_capture_settings
+from frame_rate import FRAME_RATE_FIELDS, MAX_FRAME_RATE, valid_frame_rate
+from default_profile import DEFAULT_CAPTURE_REGION
 from annotation_provider import BACKENDS as ANNOTATION_BACKENDS
 _NATIVE_INJECTION = native_injection()
 from dataset_storage import atomic_text, dataset_lock, recover_annotations
@@ -82,6 +84,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -400,7 +403,7 @@ DEFAULT_UI_OPACITIES = {name: 100 for name, _label, _value in UI_COLOR_ROLES}
 
 @dataclass
 class UiAppearance:
-    layout: str = "mission-control"
+    layout: str = "monitoring"
     colors: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_UI_COLORS))
     opacities: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_UI_OPACITIES))
     custom_palettes: dict[str, dict] = field(default_factory=dict)
@@ -594,10 +597,10 @@ class Settings:
     max_detections: int = 300
     resize_mode: str = "letterbox"
     monitor: int = 1
-    region_x: int = 0
-    region_y: int = 0
-    region_width: int = 640
-    region_height: int = 640
+    region_x: int = DEFAULT_CAPTURE_REGION[0]
+    region_y: int = DEFAULT_CAPTURE_REGION[1]
+    region_width: int = DEFAULT_CAPTURE_REGION[2]
+    region_height: int = DEFAULT_CAPTURE_REGION[3]
     capture_fps: int = 30
     inference_fps: int = 30
     frame_skip: int = 0
@@ -718,6 +721,7 @@ class Settings:
     preview_enabled: bool = True
     preview_fps: int = 5
     preview_quality: int = 80
+    preview_lossless: bool = False
     overlay_enabled: bool = True
     overlay_boxes: bool = True
     overlay_motion: bool = True
@@ -1014,7 +1018,11 @@ class InitializationWizard(QDialog):
         for model in models:
             self.model_choice.addItem(model.relative_to(ROOT / "models").as_posix(), str(model))
         current_model = str(resolve_product_path(self.settings.model_path)) if self.settings.model_path else ""
-        self.model_choice.setCurrentIndex(max(0, self.model_choice.findData(aliases.get(current_model, current_model))))
+        current_index = self.model_choice.findData(aliases.get(current_model, current_model))
+        if current_model and current_index < 0:
+            self.model_choice.addItem(f"{Path(current_model).name} ({self.t('Unavailable')})", current_model)
+            current_index = self.model_choice.count() - 1
+        self.model_choice.setCurrentIndex(max(0, current_index))
         self._field(layout, "Detection model", "Models already in the local models folder are available here.", self.model_choice)
         self.provider_choice = QComboBox()
         for label, value in (("DirectML (recommended default)", "dml"), ("Automatic", "auto"), ("CPU", "cpu"), ("CUDA", "cuda"), ("TensorRT", "tensorrt")):
@@ -1042,12 +1050,12 @@ class InitializationWizard(QDialog):
         rates_layout = QHBoxLayout(rates)
         rates_layout.setContentsMargins(0, 0, 0, 0)
         self.capture_rate = QSpinBox()
-        self.capture_rate.setRange(1, 1000)
-        self.capture_rate.setValue(max(1, self.settings.capture_fps))
+        self.capture_rate.setRange(1, MAX_FRAME_RATE)
+        self.capture_rate.setValue(self.settings.capture_fps)
         self.capture_rate.setSuffix(" fps capture")
         self.inference_rate = QSpinBox()
-        self.inference_rate.setRange(1, 1000)
-        self.inference_rate.setValue(max(1, self.settings.inference_fps))
+        self.inference_rate.setRange(1, MAX_FRAME_RATE)
+        self.inference_rate.setValue(self.settings.inference_fps)
         self.inference_rate.setSuffix(" fps inference")
         rates_layout.addWidget(self.capture_rate)
         rates_layout.addWidget(self.inference_rate)
@@ -1188,7 +1196,8 @@ class RangeControl(QWidget):
     _accent_index = 0
     _accents = ("baby", "pink", "ultraviolet", "highlight", "cobalt")
 
-    def __init__(self, low: float, high: float, value: float, decimals: int = 0, suffix: str = "") -> None:
+    def __init__(self, low: float, high: float, value: float, decimals: int = 0, suffix: str = "",
+                 *, expert_range: tuple[int, int] | None = None) -> None:
         super().__init__()
         self.scale = 10 ** decimals
         layout = QHBoxLayout(self)
@@ -1204,7 +1213,7 @@ class RangeControl(QWidget):
         self.spin.setKeyboardTracking(False)
         # The slider exposes the product's tested range. Typed values retain
         # a broad expert range so experienced users can tune beyond it.
-        self.spin.setRange(-1_000_000 if low < 0 else 0, 1_000_000)
+        self.spin.setRange(*(expert_range or (-1_000_000 if low < 0 else 0, 1_000_000)))
         self.spin.setSingleStep(1 / self.scale)
         self.spin.setSuffix(suffix)
         self.spin.setMinimumWidth(100)
@@ -1258,29 +1267,31 @@ class PreviewCanvas(QLabel):
         return QSize(640, 230)
 
     def paintEvent(self, event) -> None:
-        painter = QPainter(self)
         from interface_themes import painted_role
-        painter.fillRect(self.contentsRect(), QColor(painted_role(self,'input','#080d16')))
-        painter.end()
-        super().paintEvent(event)
+        bounds = self.contentsRect()
+        with QPainter(self) as painter:
+            painter.fillRect(bounds, QColor(painted_role(self, 'input', '#080d16')))
+            if not self._frame.isNull() and not bounds.isEmpty():
+                size = self._frame.size().scaled(bounds.size(), Qt.AspectRatioMode.KeepAspectRatio)
+                target = QRect(
+                    bounds.x() + (bounds.width() - size.width()) // 2,
+                    bounds.y() + (bounds.height() - size.height()) // 2,
+                    size.width(), size.height(),
+                )
+                # Preserve individual source pixels when magnifying a small crop.
+                pixel_ratio = painter.device().devicePixelRatioF()
+                downscaling = (size.width() * pixel_ratio < self._frame.width()
+                               or size.height() * pixel_ratio < self._frame.height())
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, downscaling)
+                painter.drawImage(target, self._frame)
+        if self._frame.isNull():
+            super().paintEvent(event)
 
     def set_frame(self, frame: QImage) -> None:
-        if frame.isNull():
-            self._frame = QImage()
-            self.clear()
+        if frame.isNull() and self._frame.isNull():
             return
         self._frame = frame
-        self._render_frame()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._render_frame()
-
-    def _render_frame(self) -> None:
-        if self._frame.isNull() or self.contentsRect().size().isEmpty():
-            return
-        pixmap = QPixmap.fromImage(self._frame)
-        self.setPixmap(pixmap.scaled(self.contentsRect().size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.update()
 
     def save_snapshot(self, path: Path) -> bool:
         """Write the most recent annotated native preview without resizing it."""
@@ -2047,9 +2058,11 @@ class AccelerationManager(QObject):
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
         self.process.readyReadStandardOutput.connect(self._read_output)
         self.process.readyReadStandardError.connect(self._read_errors)
+        self.process.errorOccurred.connect(self._process_error)
         self.process.finished.connect(self._finished)
         self._provider = ""
-        self._messages: list[str] = []
+        self._installer_message = ""
+        self._installer_error = ""
 
     @staticmethod
     def supports(provider: str) -> bool:
@@ -2086,12 +2099,50 @@ class AccelerationManager(QObject):
             return all((trt_root / name).is_file() for name in ("VaporLockTensorRt.exe", "onnxruntime.dll", "onnxruntime_providers_shared.dll", "tensorrt_rtx_1_6.dll", "tensorrt_onnxparser_rtx_1_6.dll"))
         return True
 
+    @staticmethod
+    def setup_files_present(provider: str) -> bool:
+        if provider == "trt" and not getattr(sys, "frozen", False):
+            from acceleration_install import tensor_rt_sdk_present
+
+            return tensor_rt_sdk_present(ROOT)
+        files = {
+            "dml": ("onnxruntime.dll", "DirectML.dll"),
+            "trt": ("tensorrt_rtx_1_6.dll", "tensorrt_onnxparser_rtx_1_6.dll"),
+        }.get(provider, ())
+        directory = ROOT / "engine" / provider
+        return bool(files) and all((directory / name).is_file() for name in files)
+
+    @staticmethod
+    def native_build_message(provider: str) -> str:
+        if getattr(sys, "frozen", False):
+            return "Repair the installation to restore the native engine and its matching dependencies."
+        if provider == "trt":
+            from acceleration_install import tensor_rt_sdk_directory
+
+            sdk = tensor_rt_sdk_directory(ROOT).relative_to(ROOT)
+            return (f"Run .\\BuildCommunity.ps1 -TensorRtRoot .\\{sdk} to build VaporLockTensorRt.exe. "
+                    "Use -CudaToolkit if CMake cannot locate your CUDA Toolkit.")
+        if provider == "dml":
+            return "Run BuildCommunity.ps1 -NativeDirectML to build VaporLockDml.exe and stage its dependencies."
+        if provider in {"cpu", "cuda"}:
+            return "Run BuildCommunity.ps1 to build the native CPU/CUDA engine with ONNX Runtime."
+        return "The native backend is unavailable. Rebuild the engine and retry setup."
+
+    @staticmethod
+    def cuda_engine_available() -> bool:
+        from native_engine_layout import has_model_support
+        executable, _ = EngineBridge.launch_for("cpu", require_model=True)
+        return has_model_support(executable, "cuda")
+
     @property
     def active(self) -> bool:
         return self.process.state() != QProcess.ProcessState.NotRunning
 
     def install(self, provider: str) -> None:
         if self.active or provider not in {"cuda", "dml", "trt"}:
+            return
+        if provider == "cuda" and not self.cuda_engine_available():
+            self.completed.emit(provider, False, self.native_build_message(provider))
             return
         packaged_installer = COMPONENT_ROOT / "VaporLockAccelerationSetup.exe"
         runtime = ROOT / "runtime" / "python.exe"
@@ -2104,7 +2155,8 @@ class AccelerationManager(QObject):
             self.completed.emit(provider, False, "The bundled acceleration installer is missing.")
             return
         self._provider = provider
-        self._messages = []
+        self._installer_message = ""
+        self._installer_error = ""
         self.status.emit(f"Preparing {EngineBridge.provider_label(provider)} acceleration download...")
         arguments = ["--provider", provider, "--root", str(ROOT)]
         if installer is not None:
@@ -2124,23 +2176,42 @@ class AccelerationManager(QObject):
         marker.write_text(json.dumps({"offered": True}), encoding="utf-8")
 
     def _read_output(self) -> None:
-        for line in bytes(self.process.readAllStandardOutput()).decode("utf-8", errors="replace").splitlines():
-            try:
-                message = str(json.loads(line).get("message", "")).strip()
-            except json.JSONDecodeError:
-                message = line.strip()
-            if message:
-                self._messages.append(message)
+        while self.process.canReadLine():
+            self._read_status_line(bytes(self.process.readLine()))
+
+    def _read_status_line(self, raw: bytes) -> None:
+        line = raw.decode("utf-8", errors="replace").strip()
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            payload = None
+        message = str(payload.get("message", "")).strip() if isinstance(payload, dict) else line
+        if message:
+            self._installer_message = message
+            if not isinstance(payload, dict) or payload.get("terminal") is not True:
                 self.status.emit(message)
 
     def _read_errors(self) -> None:
         text = bytes(self.process.readAllStandardError()).decode("utf-8", errors="replace").strip()
         if text:
-            self._messages.append(text[-500:])
+            self._installer_error = text[-500:]
 
-    def _finished(self, exit_code: int, _status: QProcess.ExitStatus) -> None:
-        message = self._messages[-1] if self._messages else "The installer stopped without a status message."
-        self.completed.emit(self._provider, exit_code == 0 and self.is_installed(self._provider), message)
+    def _process_error(self, error: QProcess.ProcessError) -> None:
+        if error == QProcess.ProcessError.FailedToStart:
+            self.completed.emit(self._provider, False, self.process.errorString())
+
+    def _finished(self, exit_code: int, status: QProcess.ExitStatus) -> None:
+        self._read_output()
+        self._read_status_line(bytes(self.process.readAllStandardOutput()))
+        self._read_errors()
+        succeeded = status == QProcess.ExitStatus.NormalExit and exit_code == 0
+        if succeeded:
+            message = self._installer_message or "Runtime setup completed."
+        elif status == QProcess.ExitStatus.CrashExit:
+            message = self._installer_error or "The runtime installer stopped unexpectedly."
+        else:
+            message = self._installer_error or self._installer_message or f"The installer exited with code {exit_code}."
+        self.completed.emit(self._provider, succeeded, message)
 
 
 class ControllerBridgeManager(QObject):
@@ -2458,7 +2529,7 @@ class EngineBridge(QObject):
         "event_action_enabled", "event_action_requires_activation", "event_action_mode", "event_action_button", "event_action_cooldown_ms",
         "virtual_controller_manual_priority",
         "virtual_controller_stick", "virtual_controller_strength", "invert_x", "invert_y", "response_curve",
-        "preview_enabled", "preview_fps", "preview_quality", "overlay_enabled", "overlay_boxes", "overlay_motion", "overlay_fov", "overlay_segmentation_masks", "segmentation_mask_limit", "segmentation_mask_threshold",
+        "preview_enabled", "preview_fps", "preview_quality", "preview_lossless", "overlay_enabled", "overlay_boxes", "overlay_motion", "overlay_fov", "overlay_segmentation_masks", "segmentation_mask_limit", "segmentation_mask_threshold",
         "dataset_enabled", "dataset_capture_confidence_enabled", "dataset_directory", "dataset_min_confidence", "dataset_interval_ms",
         "dataset_capture_requires_activation", "dataset_jpeg_quality", "dataset_max_images", "dataset_max_mib",
         "desktop_overlay_enabled",
@@ -2510,6 +2581,7 @@ class EngineBridge(QObject):
         self._provider_index = 0
         self._active_provider = ""
         self._has_telemetry = False
+        self._preview_lossless_supported = False
         self._last_error = ""
         self._fatal_error = False
         self._start_failure_scheduled = False
@@ -2553,20 +2625,22 @@ class EngineBridge(QObject):
         return environment
 
     @staticmethod
-    def launch_for(provider: str):
+    def launch_for(provider: str, *, require_model: bool = False, status_only: bool = False):
         if not getattr(sys, 'frozen', False):
             from native_engine_layout import source_engine, provider_ready, native_environment
-            source = source_engine(ROOT, provider)
-            if provider_ready(source, provider):
+            source = source_engine(ROOT, provider, require_model=require_model)
+            if provider_ready(source, provider, require_model=require_model):
                 environment = QProcessEnvironment()
                 for key, value in native_environment(source.parent, dict(os.environ)).items():
                     environment.insert(key, value)
                 return source, environment
         if provider != "cuda":
-            return EngineBridge.executable_for(provider), EngineBridge.process_environment(provider)
-        from runtime_generations import resolve_cuda, RuntimeIntegrityError
+            return EngineBridge.executable_for(provider, require_model=require_model), EngineBridge.process_environment(provider)
+        from runtime_generations import cached_cuda_runtime, resolve_cuda, RuntimeIntegrityError
         try:
-            runtime = resolve_cuda(ROOT)
+            runtime = cached_cuda_runtime(ROOT) if status_only else resolve_cuda(ROOT)
+            if runtime is None:
+                return None, QProcessEnvironment.systemEnvironment()
             environment = QProcessEnvironment()
             for key, value in runtime.environment(dict(os.environ)).items(): environment.insert(key, value)
             return runtime.executable, environment
@@ -2574,15 +2648,17 @@ class EngineBridge(QObject):
             return None, QProcessEnvironment.systemEnvironment()
 
     @staticmethod
-    def executable_for(provider: str) -> Path | None:
+    def executable_for(provider: str, *, require_model: bool = False) -> Path | None:
         if provider == "cuda":
-            return EngineBridge.launch_for(provider)[0]
+            return EngineBridge.launch_for(provider, status_only=True)[0]
         executable_name = "VaporLockTensorRt.exe" if provider == "trt" else "VaporLockDml.exe" if provider == "dml" else "VaporLock.exe"
         bundled = ROOT / "engine"
         executable = bundled / ("trt" if provider == "trt" else "dml" if provider == "dml" else "") / executable_name
         if executable.is_file():
-            if provider == "cuda" and not (bundled / "onnxruntime_providers_cuda.dll").is_file():
-                return None
+            if provider == "cpu" and require_model:
+                from native_engine_layout import provider_ready
+                if not provider_ready(executable, provider, require_model=True):
+                    return None
             if provider == "dml" and not AccelerationManager.is_installed("dml"):
                 return None
             if provider == "trt" and not AccelerationManager.is_installed("trt"):
@@ -2591,8 +2667,8 @@ class EngineBridge(QObject):
         if getattr(sys, "frozen", False):
             return None
         from native_engine_layout import source_engine, provider_ready
-        source = source_engine(ROOT, provider)
-        return source if provider_ready(source, provider) else None
+        source = source_engine(ROOT, provider, require_model=require_model)
+        return source if provider_ready(source, provider, require_model=require_model) else None
 
     @staticmethod
     def candidate_providers(settings: Settings) -> list[str]:
@@ -2657,6 +2733,8 @@ class EngineBridge(QObject):
 
     def apply_live_setting(self, field: str, value: object) -> bool:
         """Mirror a safe setting into the running native session, if any."""
+        if field in FRAME_RATE_FIELDS and not valid_frame_rate(value):
+            return False
         if field in CAPTURE_FIELDS:
             value = validated_capture_field(field, value)
         if self._observe_only and field in {
@@ -2671,6 +2749,10 @@ class EngineBridge(QObject):
         if self._settings is not None and field in Settings.__dataclass_fields__:
             setattr(self._settings, field, value)
         if not self.active:
+            return False
+        if field == "preview_lossless" and not self._preview_lossless_supported:
+            if value:
+                self.message.emit("Lossless preview requires an updated native engine. This engine uses JPEG.")
             return False
         if field in self.LIVE_LOCAL_SETTINGS:
             return True
@@ -2810,6 +2892,8 @@ class EngineBridge(QObject):
         api_observations: bool = False,
     ) -> list[str]:
         validate_batch3(asdict(settings))
+        if not (valid_frame_rate(settings.capture_fps) and valid_frame_rate(settings.inference_fps)):
+            raise ValueError("Capture and inference rates must be positive native integers.")
         from crosshair_reference import wire as crosshair_wire
         calibration_wire = crosshair_wire(settings)
         from batch6_settings import device_for
@@ -2907,6 +2991,8 @@ class EngineBridge(QObject):
         args.append("--cuda-graph-replay" if settings.cuda_graph_replay else "--no-cuda-graph-replay")
         args.append("--cuda-preprocess" if settings.cuda_preprocess else "--no-cuda-preprocess")
         args.append("--preview" if settings.preview_enabled else "--no-preview")
+        if settings.preview_lossless:
+            args.append("--preview-lossless")
         args.append("--overlay" if settings.overlay_enabled else "--no-overlay")
         args.append("--overlay-boxes" if settings.overlay_boxes else "--no-overlay-boxes")
         args.append("--overlay-motion" if settings.overlay_motion else "--no-overlay-motion")
@@ -2955,9 +3041,14 @@ class EngineBridge(QObject):
                 self.state_changed.emit("Stopped");self._release_manual_lock_event();self.startup_rejected.emit();return
         while self._provider_index < len(self._providers):
             provider = self._providers[self._provider_index]
-            executable, environment = self.launch_for('cpu' if self._cloud_session else provider)
+            needs_onnx = bool(self._settings.model_path) and self._cloud_session is None
+            executable, environment = self.launch_for('cpu' if self._cloud_session else provider, require_model=needs_onnx)
             if executable is None:
                 missing = f"The bundled {self.provider_label(provider)} engine is unavailable."
+                if not getattr(sys, "frozen", False) and provider == "cpu" and needs_onnx:
+                    missing = "The native CPU engine needs ONNX Runtime. Run BuildCommunity.ps1 to build it."
+                elif not getattr(sys, "frozen", False) and provider == "cuda":
+                    missing = "CUDA needs the native CPU/CUDA engine and its matching runtime. Run BuildCommunity.ps1 and refresh CUDA in Model Library."
                 if self._settings.provider != "auto":
                     self.message.emit(missing)
                     self.state_changed.emit("Stopped")
@@ -2970,6 +3061,8 @@ class EngineBridge(QObject):
             self._reset_output_stream()
             self._active_provider = provider
             self._has_telemetry = False
+            from native_engine_layout import supports_lossless_preview
+            self._preview_lossless_supported = supports_lossless_preview(executable)
             self._last_error = ""
             self.state_changed.emit(f"Starting {self.provider_label(provider)} engine")
             self.process.setProcessEnvironment(environment)
@@ -2991,6 +3084,10 @@ class EngineBridge(QObject):
                 return
             if self._cloud_session and self._cloud_session.ready:
                 arguments += ['--cloud-pipe', self._cloud_session.pipe, '--cloud-worker-pid', str(self._cloud_session.ready['pid'])]
+            if not self._preview_lossless_supported and "--preview-lossless" in arguments:
+                arguments.remove("--preview-lossless")
+                if self._settings.preview_enabled:
+                    self.message.emit("Lossless preview requires an updated native engine. This engine uses JPEG.")
             self.process.start(str(executable),arguments)
             return
         self.message.emit("No compatible bundled inference engine could be started.")
@@ -3036,8 +3133,6 @@ class EngineBridge(QObject):
             return
         if self._try_fallback(self._last_error or f"exit code {exit_code}"):
             return
-        if not self._has_telemetry and self._last_error:
-            self.message.emit(self._last_error)
         self.state_changed.emit("Stopped")
         self._release_manual_lock_event()
         self._controller_host_session = None
@@ -3094,7 +3189,7 @@ class EngineBridge(QObject):
         pending, self._pending_visuals = self._pending_visuals, {}
         if self.intentional_stop or self._output_failed or not self.active:
             return
-        # Overlay is independent of JPEG decode and has no preview-rate cap.
+        # Overlay is independent of preview image decoding and its rate cap.
         for kind in ('overlay', 'preview'):
             if kind not in pending:
                 continue
@@ -3112,17 +3207,17 @@ class EngineBridge(QObject):
                 width, height = int(payload["width"]), int(payload["height"])
                 if width <= 0 or height <= 0:
                     raise ValueError("Invalid dimensions")
-                jpeg = base64.b64decode(payload["jpeg"], validate=True)
+                encoded = base64.b64decode(payload["png"] if "png" in payload else payload["jpeg"], validate=True)
                 self._preview_observed_at = time.monotonic() - native_observation_age_ms(payload, native_tick_ms()) / 1000.0
                 from crosshair_reference import remaining_ms
                 self._preview_reference_deadline = time.monotonic()+remaining_ms(payload,native_tick_ms())/1000.
-                self.preview.emit(jpeg, width, height)
+                self.preview.emit(encoded, width, height)
             except (KeyError, ValueError, TypeError):
                 self.message.emit("Received an invalid preview frame from the native engine.")
 
     def _read_output(self) -> None:
         self.process.setReadChannel(QProcess.ProcessChannel.StandardOutput)
-        # Bound work per event-loop turn. JPEG decoding and painting happen only
+        # Bound work per event-loop turn. Image decoding and painting happen only
         # for the newest visual record; lifecycle and dataset events stay ordered.
         chunk = bytes(self.process.read(4 * 1024 * 1024))
         if self.intentional_stop:
@@ -3200,7 +3295,8 @@ class EngineBridge(QObject):
         if message:
             message = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", message).strip()
             if "Some nodes were not assigned to the preferred execution providers" in message:
-                self.message.emit("DirectML initialized; ONNX Runtime kept shape-only operations on the CPU.")
+                provider = self.provider_label(self._active_provider)
+                self.message.emit(f"{provider} initialized; ONNX Runtime assigned some operations to the CPU.")
             elif message:
                 self.message.emit(message)
 
@@ -3395,6 +3491,8 @@ PAGE_TITLES = {
     "diagnostics": "Status & Diagnostics",
 }
 
+PRIMARY_PAGES = ("overview", "capture", "detection", "selection", "output", "dataset", "diagnostics")
+
 
 class ControlCenter(QMainWindow):
     # HTTP worker threads never touch Qt widgets directly. Commands cross this
@@ -3414,7 +3512,7 @@ class ControlCenter(QMainWindow):
         self._live_close = None
         self._native_closing = False
         self._profile_transition_pending = False
-        self.settings = Settings()
+        self.settings = self.prepare_default_profile()
         self._tuning_lock = TuningLock(self)
         self._policy_start_pending = False
         self.ui_appearance = load_ui_appearance()
@@ -3438,8 +3536,9 @@ class ControlCenter(QMainWindow):
         self._last_output_data = None
         self.dirty = False
         self.pages: dict[str, QWidget] = {}
-        self.nav: dict[str, QPushButton] = {}
-        self.current_page = "games"
+        self.nav: dict[str, QPushButton | QAction] = {}
+        self.current_page = "overview"
+        self.current_route = "overview"
         self._model_selection = None
         self._pipeline_received_at = 0.0
         self._model_probes = []
@@ -3538,7 +3637,7 @@ class ControlCenter(QMainWindow):
         install_window_guard(self)
         self.sync_local_api()
         self.refresh_local_api_snapshot()
-        self.show_page("games")
+        self.show_page("overview")
         self.log("INFO", "Qt control center ready. Native engine is idle.")
         if _NATIVE_INJECTION is None:
             QTimer.singleShot(0, self.register_global_hotkeys)
@@ -3549,18 +3648,14 @@ class ControlCenter(QMainWindow):
             self._initialization_timer.setSingleShot(True)
             self._initialization_timer.timeout.connect(self.offer_initialization)
             self._initialization_timer.start(250)
-        if live_resources is not None:
-            from vlui_native_owner import NativeLiveOwner
-            from vlui_native_shell import NativeLiveCoordinator
-            self._live_owner = NativeLiveOwner(self)
-            self._live_coordinator = NativeLiveCoordinator(self, self._live_owner, live_resources)
-            from vlui_native_close import NativeCloseOwner
-            self._live_close = NativeCloseOwner(self)
+        from vlui_native_owner import NativeLiveOwner
+        from vlui_native_shell import NativeLiveCoordinator
+        from vlui_native_close import NativeCloseOwner
+        self._live_owner = NativeLiveOwner(self)
+        self._live_coordinator = NativeLiveCoordinator(self, self._live_owner, live_resources)
+        self._live_close = NativeCloseOwner(self)
 
     def build_shell(self) -> None:
-        # One continuous Vapor Lock image sits behind the entire command deck.
-        # The command bar, navigation, and workspace each carry only a smoked
-        # glass layer so the product feels like a single control surface.
         root = WorkspaceBackdrop()
         root.setObjectName("root")
         self.workspace_root = root
@@ -3570,6 +3665,7 @@ class ControlCenter(QMainWindow):
         layout.setSpacing(0)
         top = QFrame()
         top.setObjectName("commandBar")
+        top.setProperty("monitoringToolbar", True)
         top.setFixedHeight(72)
         self.command_bar = top
         from mission_layout import MeasuredHeaderLayout
@@ -3672,7 +3768,7 @@ class ControlCenter(QMainWindow):
         self.start_button = QPushButton("Start")
         self.start_button.setObjectName("primaryButton")
         self.start_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-        self.start_button.setMinimumWidth(140)
+        self.start_button.setMinimumWidth(94)
         self.start_button.setToolTip("Start capture")
         self.start_button.clicked.connect(self.start_capture)
         top_layout.addWidget(self.start_button)
@@ -3685,7 +3781,7 @@ class ControlCenter(QMainWindow):
         layout.addWidget(top)
         shell = QFrame()
         shell.setObjectName("workspaceShell")
-        shell_layout = QHBoxLayout(shell)
+        shell_layout = QVBoxLayout(shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
         self.navigation_deck = self.make_navigation_deck()
@@ -3707,8 +3803,7 @@ class ControlCenter(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, "command_bar"):
             self.update_header_density()
-        if hasattr(self, "session_cockpit_grid") and hasattr(self, "session_cockpit_cards"):
-            self.update_overview_grid()
+        self.update_overview_grid()
         if hasattr(self, "policy_reason_scroll"):
             self.size_policy_reason()
         self.update_targeting_layout()
@@ -3767,7 +3862,7 @@ class ControlCenter(QMainWindow):
         if not hasattr(self, "policy_deck_layout"):
             return
         scale = float(getattr(self._live_owner, '_scale', '1'))
-        stacked = self.width() - self.navigation_deck.width() < round(1000 * scale)
+        stacked = self.stack.width() < round(1000 * scale)
         rules_active=(getattr(self,'current_page','')=='selection' and hasattr(self,'targeting_tabs')
                       and self.targeting_tabs.currentIndex()==self.targeting_tabs.index_of('Class rules'))
         self.policy_deck_layout.setDirection(QHBoxLayout.Direction.TopToBottom if stacked else QHBoxLayout.Direction.LeftToRight)
@@ -3806,19 +3901,8 @@ class ControlCenter(QMainWindow):
         compact = self.width() < 1160
         self.save_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly if compact else Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.save_button.setText(self.t('Save profile'))
-        if hasattr(self, 'navigation_deck'):
-            factor = float(getattr(self._live_owner, '_scale', '1'))
-            base = 220 if self.ui_appearance.layout=='mission-control' else 210 if theme_for(self.ui_appearance.layout).high_contrast else 196
-            self.navigation_deck.setFixedWidth(min(round(base * factor), max(base, round(self.width() * .3))))
-        if hasattr(self, 'guide_link'):
-            title = self.t('Settings guide')
-            width = max(80, self.navigation_deck.width() - 40 - self.guide_link.iconSize().width())
-            multiline = self.guide_link.fontMetrics().horizontalAdvance(title) > width and ' ' in title
-            self.guide_link.setText(title.replace(' ', '\n', 1) if multiline else title)
-            self.guide_link.setAccessibleName(title)
-            self.guide_link.setMinimumHeight(max(36, self.guide_link.fontMetrics().lineSpacing() * (2 if multiline else 1) + 10))
-        for label in (self.context_kicker, self.quick_profile_label, self.session_mode_label, self.quick_model_label):
-            label.setVisible(not compact or self.ui_appearance.layout=='mission-control')
+        for label in (self.quick_profile_label, self.session_mode_label, self.quick_model_label):
+            label.show()
         self.command_bar.layout().setContentsMargins(*(14, 10, 14, 10) if compact else (24, 10, 24, 10))
         self.command_bar.layout().setSpacing(8 if compact else 11)
         if hasattr(self, "overview_release"):
@@ -3828,96 +3912,34 @@ class ControlCenter(QMainWindow):
             coordinator._size_command_row()
 
     def update_overview_grid(self) -> None:
-        columns = 1 if self.width() < 1100 else 3
-        grid = self.session_cockpit_grid
-        if getattr(self, "_overview_grid_columns", None) == columns and grid.count() == len(self.session_cockpit_cards):
-            return
-        for card in self.session_cockpit_cards:
-            grid.removeWidget(card)
-        for index, card in enumerate(self.session_cockpit_cards):
-            grid.addWidget(card, index // columns, index % columns)
-        for column in range(4):
-            grid.setColumnStretch(column, 1 if column < columns else 0)
-        self._overview_grid_columns = columns
+        if hasattr(self, "_monitoring_preview_viewport"):
+            width = self._monitoring_columns.left.width()
+            self._monitoring_preview_viewport.setMinimumHeight(max(270, min(420, width * 9 // 16)))
 
     def make_navigation_deck(self) -> QWidget:
+        from mission_layout import ActionFlow, ActionRow
+
         deck = QFrame()
-        deck.setObjectName("navigationDeck")
-        deck.setFixedWidth(196)
-        deck_layout = QVBoxLayout(deck)
-        deck_layout.setContentsMargins(0, 0, 0, 0)
-        deck_layout.setSpacing(0)
-        identity = QWidget()
-        identity_layout = QVBoxLayout(identity)
-        identity_layout.setContentsMargins(16, 16, 16, 10)
-        identity_layout.setSpacing(6)
-        logo = QLabel()
-        logo.setObjectName("navigationLogo")
-        logo.setAccessibleName("VaporLock")
-        logo.setProperty("_vaporlock_i18n_skip", True)
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        assets = Path(sys._MEIPASS) / "assets" if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1] / "assets"
-        logo.setPixmap(QPixmap(str(assets / "VaporLock.png")).scaled(
-            104, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        identity_layout.addWidget(logo)
-        deck_layout.addWidget(identity)
-        scroll = QScrollArea()
-        scroll.setObjectName("navigationScroll")
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        content = QWidget()
-        content.setObjectName("navigationContent")
-        content.setMinimumWidth(0)
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(8, 14, 8, 14)
-        layout.setSpacing(2)
-        for group, items in (
-            ("LIBRARY", (("games", "Games"), ("profiles", "Profiles"), ("model", "Model Library"))),
-            ("WORKSPACE", (("overview", "Overview"), ("detection", "Detection"), ("selection", "Targeting"), ("output", "Movement"))),
-            ("TOOLS", (("dataset", "Training Data"), ("shortcuts", "Shortcuts"), ("automation", "API Suite"), ("diagnostics", "Status & Diagnostics"), ("misc", "Misc"))),
-        ):
-            label = QLabel(group)
-            label.setObjectName("navGroup")
-            layout.addWidget(label)
-            for key, title in items:
-                button = QPushButton(title)
-                button.setCheckable(True)
-                button.setFlat(True)
-                button.setObjectName("navButton")
-                button.setIcon(self.navigation_icon(key))
-                button.setToolTip(title)
-                button.setMinimumHeight(36)
-                button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-                button.clicked.connect(lambda _checked=False, page=key: self.show_page(page))
-                self.nav[key] = button
-                layout.addWidget(button)
-            if group != "TOOLS":
-                layout.addSpacing(7)
-        layout.addStretch(1)
-        scroll.setWidget(content)
-        deck_layout.addWidget(scroll)
-        footer = QWidget()
-        footer_layout = QVBoxLayout(footer)
-        footer_layout.setContentsMargins(8, 8, 8, 14)
-        guide = QPushButton("Settings guide")
-        guide.setObjectName("guideLink")
-        guide.setFlat(True)
-        guide.setMinimumHeight(36)
-        guide.clicked.connect(lambda: self.open_settings_guide())
-        guide.setToolTip("Open the bundled guide in your browser.")
-        self.guide_link = guide
-        guide.setProperty("missionIcon", "book")
-        footer_layout.addWidget(guide)
-        for title, attribute in (("Appearance", "interface_layout_choice"), ("Language", "language_choice")):
+        deck.setObjectName("monitoringNavigation")
+        deck_layout = QHBoxLayout(deck)
+        deck_layout.setContentsMargins(18, 7, 18, 7)
+        deck_layout.setSpacing(15)
+        brand = QLabel("VaporLock")
+        brand.setObjectName("monitoringBrand")
+        deck_layout.addWidget(brand)
+        tabs = ActionRow()
+        layout = ActionFlow(tabs)
+        layout.setSpacing(5)
+        for key in PRIMARY_PAGES:
+            title = PAGE_TITLES[key]
             button = QPushButton(title)
-            button.setObjectName("navButton")
-            button.setMinimumHeight(36)
-            button.setProperty("missionIcon", "display" if title == "Appearance" else "globe")
-            button.clicked.connect(lambda _checked=False, name=attribute: self.reveal_setting("interface", getattr(self, name)))
-            footer_layout.addWidget(button)
-        deck_layout.addWidget(footer)
+            button.setObjectName("monitoringTab")
+            button.setCheckable(True)
+            button.setToolTip(title)
+            button.clicked.connect(lambda _checked=False, page=key: self.show_page(page))
+            self.nav[key] = button
+            layout.addWidget(button)
+        deck_layout.addWidget(tabs, 1)
         return deck
 
     def make_telemetry_strip(self) -> QWidget:
@@ -3969,9 +3991,6 @@ class ControlCenter(QMainWindow):
         edition.setWordWrap(True)
         layout.addWidget(edition, 0, len(self.telemetry_widgets))
         self.telemetry_widgets.append(edition)
-        for title,symbol,callback in (('Settings guide','book',self.open_settings_guide),('Diagnostics','pulse',lambda:self.show_page('diagnostics'))):
-            link=QPushButton(title);link.setProperty('missionIcon',symbol);link.clicked.connect(callback)
-            layout.addWidget(link,0,len(self.telemetry_widgets));self.telemetry_widgets.append(link)
         scroll = self.telemetry_scroll = QScrollArea()
         scroll.setObjectName('telemetryScroll')
         scroll.setAccessibleName('Session status')
@@ -3983,13 +4002,45 @@ class ControlCenter(QMainWindow):
         scroll.setWidget(strip)
         scroll.viewport().installEventFilter(self)
         strip.setAutoFillBackground(False)
+        footer = QFrame()
+        footer.setObjectName("monitoringFooter")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(0, 0, 14, 4)
+        footer_layout.setSpacing(8)
+        footer_layout.addWidget(scroll, 1)
+
+        self.language_choice = QComboBox()
+        self.language_choice.setObjectName("languageChoice")
+        self.language_choice.setProperty("_vaporlock_i18n_skip", True)
+        for name, code in LANGUAGE_OPTIONS:
+            self.language_choice.addItem(name, code)
+        self.language_choice.setCurrentIndex(self.language_choice.findData(self.ui_language))
+        self.language_choice.currentIndexChanged.connect(self.language_changed)
+        footer_layout.addWidget(self.language_choice, 0, Qt.AlignmentFlag.AlignBottom)
+
+        self.more_tabs_button = QToolButton()
+        self.more_tabs_button.setObjectName("monitoringMore")
+        self.more_tabs_button.setText("More tabs")
+        self.more_tabs_button.setToolTip("Open the remaining Vapor Lock tabs")
+        self.more_tabs_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(self.more_tabs_button)
+        menu.setObjectName("monitoringPageMenu")
+        for key in ("model", "games", "profiles", "shortcuts", "automation", "misc", "interface"):
+            action = menu.addAction(PAGE_TITLES[key])
+            action.setCheckable(True)
+            action.triggered.connect(lambda _checked=False, page=key: self.show_page(page))
+            self.nav[key] = action
+        menu.addSeparator()
+        menu.addAction("Settings guide", lambda: self.open_settings_guide())
+        self.more_tabs_button.setMenu(menu)
+        footer_layout.addWidget(self.more_tabs_button, 0, Qt.AlignmentFlag.AlignBottom)
         self.update_telemetry_layout()
-        return scroll
+        return footer
 
     def navigation_icon(self, page: str):
         from mission_icons import icon, NAVIGATION
         palette = appearance_palette(self.ui_appearance, True)
-        return icon(NAVIGATION[page], palette['ice'], palette['baby'], palette['steel'])
+        return icon(NAVIGATION.get(page, 'display'), palette['ice'], palette['baby'], palette['steel'])
 
     def new_page(self, title: str, subtitle: str, include_heading: bool = True) -> tuple[QScrollArea, QVBoxLayout]:
         scroll = QScrollArea()
@@ -4218,16 +4269,19 @@ class ControlCenter(QMainWindow):
         if save and not save_ui_appearance(self.ui_appearance):
             self.log("WARN", "Windows could not save the interface appearance preference.")
         scale = getattr(self._live_owner, '_scale', '1')
-        self.setStyleSheet(scaled_native_stylesheet(ui_stylesheet(self.ui_appearance, True), scale))
+        from monitoring_styles import monitoring_stylesheet
+        palette = appearance_palette(self.ui_appearance, True)
+        self.setStyleSheet(scaled_native_stylesheet(ui_stylesheet(self.ui_appearance, True), scale)
+                           + monitoring_stylesheet(self.ui_appearance, palette, scale))
         if hasattr(self, "workspace_root"):
             self.workspace_root.set_appearance(self.ui_appearance, True)
         self.refresh_session_cockpit()
-        palette = appearance_palette(self.ui_appearance, True)
         cloud_workspace=getattr(getattr(self,'_cloud_suite',None),'workspace',None)
         if cloud_workspace is not None:cloud_workspace.apply_palette()
         for page, button in self.nav.items():
             button.setIcon(self.navigation_icon(page))
-            button.setIconSize(QSize(round(20*float(scale)), round(20*float(scale))))
+            if isinstance(button, QPushButton):
+                button.setIconSize(QSize(round(16*float(scale)), round(16*float(scale))))
         from mission_icons import apply as apply_icon
         for name, symbol in (("start_button", "start"), ("stop_button", "stop"),
                 ("save_button", "save"), ("undo_button", "undo"),
@@ -4264,9 +4318,6 @@ class ControlCenter(QMainWindow):
             self.palette_status.setText(self.t("Customized palette" if customized else "Theme defaults"))
         if hasattr(self, "command_bar"):
             self.command_bar.setFixedHeight(round((78 if contrast else 72) * float(scale)))
-        if hasattr(self, "navigation_deck"):
-            base = 210 if contrast else 196
-            self.navigation_deck.setFixedWidth(min(round(base * float(scale)), max(base, round(self.width() * .3))))
         margins = (22, 18, 22, 25) if contrast else (27, 12, 27, 12)
         for content in self.findChildren(QWidget, "pageContent"):
             if content.layout() is not None:
@@ -4442,7 +4493,7 @@ class ControlCenter(QMainWindow):
             source_title = kicker.property("_vaporlock_i18n_page_title")
             if source_title:
                 kicker.setText(f"VAPOR LOCK / {self.t(str(source_title)).upper()}")
-        self.header_page.setText(self.t(PAGE_TITLES.get(self.current_page, "Control Center")))
+        self.header_page.setText(self.t(PAGE_TITLES.get(self.current_route, "Control Center")))
         self.setWindowTitle(f"Vapor Lock · {self.t('Control Center')}")
         self.edition_summary.setText(PRODUCT_VERSION)
         self.edition_summary.setToolTip(f"Vapor Lock {PRODUCT_VERSION}")
@@ -4457,6 +4508,8 @@ class ControlCenter(QMainWindow):
             self.language_choice.blockSignals(True)
             self.language_choice.setCurrentIndex(max(0, self.language_choice.findData(self.ui_language)))
             self.language_choice.blockSignals(False)
+            self.language_choice.setAccessibleName(self.t("Display language"))
+            self.language_choice.setToolTip(self.t("Display language"))
         if hasattr(self, "controller_tester"):
             self.controller_tester.refresh()
         self.refresh_readiness()
@@ -4492,6 +4545,8 @@ class ControlCenter(QMainWindow):
         if not save_preferred_language(language):
             self.log("WARN", "Windows could not save the interface language preference.")
         self.apply_interface_language()
+        if self._live_owner is not None:
+            self._live_owner.native_changed()
 
     @disposable_deny('external-open')
     def open_settings_guide(self, topic=None) -> bool:
@@ -4541,6 +4596,7 @@ class ControlCenter(QMainWindow):
         self.apply_ui_appearance(save=False)
 
     def rebuild_pages(self) -> None:
+        route = self.current_route
         dialog=getattr(self,"_crosshair_dialog",None)
         if dialog:dialog.reject()
         for name in ('annotation_assist','observation_sharing'):
@@ -4572,12 +4628,13 @@ class ControlCenter(QMainWindow):
                 getattr(self, name).setText(text)
         self.capture_interface_copy()
         self.apply_interface_language()
-        self.show_page(self.current_page)
+        self.show_page(route)
         self.set_targeting_inspector_tab(inspector_index)
         for index, value in enumerate(inspector_scrolls):
             scroll = self.targeting_inspector_stack.widget(index)
             QTimer.singleShot(0, lambda scroll=scroll, value=value: scroll.verticalScrollBar().setValue(value))
         self.log_view.setPlainText(log_text)
+        self._refresh_monitoring_activity()
         for attribute in ("preview_view", "policy_preview_view"):
             if hasattr(self, attribute):
                 getattr(self, attribute).set_frame(frame)
@@ -4588,136 +4645,135 @@ class ControlCenter(QMainWindow):
                 QTimer.singleShot(0, lambda page=page, value=scrolls[key]: page.verticalScrollBar().setValue(value))
 
     def overview_page(self) -> QWidget:
-        page, layout = self.new_page("Session overview", "Review capture, model and movement setup before starting a session.")
-        from mission_layout import TaskColumns,TaskCard
-        overview_columns=TaskColumns(proportions=(60,40))
-        for panel in (overview_columns.left,overview_columns.right):panel.setObjectName('missionTaskColumn')
-        preview_card=TaskCard('Live preview','display')
-        config_card=TaskCard('Current configuration','gear')
-        overview_columns.left_layout.addWidget(preview_card,1)
-        overview_columns.right_layout.addWidget(config_card)
-        self._overview_preview_slot=preview_card.body
-        notice = QFrame()
-        notice.setObjectName("signalPanel")
-        notice_layout = QVBoxLayout(notice)
-        notice_layout.setContentsMargins(10, 8, 10, 8)
-        notice_layout.setSpacing(6)
-        signal_copy = QVBoxLayout()
-        signal_copy.setSpacing(3)
-        signal_label = QLabel("LOCAL SESSION")
-        signal_label.setObjectName("signalCaption")
+        page, overview_layout = self.new_page("Session monitor", "Monitor live capture, pipeline timing and output status.")
+        from mission_layout import ActionFlow, ActionRow, TaskCard, TaskColumns
+
+        overview_columns = TaskColumns(proportions=(60, 40))
+        self._monitoring_columns = overview_columns
+        overview_layout.addWidget(overview_columns, 1)
+        for panel in (overview_columns.left, overview_columns.right):
+            panel.setObjectName("missionTaskColumn")
+
+        preview_card = TaskCard("Live preview", "display")
+        preview_card.setObjectName("monitoringPreview")
+        self._monitoring_preview_viewport = QWidget()
+        self._monitoring_preview_viewport.setMinimumHeight(300)
+        self._overview_preview_slot = QVBoxLayout(self._monitoring_preview_viewport)
+        self._overview_preview_slot.setContentsMargins(0, 0, 0, 0)
+        preview_card.body.addWidget(self._monitoring_preview_viewport, 1)
+        overview_columns.left_layout.addWidget(preview_card)
+
+        activity_card = TaskCard("Session activity", "pulse")
+        activity_card.setObjectName("monitoringActivity")
+        self._monitoring_activity = QLabel()
+        self._monitoring_activity.setObjectName("detail")
+        self._monitoring_activity.setProperty("_vaporlock_i18n_skip", True)
+        self._monitoring_activity.setTextFormat(Qt.TextFormat.PlainText)
+        self._monitoring_activity.setWordWrap(True)
+        self._monitoring_activity.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        activity_card.body.addWidget(self._monitoring_activity)
+        overview_columns.left_layout.addWidget(activity_card)
+        overview_columns.left_layout.addStretch(1)
+
+        metrics = QFrame()
+        metrics.setObjectName("monitoringMetrics")
+        metrics_grid = QGridLayout(metrics)
+        metrics_grid.setContentsMargins(0, 0, 0, 0)
+        metrics_grid.setSpacing(8)
+        self._monitoring_metrics = {}
+        for index, (key, title) in enumerate((
+            ("capture", "Capture rate"), ("inference", "Inference time"),
+            ("tracks", "Active tracks"), ("output", "Output state"),
+        )):
+            card, value = self.metric_card(title)
+            card.setObjectName("monitoringMetric")
+            value.setObjectName("monitoringValue")
+            value.setWordWrap(True)
+            self._monitoring_metrics[key] = value
+            metrics_grid.addWidget(card, index // 2, index % 2)
+        metrics_grid.setColumnStretch(0, 1)
+        metrics_grid.setColumnStretch(1, 1)
+        self.metric_tracks = self._monitoring_metrics["tracks"]
+        overview_columns.right_layout.addWidget(metrics)
+
+        def add_readout(card: QVBoxLayout, title: str) -> QLabel:
+            row = QHBoxLayout()
+            caption = QLabel(title)
+            caption.setObjectName("detail")
+            caption.setWordWrap(True)
+            value = QLabel()
+            value.setObjectName("monitoringTimingValue")
+            value.setWordWrap(True)
+            value.setTextFormat(Qt.TextFormat.PlainText)
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(caption, 1)
+            row.addWidget(value, 1)
+            card.addLayout(row)
+            return value
+
+        timing = TaskCard("Pipeline timing", "pulse")
+        timing.setObjectName("monitoringPipeline")
+        timing.body.setContentsMargins(14, 12, 14, 12)
+        timing.body.setSpacing(5)
+        self._monitoring_timing = {
+            key: add_readout(timing.body, title) for key, title in (
+                ("capture_ms", "Capture"), ("preprocess_ms", "Preprocessing"),
+                ("model_ms", "Model"), ("postprocess_ms", "Postprocessing"), ("tracking_ms", "Tracking"),
+            )
+        }
+        self.metric_fps = add_readout(timing.body, "Processing rate")
+        self.metric_fps.setText("-")
+        overview_columns.right_layout.addWidget(timing)
+
+        config_card = TaskCard("Current configuration", "gear")
+        config_card.setObjectName("monitoringReadiness")
+        config_card.body.setContentsMargins(14, 12, 14, 12)
+        config_card.body.setSpacing(5)
+        self.metric_state = add_readout(config_card.body, "Session state")
+        self.metric_state.setText(self.localized_engine_state(self._last_engine_state))
+        self.metric_target = add_readout(config_card.body, "Current lock")
+        self.metric_target.setText(self.t("No lock"))
         self.readiness = QLabel()
         self.readiness.setObjectName("signalValue")
+        self.readiness.setTextFormat(Qt.TextFormat.PlainText)
         self.readiness.setWordWrap(True)
-        self.readiness_detail = QLabel("Local session status")
+        config_card.body.addWidget(self.readiness)
+        self.readiness_detail = QLabel("Local session status", config_card)
         self.readiness_detail.setObjectName("detail")
         self.readiness_detail.setToolTip("The control center exchanges lightweight commands and telemetry with the native engine.")
-        signal_copy.addWidget(signal_label)
-        signal_copy.addWidget(self.readiness)
-        notice_layout.addWidget(self.readiness)
-        signal_label.setParent(notice);signal_label.hide()
-        details = QHBoxLayout()
-        details.setSpacing(24)
-        provider = QVBoxLayout()
-        provider.setSpacing(3)
-        provider_label = QLabel("PROVIDER")
-        provider_label.setObjectName("signalCaption")
-        self.overview_provider = QLabel()
-        self.overview_provider.setObjectName("signalValue")
-        provider.addWidget(provider_label)
-        provider.addWidget(self.overview_provider)
-        model = QVBoxLayout()
-        model.setSpacing(3)
-        model_label = QLabel("MODEL")
-        model_label.setObjectName("signalCaption")
-        self.overview_model = QLabel()
-        self.overview_model.setObjectName("signalValue")
-        model.addWidget(model_label)
-        model.addWidget(self.overview_model)
-        details.addLayout(provider)
-        details.addLayout(model)
-        # Model/provider are shown as configuration rows below, not a second
-        # oversized summary. Keep the existing readout objects for updates.
-        for item in (provider_label,self.overview_provider,model_label,self.overview_model):
-            item.setParent(notice);item.hide()
-        release = QLabel(f"Vapor Lock {PRODUCT_VERSION}")
-        release.setObjectName("signalCaption")
-        release.setProperty("_vaporlock_i18n_skip", True)
-        self.overview_release = release
-        release.setParent(notice);release.hide()
-        self.overview_configuration=QLabel()
+        self.readiness_detail.hide()
+        self.overview_configuration = QLabel()
         self.overview_configuration.setTextFormat(Qt.TextFormat.PlainText)
         self.overview_configuration.setWordWrap(True)
         config_card.body.addWidget(self.overview_configuration)
-        config_card.body.addWidget(notice)
-        cockpit = QGridLayout()
-        cockpit.setHorizontalSpacing(9)
-        cockpit.setVerticalSpacing(9)
-        self.session_cockpit: dict[str, tuple[QLabel, QPushButton]] = {}
+        self.session_cockpit = {
+            key: (add_readout(config_card.body, caption), None)
+            for key, caption in (("frame", "Capture source"), ("output", "Movement output"))
+        }
+        self.session_cockpit["pipeline"] = (add_readout(config_card.body, "Model readiness"), None)
+        overview_columns.right_layout.addWidget(config_card)
+        overview_columns.right_layout.addStretch(1)
 
-        def cockpit_card(key: str, caption: str, action: str, callback) -> QFrame:
-            card=TaskCard(caption,{'pipeline':'model','frame':'display','output':'movement','setup':'gear'}[key])
-            value=QLabel();value.setObjectName('detail');card.body.addWidget(value)
-            value.setWordWrap(True)
-            button = QPushButton(action)
-            button.setObjectName("compactButton")
-            button.clicked.connect(callback)
-            card.layout().addWidget(button)
-            self.session_cockpit[key] = (value, button)
-            return card
-
-        cards = [
-            cockpit_card("frame", "Capture source", "Capture settings", lambda: self.show_page("capture")),
-            cockpit_card("pipeline", "Model", "Model library", lambda: self.show_page("model")),
-            cockpit_card("output", "Movement output", "Movement settings", lambda: self.show_page("output")),
-        ]
-        layout.addLayout(cockpit)
-        self.session_cockpit_grid = cockpit
-        self.session_cockpit_cards = cards
-        self.update_overview_grid()
-        layout.addWidget(overview_columns,1)
-        setup_card=cockpit_card('setup','Initialization','Setup and calibration',self.open_setup_and_calibration)
-        from mission_layout import ActionFlow
-        setup_actions=QWidget();setup_flow=ActionFlow(setup_actions)
-        setup_flow.addWidget(self.session_cockpit['setup'][1])
-        # Keep the readiness text associated with its existing action.
-        setup_flow.addWidget(self.session_cockpit['setup'][0])
-        setup_card.deleteLater()
-        layout.addWidget(setup_actions)
+        setup_actions = ActionRow()
+        setup_flow = ActionFlow(setup_actions)
+        setup_button = QPushButton("Setup and calibration")
+        setup_button.setObjectName("compactButton")
+        setup_button.clicked.connect(self.open_setup_and_calibration)
+        setup_flow.addWidget(setup_button)
         self.testing_suite_button = QPushButton("Open testing grounds")
         self.testing_suite_button.setObjectName("openTestingGrounds")
         self.testing_suite_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.testing_suite_button.clicked.connect(self.open_testing_suite)
         self.testing_suite_button.setToolTip('Open the standalone practice range. Capture and movement remain under your control.')
         setup_flow.addWidget(self._tuning_lock.wrap(self.testing_suite_button))
-        metrics = QGridLayout()
-        state, self.metric_state = self.metric_card("Session state")
-        fps, self.metric_fps = self.metric_card("Processing rate")
-        tracks, self.metric_tracks = self.metric_card("Active tracks")
-        target, self.metric_target = self.metric_card("Current lock")
-        for index,card in enumerate((state, fps, tracks, target)):
-            metrics.addWidget(card,index//2,index%2)
-        config_card.body.addLayout(metrics)
-        overview_layout=layout
+        activity_card.body.addWidget(setup_actions)
+        self.session_cockpit["setup"] = (add_readout(config_card.body, "Initialization"), setup_button)
+        self._refresh_monitoring_metrics()
+        self._refresh_monitoring_activity()
+
         self._interface_page, interface_outer = self.new_page('Interface & Language','Configure the display language, theme and setup preferences.')
-        from mission_layout import TaskColumns,TaskCard
-        interface_columns=TaskColumns(proportions=(1,1))
-        for panel in (interface_columns.left,interface_columns.right):panel.setObjectName('missionTaskColumn')
-        interface_outer.addWidget(interface_columns)
-        language_card=TaskCard('Language','globe')
         theme_card=TaskCard('Interface mode','display')
-        interface_columns.left_layout.addWidget(language_card)
-        interface_columns.right_layout.addWidget(theme_card)
-        layout=language_card.body
-        language = QComboBox()
-        language.setObjectName("languageChoice")
-        language.setProperty("_vaporlock_i18n_skip", True)
-        for name, code in LANGUAGE_OPTIONS:
-            language.addItem(name, code)
-        language.setCurrentIndex(max(0, language.findData(self.ui_language)))
-        language.currentIndexChanged.connect(self.language_changed)
-        self.language_choice = language
-        self.setting(layout, "Display language", "Choose the language used throughout Control Center.", language)
+        interface_outer.addWidget(theme_card)
         layout=theme_card.body
         interface_layout = QComboBox()
         for identifier, theme in THEMES.items():
@@ -4812,10 +4868,7 @@ class ControlCenter(QMainWindow):
         self.section(layout, "ONNX Runtime")
         self.setting(layout, "Intra-operation threads", "0 lets ONNX Runtime choose automatically. A positive value caps work inside each model operation.", self.range("ort_intra_op_threads", 0, 64))
         self.setting(layout, "Inter-operation threads", "0 lets ONNX Runtime choose automatically. A positive value caps parallel model graph work.", self.range("ort_inter_op_threads", 0, 32))
-        cuda_graph = QCheckBox("Enable CUDA Graph replay")
-        cuda_graph.setChecked(False)
-        cuda_graph.setEnabled(False)
-        self.setting(layout, "CUDA Graph replay", "Unavailable in this engine: persistent CUDA I/O buffers are required. Standard CUDA inference remains available.", cuda_graph)
+        self.setting(layout, "CUDA Graph replay", "Reduces launch overhead on compatible CUDA models. Changes take effect on the next start.", self.cuda_graph_control("Enable CUDA Graph replay"))
         cuda_preprocess = self.cuda_preprocess_control("Use GPU preprocessing")
         self.setting(layout, "GPU preprocessing", "Requires a compatible CUDA or TensorRT RTX engine and a float NCHW model. Other models use CPU preprocessing.", cuda_preprocess)
         self.refresh_cuda_preprocess_controls()
@@ -4855,11 +4908,12 @@ class ControlCenter(QMainWindow):
             high: float,
             decimals: int = 0,
             suffix: str = "",
+            detail: str = "",
         ) -> None:
             control = self.range(field, low, high, decimals, suffix)
             control.setObjectName("policyInspectorRange")
             control.pass_slider_wheel_to_parent()
-            labeled_control(parent, title, control, title)
+            labeled_control(parent, title, control, detail or title)
 
         source = card("SOURCE")
         monitor = QComboBox()
@@ -4881,18 +4935,16 @@ class ControlCenter(QMainWindow):
         source.addWidget(self._tuning_lock.wrap(picker))
 
         rate = card("RATE")
-        compact_range(rate, "Capture rate", "capture_fps", 1, 120, 0, " fps")
-        compact_range(rate, "Inference rate", "inference_fps", 1, 120, 0, " fps")
+        compact_range(rate, "Capture rate", "capture_fps", 1, 120, 0, " fps",
+                      "Slider values top out at 120 fps; type a higher value when your source and hardware support it.")
+        compact_range(rate, "Inference rate", "inference_fps", 1, 120, 0, " fps",
+                      "Slider values top out at 120 fps; type a higher value when your model can sustain it.")
         compact_range(rate, "Frame skip", "frame_skip", 0, 60)
 
         runtime = card("RUNTIME")
         compact_range(runtime, "Intra-operation threads", "ort_intra_op_threads", 0, 64)
         compact_range(runtime, "Inter-operation threads", "ort_inter_op_threads", 0, 32)
-        cuda_graph = QCheckBox("CUDA Graph replay")
-        cuda_graph.setChecked(False)
-        cuda_graph.setEnabled(False)
-        cuda_graph.setToolTip("Unavailable in this engine: persistent CUDA I/O buffers are required. Standard CUDA inference remains available.")
-        runtime.addWidget(cuda_graph)
+        runtime.addWidget(self._tuning_lock.wrap(self.cuda_graph_control("CUDA Graph replay")))
         cuda_preprocess = self.cuda_preprocess_control("CUDA preprocessing")
         runtime.addWidget(cuda_preprocess)
         self.refresh_cuda_preprocess_controls()
@@ -4908,6 +4960,16 @@ class ControlCenter(QMainWindow):
         self._discrete_registry.register(binding, 'cuda_preprocess', control)
         return control
 
+    def cuda_graph_control(self, title: str) -> QCheckBox:
+        control = QCheckBox(title)
+        control.setObjectName("cudaGraphChoice")
+        control.setProperty("_vaporlock_i18n_skip", True)
+        control.setChecked(self.settings.cuda_graph_replay)
+        control.setEnabled(False)
+        control.toggled.connect(lambda state: self.change("cuda_graph_replay", state))
+        control.setProperty("graphTitle", title)
+        return control
+
     def refresh_cuda_preprocess_controls(self) -> None:
         controls = self.findChildren(QCheckBox, "cudaPreprocessChoice")
         if not controls:
@@ -4915,7 +4977,7 @@ class ControlCenter(QMainWindow):
         status = "other-provider"
         if self.settings.provider in {"cuda", "trt"}:
             status = self.engine_capabilities.request(
-                *self.engine.launch_for(self.settings.provider)
+                *self.engine.launch_for(self.settings.provider, status_only=True)
             )
         detail = {
             "other-provider": "Select CUDA or TensorRT RTX to use GPU preprocessing. CPU and DirectML use CPU preprocessing.",
@@ -4930,6 +4992,22 @@ class ControlCenter(QMainWindow):
             control.setEnabled(status == "available")
             control.setChecked(status == "available" and self.settings.cuda_preprocess)
             control.setToolTip(self.t(detail))
+            control.blockSignals(blocked)
+        graph_available = self.settings.provider == "cuda" and getattr(self.engine_capabilities, "cuda_graph_replay", None) is True
+        if self.settings.provider != "cuda":
+            graph_detail = "Select CUDA to use CUDA Graph replay."
+        elif graph_available:
+            graph_detail = "Compatible models use CUDA Graph replay after restart. Other models use standard CUDA."
+        elif status == "checking":
+            graph_detail = "Checking this engine's CUDA Graph replay support..."
+        else:
+            graph_detail = "CUDA Graph replay is unavailable in this engine."
+        for control in self.findChildren(QCheckBox, "cudaGraphChoice"):
+            blocked = control.blockSignals(True)
+            control.setEnabled(graph_available)
+            control.setChecked(self.settings.cuda_graph_replay)
+            control.setText(self.t(control.property("graphTitle")))
+            control.setToolTip(self.t(graph_detail))
             control.blockSignals(blocked)
 
     def apply_region(self, editor: QLineEdit) -> None:
@@ -5107,7 +5185,7 @@ class ControlCenter(QMainWindow):
         benchmark = QWidget()
         benchmark_row = QHBoxLayout(benchmark)
         benchmark_row.setContentsMargins(0, 0, 0, 0)
-        self.model_benchmark = QLabel("Run a short live comparison of the bundled CUDA, DirectML, and CPU engines for this model.")
+        self.model_benchmark = QLabel("Compare available providers using a centered 640 × 640 capture.")
         self.model_benchmark.setObjectName("detail")
         self.model_benchmark.setWordWrap(True)
         self.model_benchmark_button = QPushButton("Benchmark providers")
@@ -5115,7 +5193,7 @@ class ControlCenter(QMainWindow):
         self.model_benchmark_button.clicked.connect(self.benchmark_providers)
         benchmark_row.addWidget(self.model_benchmark, 1)
         benchmark_row.addWidget(self.model_benchmark_button)
-        self.model_benchmark_button.setToolTip('Measures the model on the configured capture region with output, preview and dataset writing disabled. Capture must be stopped first.')
+        self.model_benchmark_button.setToolTip('Capture must be stopped first. The benchmark runs with output, preview and dataset writing disabled.')
         check_details.body.addWidget(self.model_benchmark)
         actions_flow.addWidget(self._tuning_lock.wrap(self.model_benchmark_button))
         benchmark.deleteLater()
@@ -5310,7 +5388,7 @@ class ControlCenter(QMainWindow):
         inspector_tabs.setContentsMargins(0, 0, 0, 0)
         inspector_tabs.setSpacing(2)
         self.targeting_inspector_buttons: list[QPushButton] = []
-        for tab_index, title in enumerate(("Capture", "Policy", "Tuning")):
+        for tab_index, title in ((1, "Controls"), (2, "Tuning")):
             button = QPushButton(title)
             button.setObjectName("secondaryTabButton")
             button.setCheckable(True)
@@ -5574,10 +5652,12 @@ class ControlCenter(QMainWindow):
         policy_body=self.targeting_inspector_stack.widget(1).widget().layout()
         policy_body.insertWidget(max(0,policy_body.count()-1),policy_content)
         def show_task(index):
+            if index != 0 and self.current_route == "capture":
+                self._select_navigation("selection")
             self.targeting_inspector_stack.setVisible(index==0)
             task_tabs.setVisible(index!=0)
-            for button in self.targeting_inspector_buttons:button.setVisible(index==0)
             if index==0:self.set_targeting_inspector_tab(1)
+            self._update_targeting_navigation()
             self.update_targeting_layout()
             inspector.updateGeometry()
         task_tabs._stack.currentChanged.connect(show_task)
@@ -5605,12 +5685,25 @@ class ControlCenter(QMainWindow):
             return
         if not 0 <= index < self.targeting_inspector_stack.count():
             return
-        if getattr(self,'_mission_target_routes_ready',False):self.targeting_tabs.setCurrentIndex(0)
+        routes_ready = getattr(self, "_mission_target_routes_ready", False)
+        if routes_ready:
+            self.targeting_tabs.setCurrentIndex(0)
         self.targeting_inspector_stack.setCurrentIndex(index)
-        for button_index, button in enumerate(self.targeting_inspector_buttons):
+        for button_index, button in enumerate(self.targeting_inspector_buttons, start=1):
             button.blockSignals(True)
             button.setChecked(button_index == index)
             button.blockSignals(False)
+        if routes_ready and self.current_page == "selection":
+            self._select_navigation("capture" if index == 0 else "selection")
+        self._update_targeting_navigation()
+
+    def _update_targeting_navigation(self) -> None:
+        if not hasattr(self, "targeting_tabs"):
+            return
+        show_targeting = self.current_route != "capture"
+        self.targeting_tabs._tab_scroll.setVisible(show_targeting)
+        for button in self.targeting_inspector_buttons:
+            button.setVisible(show_targeting and self.targeting_tabs.currentIndex() == 0)
 
     def reset_target_policy(self) -> None:
         defaults = Settings()
@@ -5659,6 +5752,18 @@ class ControlCenter(QMainWindow):
         ):
             self.setting(layout, title, detail, self.feature_control(self.range(field, 0.0, maximum, 2, suffix)))
 
+    def _build_preview_encoding_controls(self, stream: QVBoxLayout) -> None:
+        lossless = QCheckBox("Enabled")
+        lossless.setObjectName("losslessPreview")
+        lossless.setProperty("guideField", "preview_lossless")
+        lossless.setChecked(self.settings.preview_lossless)
+        quality = self.range("preview_quality", 30, 100, 0)
+        quality.setEnabled(not lossless.isChecked())
+        lossless.toggled.connect(lambda enabled: quality.setEnabled(not enabled))
+        lossless.toggled.connect(lambda enabled: self.change("preview_lossless", enabled))
+        self.setting(stream, "Lossless preview", "Send PNG frames to preserve source colors. This can use more CPU and bandwidth. It only affects the preview.", lossless)
+        self.setting(stream, "JPEG quality", "Compression quality for debug frames. Higher values retain finer detail and use more interprocess bandwidth.", quality)
+
     def _build_preview_controls(self, stream: QVBoxLayout, annotations: QVBoxLayout, desktop: QVBoxLayout) -> None:
         self.section(stream, "Preview stream")
         enabled = QCheckBox("Enabled")
@@ -5667,7 +5772,7 @@ class ControlCenter(QMainWindow):
         self._discrete_registry.register('discrete.preview_enabled.1', 'preview_enabled', enabled)
         self.setting(stream, "Live preview", "Emit compressed annotated frames from the native engine only while a session is running. Disabling this removes preview encoding work from the capture pipeline.", enabled)
         self.setting(stream, "Preview rate", "Maximum annotated frames sent to this control center each second.", self.range("preview_fps", 1, 30, 0, " fps"))
-        self.setting(stream, "JPEG quality", "Compression quality for debug frames. Higher values retain finer detail and use more interprocess bandwidth.", self.range("preview_quality", 30, 100, 0))
+        self._build_preview_encoding_controls(stream)
         snapshot = QPushButton("Save annotated PNG")
         snapshot.clicked.connect(self.save_annotated_snapshot)
         self.setting(stream, "Preview snapshot", "Save the most recent native annotated debug frame as a PNG in this Windows account's Vapor Lock screenshots folder.", self.feature_control(snapshot))
@@ -6538,7 +6643,7 @@ class ControlCenter(QMainWindow):
         self.reload_motion_compensation_library()
 
     def visuals_page(self) -> QWidget:
-        page, layout = self.new_page("Visuals", "Inspect the exact selected-monitor crop that the native detector is evaluating, including its active tracks, anchor, and projected motion.")
+        page, layout = self.new_page("Visuals", "Inspect the source capture with optional tracks, anchor, and projected motion.")
         self.section(layout, "Live annotated preview")
         self.preview_view = PreviewCanvas()
         layout.addWidget(self.preview_view)
@@ -6552,7 +6657,7 @@ class ControlCenter(QMainWindow):
         enabled.toggled.connect(lambda state: self.change("preview_enabled", state))
         self.setting(stream, "Live preview", "Emit compressed annotated frames from the native engine only while a session is running. Disabling this removes preview encoding work from the capture pipeline.", enabled)
         self.setting(stream, "Preview rate", "Maximum annotated frames sent to this control center each second.", self.range("preview_fps", 1, 30, 0, " fps"))
-        self.setting(stream, "JPEG quality", "Compression quality for debug frames. Higher values retain finer detail and use more interprocess bandwidth.", self.range("preview_quality", 30, 100, 0))
+        self._build_preview_encoding_controls(stream)
         snapshot = QPushButton("Save annotated PNG")
         snapshot.clicked.connect(self.save_annotated_snapshot)
         self.setting(stream, "Preview snapshot", "Save the most recent native annotated debug frame as a PNG in this Windows account's Vapor Lock screenshots folder.", self.feature_control(snapshot))
@@ -7352,7 +7457,9 @@ class ControlCenter(QMainWindow):
         return page
 
     def range(self, field: str, low: float, high: float, decimals: int = 0, suffix: str = "") -> RangeControl:
-        control = RangeControl(low, high, float(getattr(self.settings, field)), decimals, suffix)
+        expert_range = (1, MAX_FRAME_RATE) if field in FRAME_RATE_FIELDS else None
+        control = RangeControl(low, high, float(getattr(self.settings, field)), decimals, suffix,
+                               expert_range=expert_range)
         if field.startswith('cloud_'):
             control.spin.setRange(low,high)
         if field in {'dataset_annotation_nms_iou','ultralytics_annotation_nms_iou'}:
@@ -7442,6 +7549,8 @@ class ControlCenter(QMainWindow):
 
     @tuning_guard
     def change(self, field: str, value: object) -> None:
+        if field in FRAME_RATE_FIELDS and not valid_frame_rate(value):
+            raise ValueError("Capture and inference rates must be positive native integers.")
         if field.startswith('cloud_'):
             from cloud_settings import validate as validate_cloud
             validate_cloud({**vars(self.settings),field:value})
@@ -7523,6 +7632,8 @@ class ControlCenter(QMainWindow):
                 self._last_edit = (field, now)
                 self.undo_button.setEnabled(True)
             setattr(self.settings, field, value)
+            if field == "cuda_graph_replay":
+                self.refresh_cuda_preprocess_controls()
             if field in {"confidence", "acquire_confidence", "retain_confidence"}:
                 self.refresh_target_confidence_summary()
             if field.endswith(('_effects_enabled','_effects_extra_copies')):
@@ -7979,6 +8090,8 @@ class ControlCenter(QMainWindow):
             return []
 
     def coerce_remote_setting(self, field: str, value: object) -> object | None:
+        if field in FRAME_RATE_FIELDS:
+            return value if valid_frame_rate(value) else None
         if field in BATCH3_FIELDS:
             try: validate_batch3({field: value})
             except ValueError: return None
@@ -8196,6 +8309,13 @@ class ControlCenter(QMainWindow):
                 self.log('INFO', '.cloud requires its bundled CPU, DirectML or CUDA component and native capture engine. TensorRT is not supported for .cloud.')
                 self.show_model_start_failure()
                 return
+        elif requested == "trt" and not self.acceleration.is_installed(requested):
+            if self.acceleration.setup_files_present(requested):
+                self.log("WARN", self.acceleration.native_build_message(requested))
+            else:
+                self.log("INFO", "Open Model Library to set up TensorRT RTX.")
+            self.show_model_start_failure()
+            return
         elif requested in {"cuda", "dml"} and not self.acceleration.is_installed(requested):
             self.log("INFO", f"{self.engine.provider_label(requested)} is not installed yet. Install it from Model Library or use CPU.")
             self.show_model_start_failure()
@@ -8347,9 +8467,14 @@ class ControlCenter(QMainWindow):
             return
         requested = self.acceleration.recommended_provider() if self.settings.provider == "auto" else self.settings.provider
         if requested == "cpu":
-            self.acceleration_button.setText("CPU ready")
             self.acceleration_button.setEnabled(False)
-            self.set_acceleration_detail("CPU inference is ready. Select CUDA or DirectML to install that provider when the computer supports it.")
+            needs_onnx = Path(self.settings.model_path).suffix.lower() == ".onnx"
+            engine = self.engine.launch_for("cpu", require_model=needs_onnx)[0]
+            self.acceleration_button.setText(self.t("CPU ready" if engine else "CPU engine required"))
+            if engine:
+                self.set_acceleration_detail("CPU inference is ready. Select CUDA or DirectML to install that provider when the computer supports it.")
+            else:
+                self.set_acceleration_detail(self.acceleration.native_build_message(requested))
             return
         if not self.acceleration.supports(requested):
             title = self.engine.provider_label(requested)
@@ -8359,6 +8484,21 @@ class ControlCenter(QMainWindow):
             return
         title = self.engine.provider_label(requested)
         installed = self.acceleration.is_installed(requested)
+        if not installed and (
+            (requested == "cuda" and not self.acceleration.cuda_engine_available())
+            or self.acceleration.setup_files_present(requested)
+        ):
+            self.acceleration_button.setText(f"{title} engine required")
+            self.acceleration_button.setEnabled(False)
+            self.set_acceleration_detail(self.acceleration.native_build_message(requested))
+            return
+        if requested == "cuda" and not installed:
+            from runtime_generations import cuda_setup_present
+            if cuda_setup_present(ROOT):
+                self.acceleration_button.setText(self.t("Refresh CUDA"))
+                self.acceleration_button.setEnabled(not self.acceleration.active)
+                self.set_acceleration_detail("Refresh CUDA to match this build. Existing verified runtime files are reused.")
+                return
         self.acceleration_button.setText(f"{title} {'ready' if installed else 'install'}")
         self.acceleration_button.setEnabled(not self.acceleration.active and not installed)
         self.set_acceleration_detail(
@@ -8636,7 +8776,10 @@ class ControlCenter(QMainWindow):
         provider = self.acceleration.recommended_provider() if self.settings.provider == "auto" else self.settings.provider
         if provider == "cpu":
             return
-        if self.acceleration.is_installed(provider):
+        if (
+            self.acceleration.is_installed(provider) or self.acceleration.setup_files_present(provider)
+            or (provider == "cuda" and not self.acceleration.cuda_engine_available())
+        ):
             self.refresh_acceleration_controls()
             return
         self.acceleration_button.setEnabled(False)
@@ -8652,20 +8795,23 @@ class ControlCenter(QMainWindow):
         if provider in {"cuda", "trt"}:
             self.engine_capabilities.stop()
         title = self.engine.provider_label(provider)
-        if successful:
-            self.log("INFO", f"{title} acceleration is ready.")
-            self.set_acceleration_detail(f"{title} acceleration installed successfully. It will be used on the next capture session.")
-        else:
-            self.log("WARN", f"{title} acceleration installation failed: {message}")
-            self.set_acceleration_detail(f"{title} installation failed: {message}")
         self.refresh_acceleration_controls()
+        if successful and self.acceleration.is_installed(provider):
+            detail = f"{title} acceleration is ready."
+        elif successful:
+            detail = f"{message} {self.acceleration.native_build_message(provider)}"
+        else:
+            detail = f"{title} runtime setup failed: {message}"
+        self.log("INFO" if successful else "WARN", detail)
+        selected = self.acceleration.recommended_provider() if self.settings.provider == "auto" else self.settings.provider
+        if provider == selected:
+            self.set_acceleration_detail(detail)
 
     def show_page(self, key: str) -> None:
-        # Capture now lives beside Policy inside Targeting. Keep the former
-        # route working for integrations and saved actions without maintaining
-        # a second copy of the controls.
-        requested_inspector = 0 if key == "capture" else None
-        if requested_inspector is not None:
+        route = key
+        if self._live_coordinator is not None:
+            self._live_coordinator.show_native_page()
+        if key == "capture":
             key = "selection"
         self.current_page = key
         panel_name = {'games': 'game_cards', 'profiles': 'profile_cards'}.get(key)
@@ -8676,17 +8822,29 @@ class ControlCenter(QMainWindow):
             if key=='overview':self._overview_preview_slot.addWidget(self._shared_preview_shell)
             else:self._target_preview_layout.insertWidget(1,self._shared_preview_shell)
             self._shared_preview_shell.show()
-        for name, button in self.nav.items():
-            button.setChecked(name == key)
-        if hasattr(self, "header_page"):
-            self.header_page.setText(self.t(PAGE_TITLES.get(key, "Control Center")))
+        if route == "capture":
+            self.set_targeting_inspector_tab(0)
+        elif key == "selection" and self.targeting_inspector_stack.currentIndex() == 0:
+            self.set_targeting_inspector_tab(1)
+        self._select_navigation(route)
+        self._update_targeting_navigation()
         self.update_targeting_layout()
-        if requested_inspector is not None:
-            self.set_targeting_inspector_tab(requested_inspector)
 
-    def settings_search_targets(self) -> list[tuple[str, str, QLabel]]:
+    def _select_navigation(self, route: str) -> None:
+        self.current_route = route
+        for name, button in self.nav.items():
+            button.setChecked(name == route)
+        more_active = isinstance(self.nav.get(route), QAction)
+        if self.more_tabs_button.property("hiddenPageActive") != more_active:
+            self.more_tabs_button.setProperty("hiddenPageActive", more_active)
+            self.more_tabs_button.style().unpolish(self.more_tabs_button)
+            self.more_tabs_button.style().polish(self.more_tabs_button)
+        if hasattr(self, "header_page"):
+            self.header_page.setText(self.t(PAGE_TITLES.get(route, "Control Center")))
+
+    def settings_search_targets(self) -> list[tuple[str, str, QWidget]]:
         """Index visible setting labels without maintaining a second schema."""
-        targets: list[tuple[str, str, QLabel]] = []
+        targets = [(self.t(PAGE_TITLES["interface"]), self.t("Display language"), self.language_choice)]
         searchable_objects = {"fieldTitle", "policyControlLabel", "policyCardTitle", "pageTitle"}
         for page_key, page in self.pages.items():
             page_title = self.t(PAGE_TITLES.get(page_key, page_key.title()))
@@ -8703,6 +8861,9 @@ class ControlCenter(QMainWindow):
         return sorted(targets, key=lambda item: (item[0].casefold(), item[1].casefold()))
 
     def reveal_setting(self, page_key: str, target: QWidget) -> None:
+        if target is self.language_choice:
+            target.setFocus(Qt.FocusReason.OtherFocusReason)
+            return
         page = self.pages.get(page_key)
         if page is None:
             return
@@ -9197,6 +9358,37 @@ class ControlCenter(QMainWindow):
         if hasattr(self,'diag_freshness'):
             age=self._pipeline_snapshot.get('age')
             self.diag_freshness.setText('—' if age is None else f'{age:.1f} ms')
+        self._refresh_monitoring_metrics()
+
+    def _refresh_monitoring_metrics(self):
+        if not hasattr(self, "_monitoring_metrics"):
+            return
+        from pipeline_tools import finite
+
+        sample = self.pipeline_display_metrics()
+        active = any(sample[key] is not None for key in ("capture", "inference", "inference_ms"))
+        data = (self._last_output_data or {}) if active else {}
+
+        def formatted(value, unit):
+            return f"{value:.1f} {unit}" if finite(value) else "-"
+
+        track_count = data.get("tracks")
+        output = (self.t("Observe only") if data.get("observe_only") is True else
+                  self.t("Active") if data.get("output_active") is True else self.t("Idle"))
+        values = {
+            "capture": formatted(sample["capture"], "fps"),
+            "inference": formatted(sample["inference_ms"], "ms"),
+            "tracks": str(track_count) if type(track_count) is int and track_count >= 0 else "-",
+            "output": output if active else "-",
+        }
+        for key, value in values.items():
+            label = self._monitoring_metrics[key]
+            if label.text() != value:
+                label.setText(value)
+        for key, label in self._monitoring_timing.items():
+            value = formatted(data.get(key), "ms")
+            if label.text() != value:
+                label.setText(value)
 
     def refresh_pipeline_diagnostics(self):
         if hasattr(self, 'policy_preview_status'):
@@ -9212,12 +9404,71 @@ class ControlCenter(QMainWindow):
             self._live_owner.native_changed()
 
     def pipeline_diagnostic_text(self):
+        from pipeline_tools import finite
+
         values = self.pipeline_display_metrics()
         def number(key, unit):
             return self.t('Unavailable') if values[key] is None else f'{values[key]:.1f} {unit}'
-        return self.tf('Fresh frames: {capture} · Completed inferences: {inference}\nSelected observation age: {age} · Accepted output writes: {writes}\nAccepted writes are software reports, not measured physical delivery.',
+        summary = self.tf('Fresh frames: {capture} · Completed inferences: {inference}\nSelected observation age: {age} · Accepted output writes: {writes}\nAccepted writes are software reports, not measured physical delivery.',
             capture=number('capture','/s'), inference=number('inference','/s'),
             age=number('age','ms'), writes=number('writes','/s'))
+        if values['capture'] is None and values['inference'] is None:
+            return summary
+
+        data = self._last_output_data or {}
+        lines = [summary]
+        capture_cap = data.get('configured_capture_fps')
+        inference_cap = data.get('configured_inference_fps')
+        if all(type(rate) is int and rate > 0 for rate in (capture_cap, inference_cap)):
+            lines.append(self.tf('Configured limits: {capture} capture fps · {inference} inference fps',
+                capture=capture_cap, inference=inference_cap))
+        capture_size = data.get('capture_width'), data.get('capture_height')
+        input_size = data.get('model_input_width'), data.get('model_input_height')
+        if all(type(dimension) is int and dimension > 0 for dimension in (*capture_size, *input_size)):
+            lines.append(self.tf('Capture: {capture} · Model input: {input}',
+                capture=f'{capture_size[0]} × {capture_size[1]}', input=f'{input_size[0]} × {input_size[1]}'))
+        source_rate = data.get('capture_dxgi_update_fps')
+        if finite(source_rate):
+            lines.append(self.tf('DXGI desktop updates: {rate}/s', rate=f'{source_rate:.1f}'))
+        coalesced_rate = data.get('capture_dxgi_coalesced_fps')
+        if finite(coalesced_rate):
+            lines.append(self.tf('DXGI updates combined before acquisition: {rate}/s', rate=f'{coalesced_rate:.1f}'))
+        graph_active = data.get('cuda_graph_replay_active')
+        if type(graph_active) is bool and self.engine.active_provider == 'cuda' and data.get('model') == 'loaded':
+            lines.append(self.t('CUDA Graph replay active' if graph_active else 'Standard CUDA inference'))
+
+        timing = data.get('timing')
+        if not isinstance(timing, dict):
+            timing = {}
+        for key, caption in (
+            ('observation_interval', 'Fresh frame interval'),
+            ('capture_rate_wait', 'Capture pacing wait'),
+            ('capture_rate_overshoot', 'Capture timer overshoot'),
+            ('capture_acquire', 'Capture wait'),
+            ('capture_dxgi_readback', 'DXGI readback wait'),
+            ('capture_dxgi_cpu_copy', 'DXGI CPU pixel copy'),
+            ('model', 'Model execution'),
+            ('post_tracking_work', 'Post-tracking work'),
+            ('completion_interval', 'Inference completion interval'),
+            ('observation_age', 'Frame age after tracking'),
+        ):
+            sample = timing.get(key)
+            if not isinstance(sample, dict) or type(sample.get('count')) is not int or sample['count'] <= 0:
+                continue
+            median, p95 = sample.get('p50_ms'), sample.get('p95_ms')
+            if finite(median) and finite(p95):
+                lines.append(self.tf('{stage}: {median} ms median · {p95} ms p95',
+                    stage=self.t(caption), median=f'{median:.1f}', p95=f'{p95:.1f}'))
+        coalesced = data.get('capture_dxgi_coalesced_frames')
+        if type(coalesced) is int and coalesced >= 0:
+            lines.append(self.tf('DXGI updates combined since start: {count}', count=coalesced))
+        frame_skip = data.get('inference_explicit_skip_total')
+        rate_limited = data.get('inference_rate_limited_total')
+        if (all(type(count) is int and count >= 0 for count in (frame_skip, rate_limited))
+                and (frame_skip or rate_limited)):
+            lines.append(self.tf('Inference skips: {explicit} by frame skip · {limited} by FPS limit',
+                explicit=frame_skip, limited=rate_limited))
+        return '\n'.join(lines)
 
     def model_probe_busy(self) -> bool:
         if self.cloud_background_busy():return True
@@ -9250,7 +9501,7 @@ class ControlCenter(QMainWindow):
 
     def _probe_model(self, settings, provider, completed, *, inspection=False):
         from model_probe import ModelProbe, inert_settings
-        executable, environment = self.engine.launch_for(provider)
+        executable, environment = self.engine.launch_for(provider, require_model=True)
         if executable is None:
             from model_probe import ProbeResult
             completed(ProbeResult(False, 'Native engine is unavailable'))
@@ -9303,6 +9554,8 @@ class ControlCenter(QMainWindow):
 
     @disposable_deny('model-process')
     def benchmark_providers(self) -> None:
+        from model_probe import performance_probe_settings
+
         if self.engine.active:
             self.model_benchmark.setText("Stop the active capture session before benchmarking providers.")
             return
@@ -9319,11 +9572,8 @@ class ControlCenter(QMainWindow):
         if not candidates:
             self.model_benchmark.setText("No bundled native engine is available for benchmarking.")
             return
-        settings = Settings(**asdict(self.settings))
+        settings = performance_probe_settings(self.settings)
         settings.model_path = str(model)
-        settings.capture_fps = max(120, settings.capture_fps)
-        settings.inference_fps = max(120, settings.inference_fps)
-        settings.frame_skip = 0
         settings.preview_enabled = False
         settings.dataset_enabled = False
         settings.movement_enabled = False
@@ -9335,7 +9585,6 @@ class ControlCenter(QMainWindow):
         self._benchmark_active = True
         self.model_benchmark_button.setEnabled(False)
         self.set_start_enabled(False)
-        self.model_benchmark.setText("Benchmarking providers on the current capture region...")
         self._run_next_provider_benchmark()
 
     def _run_next_provider_benchmark(self) -> None:
@@ -9356,7 +9605,8 @@ class ControlCenter(QMainWindow):
             self._benchmark_results.append({'provider': provider, **result.measurement} if result.ok
                                            else {'provider': provider, 'error': result.reason})
             self._run_next_provider_benchmark()
-        self.model_benchmark.setText(f"Benchmarking {self.engine.provider_label(provider)}...")
+        self.model_benchmark.setText(self.tf("Benchmarking {provider} at 640 × 640…",
+                                            provider=self.engine.provider_label(provider)))
         self._probe_model(self._benchmark_settings, provider, completed)
 
     def _finish_provider_benchmark(self) -> None:
@@ -9408,8 +9658,6 @@ class ControlCenter(QMainWindow):
         self.model_validation.setText("Preparing runtime validation…")
         validation_settings = Settings(**asdict(self.settings))
         validation_settings.model_path = str(model)
-        validation_settings.capture_fps = max(30, validation_settings.capture_fps)
-        validation_settings.inference_fps = max(30, validation_settings.inference_fps)
         validation_settings.preview_enabled = False
         validation_settings.dataset_enabled = False
         validation_settings.movement_enabled = False
@@ -10634,7 +10882,10 @@ class ControlCenter(QMainWindow):
                     ('NMS overlap threshold',f'{self.settings.nms_iou:.2f}' if self.settings.nms_enabled else self.t('Off')),
                     ('Acquisition radius',f'{self.settings.acquisition_radius} px'),
                     ('Retention radius',f'{self.settings.retention_radius} px'))
-            self.overview_configuration.setText('\n'.join(self.t(label)+': '+str(value) for label,value in values))
+            readouts = [f"{self.t(label)}: {value}" for label, value in values]
+            self.overview_configuration.setText("\n".join(
+                "  |  ".join(readouts[index:index + 2]) for index in range(0, len(readouts), 2)
+            ))
         self.refresh_session_cockpit()
 
     def refresh_session_cockpit(self) -> None:
@@ -10837,6 +11088,11 @@ class ControlCenter(QMainWindow):
         snapshot = read_profile_snapshot(writable_native_path(Path(path)))
         return self.prepare_profile_bytes(snapshot.data)
 
+    def prepare_default_profile(self) -> Settings:
+        from default_profile import DEFAULT_PROFILE_JSON
+
+        return self.prepare_profile_bytes(DEFAULT_PROFILE_JSON)
+
     def prepare_profile_bytes(self, data: bytes) -> Settings:
         try:
             if type(data) is not bytes or len(data) > 1048576:
@@ -10864,7 +11120,7 @@ class ControlCenter(QMainWindow):
                 overlay = raw.get("overlay", {})
                 visuals = raw.get("visuals", {})
                 dataset = raw.get("dataset", {})
-                region = capture.get("region", [0, 0, 640, 640])
+                region = capture.get("region", list(DEFAULT_CAPTURE_REGION))
                 if isinstance(region, str):
                     try:
                         region = [int(value.strip()) for value in region.split(",")]
@@ -10895,6 +11151,8 @@ class ControlCenter(QMainWindow):
             # Preserve the old snap exception, now visible and explicitly switchable.
             allowed.setdefault("snap_bypasses_confirmation", True)
             allowed.setdefault("max_speed", float(allowed.get("max_step", 24)) * 60.0)
+            if type(allowed.get("inference_fps")) is int and allowed["inference_fps"] == 0:
+                allowed["inference_fps"] = 1  # Effective rate of older profiles with a zero value.
             from ultralytics_credentials import validate_envelope
             validate_envelope(allowed.get('ultralytics_key_protected', ''))
             for path_field in ("model_path", "dataset_directory", "dataset_annotation_model", "ultralytics_annotation_model", "ultralytics_output_directory", "training_base_model", "training_dataset", "motion_compensation_library", "cloud_project", "cloud_output", "cloud_initial_model", "cloud_checkpoint"):
@@ -10922,8 +11180,8 @@ class ControlCenter(QMainWindow):
             if (not 1<=replacement.ultralytics_annotation_passes<=10 or not 1<=replacement.ultralytics_image_limit<=10000
                     or not .01<=replacement.ultralytics_annotation_confidence<=.99 or not .05<=replacement.ultralytics_annotation_iou<=.99):
                 raise ValueError('Invalid Ultralytics profile settings.')
-            if not 1 <= replacement.capture_fps <= 2**53-1:
-                raise ValueError('Profile capture rate must be a positive safe integer.')
+            if not (valid_frame_rate(replacement.capture_fps) and valid_frame_rate(replacement.inference_fps)):
+                raise ValueError("Profile capture and inference rates must be positive native integers.")
             validated_native_settings(asdict(replacement), tuple((name, str(spec.type))
                 for name, spec in Settings.__dataclass_fields__.items()))
             return replacement
@@ -10973,7 +11231,7 @@ class ControlCenter(QMainWindow):
             return
         if self.engine.active:
             self.stop_capture()
-        self.settings = Settings()
+        self.settings = self.prepare_default_profile()
         self.clear_tuning_undo()
         self._active_profile_path = None
         self.dirty = True
@@ -10992,7 +11250,11 @@ class ControlCenter(QMainWindow):
     def update_model_start_feedback(self, state: str) -> None:
         previous = getattr(self, '_last_engine_state', '')
         if state.startswith('Starting'):
-            self.show_model_selection_status('Loading the selected model…', {})
+            if (self.engine.active_provider == 'cuda' and self.settings.cuda_graph_replay
+                    and Path(self.settings.model_path).suffix.lower() == '.onnx'):
+                self.show_model_selection_status('Loading the selected model and preparing CUDA Graph replay.', {})
+            else:
+                self.show_model_selection_status('Loading the selected model…', {})
         elif state.startswith('Running'):
             self._model_selection_status_copy = None
             self.render_model_selection_status()
@@ -11268,9 +11530,9 @@ class ControlCenter(QMainWindow):
                 getattr(self, attribute).setText('--')
         self.refresh_preview_status()
 
-    def apply_preview(self, jpeg: bytes, width: int, height: int) -> None:
-        image = QImage.fromData(jpeg, "JPG")
-        if image.isNull():
+    def apply_preview(self, encoded: bytes, width: int, height: int) -> None:
+        image = QImage.fromData(encoded)
+        if image.isNull() or image.size() != QSize(width, height):
             self.log("WARN", "The native engine sent a preview image that Qt could not decode.")
             return
         self._last_preview_frame = image
@@ -11356,6 +11618,24 @@ class ControlCenter(QMainWindow):
         if not hasattr(self, "log_view"):
             return
         self.log_view.appendPlainText(f"{level:<6} {message}")
+        self._refresh_monitoring_activity()
+
+    def _refresh_monitoring_activity(self):
+        activity = getattr(self, "_monitoring_activity", None)
+        if activity is None:
+            return
+        lines = []
+        if hasattr(self, "log_view"):
+            block = self.log_view.document().lastBlock()
+            for _ in range(3):
+                if not block.isValid():
+                    break
+                if block.text():
+                    lines.append(block.text())
+                block = block.previous()
+        recent = "\n".join(reversed(lines)) if lines else self.t("No session activity yet.")
+        if activity.text() != recent:
+            activity.setText(recent)
 
     @disposable_deny('clipboard')
     def copy_diagnostics(self) -> None:
@@ -11510,7 +11790,7 @@ def main() -> None:
     window = ControlCenter(live_resources=live_resources)
     app._vaporlock_main_window = window
     if interface_unavailable:
-        window.log("WARN", window.t("The live interface is unavailable. Use native controls or reload it."))
+        window.log("INFO", window.t("The native dashboard is available. Optional interface resources were not loaded."))
     window.showMaximized()
     sys.exit(app.exec())
 

@@ -56,6 +56,80 @@ class PublicClientTests(unittest.TestCase):
         for path in (ROOT/'ui').glob('*.py'):
             with self.subTest(path=path.name):compile(path.read_bytes(),str(path),'exec')
 
+    def test_configured_frame_rate_reaches_the_native_engine(self):
+        from frame_rate import MAX_FRAME_RATE
+        from vapor_lock_gui import ControlCenter, EngineBridge
+        from vlui_live_protocol import CommandRejected, validate_command
+        from vlui_numeric_catalog import parse_numeric_value
+
+        def profile(capture, inference):
+            return ControlCenter.prepare_profile_bytes(None, json.dumps({
+                "capture_fps": capture, "inference_fps": inference,
+            }).encode())
+
+        def capture_command(rate):
+            return validate_command("setCaptureRate", json.dumps({"requestId": "1", "fps": rate}))
+
+        for capture, inference in ((256, 240), (144, 360), (MAX_FRAME_RATE, MAX_FRAME_RATE)):
+            with self.subTest(capture=capture, inference=inference):
+                arguments = EngineBridge.arguments_for(profile(capture, inference), "cpu")
+                self.assertEqual(arguments[arguments.index("--capture-fps") + 1], str(capture))
+                self.assertEqual(arguments[arguments.index("--inference-fps") + 1], str(inference))
+                self.assertEqual(capture_command(capture).payload["fps"], capture)
+                self.assertEqual(parse_numeric_value("numeric.inference_fps", str(inference), "expert"), inference)
+
+        self.assertEqual(profile(256, 0).inference_fps, 1)
+        for rate in (False, 0, -1, MAX_FRAME_RATE + 1):
+            with self.subTest(rate=rate):
+                with self.assertRaises(ValueError):
+                    profile(rate, 256)
+                with self.assertRaises(CommandRejected):
+                    capture_command(rate)
+        for rate in (False, -1, MAX_FRAME_RATE + 1):
+            with self.subTest(inference=rate), self.assertRaises(ValueError):
+                profile(256, rate)
+
+    def test_measured_rate_recommendation_keeps_user_ceilings(self):
+        from pipeline_tools import recommended_rates
+
+        results = [{"provider": "dml", "fps": 240, "inference_ms": 3, "frames": 480, "seconds": 2}]
+        self.assertEqual(recommended_rates(results)["inference_fps"], 216)
+        proposal = recommended_rates(results, capture_limit=120, inference_limit=144)
+        self.assertEqual((proposal["capture_fps"], proposal["inference_fps"]), (120, 144))
+
+    def test_provider_measurements_default_to_centered_640_crop(self):
+        from default_profile import DEFAULT_PROFILE_JSON
+        from model_probe import performance_probe_settings
+        from vapor_lock_gui import ControlCenter, EngineBridge
+
+        def native_region(settings):
+            arguments = EngineBridge.arguments_for(settings, "dml", observe_only=True)
+            return arguments[arguments.index("--region") + 1]
+
+        default = ControlCenter.prepare_profile_bytes(None, DEFAULT_PROFILE_JSON)
+        self.assertEqual(native_region(default), "0,0,640,640")
+        custom = ControlCenter.prepare_profile_bytes(None, json.dumps({
+            "region_x": -12, "region_y": 9, "region_width": 100, "region_height": 80,
+            "frame_skip": 3, "capture_fps": 88, "inference_fps": 103,
+        }).encode())
+        standard = performance_probe_settings(custom)
+        profiled = performance_probe_settings(custom, use_current_region=True)
+        self.assertEqual(native_region(standard), "0,0,640,640")
+        self.assertEqual(native_region(profiled), "-12,9,100,80")
+        self.assertEqual(native_region(custom), "-12,9,100,80")
+        self.assertEqual((standard.frame_skip, profiled.frame_skip, custom.frame_skip), (0, 0, 3))
+        self.assertEqual((standard.capture_fps, standard.inference_fps), (88, 103))
+
+    def test_engine_capabilities_accepts_legacy_and_cuda_graph_responses(self):
+        from engine_capabilities import EngineCapabilities
+
+        response = {"type": "capabilities", "protocol_version": 1, "cuda_preprocess": False}
+        self.assertEqual(EngineCapabilities.decode(json.dumps(response).encode()), (False, False))
+        response["cuda_graph_replay"] = True
+        self.assertEqual(EngineCapabilities.decode(json.dumps(response).encode()), (False, True))
+        response["cuda_graph_replay"] = 1
+        self.assertIsNone(EngineCapabilities.decode(json.dumps(response).encode()))
+
     def test_enforcement_removed_not_only_disabled(self):
         for name in RETIRED:self.assertFalse((ROOT/'ui'/(name+'.py')).exists(),name)
         for path in (ROOT/'ui').glob('*.py'):
@@ -128,11 +202,88 @@ class PublicClientTests(unittest.TestCase):
             exe.unlink();single=temporary/'build/windows-release/dml/VaporLockDml.exe';single.parent.mkdir();single.write_bytes(b'not executed')
             self.assertEqual(source_engine(temporary,'dml'),single)
 
+    def test_legacy_synthetic_engine_cannot_admit_cpu_models_or_cuda(self):
+        from native_engine_layout import provider_ready, source_engine
+        from runtime_generations import RuntimeIntegrityError, current_binding
+
+        with fixture() as temporary:
+            release = temporary / 'build/windows-release/Release'
+            release.mkdir(parents=True)
+            engine = release / 'VaporLock.exe'
+            dos_header = bytearray(64)
+            dos_header[:2] = b'MZ'
+            dos_header[60:64] = (64).to_bytes(4, 'little')
+            engine.write_bytes(dos_header + b'PE\x00\x00\x64\x86'
+                               + 'ONNX Runtime was not found when Vapor Lock was built.'.encode('utf-16-le'))
+            for name in ('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll'):
+                (release / name).write_bytes(b'not loaded')
+            self.assertEqual(source_engine(temporary, 'cpu'), engine)
+            self.assertTrue(provider_ready(engine, 'cpu'))
+            self.assertFalse(provider_ready(engine, 'cpu', require_model=True))
+            self.assertFalse(provider_ready(engine, 'cuda'))
+            with self.assertRaisesRegex(RuntimeIntegrityError, 'lacks CUDA ONNX support'):
+                current_binding(temporary, require_cuda=True)
+
     def test_native_environment_excludes_inherited_dll_paths(self):
         from native_engine_layout import native_environment
         value=native_environment(Path('C:/source/engine'),{'PATH':'C:/untrusted','PYTHONPATH':'C:/injected','CUDA_PATH':'C:/cuda','USERPROFILE':'safe'})
         self.assertNotIn('C:/untrusted',value['PATH']);self.assertNotIn('PYTHONPATH',value);self.assertNotIn('CUDA_PATH',value)
         self.assertEqual(value['USERPROFILE'],'safe')
+
+    def test_runtime_setup_distinguishes_download_from_engine_readiness(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import vapor_lock_gui as gui
+
+        manager = gui.AccelerationManager(None)
+        manager._provider = "trt"
+        progress, completions = [], []
+        manager.status.connect(progress.append)
+        manager.completed.connect(lambda *result: completions.append(result))
+        manager._read_status_line(b'{"message":"Downloading TensorRT RTX..."}\n')
+        manager._read_status_line(b'{"message":"TensorRT RTX runtime files are installed.","terminal":true}\n')
+        manager._finished(0, gui.QProcess.ExitStatus.NormalExit)
+        self.assertEqual(progress, ["Downloading TensorRT RTX..."])
+        self.assertEqual(completions, [("trt", True, "TensorRT RTX runtime files are installed.")])
+
+        acceleration = Mock()
+        acceleration.is_installed.return_value = False
+        acceleration.native_build_message.return_value = "Build VaporLockTensorRt.exe."
+        center = SimpleNamespace(
+            acceleration=acceleration, engine=SimpleNamespace(provider_label=lambda _provider: "TensorRT RTX"),
+            engine_capabilities=Mock(), log=Mock(), settings=SimpleNamespace(provider="trt"),
+            refresh_acceleration_controls=Mock(), set_acceleration_detail=Mock(),
+        )
+        gui.ControlCenter.acceleration_completed(center, *completions[0])
+        center.log.assert_called_once_with("INFO", "TensorRT RTX runtime files are installed. Build VaporLockTensorRt.exe.")
+        center.set_acceleration_detail.assert_called_once_with(center.log.call_args.args[1])
+
+        manager._read_status_line(b'{"message":"Checksum mismatch.","terminal":true}\n')
+        manager._finished(1, gui.QProcess.ExitStatus.NormalExit)
+        self.assertEqual(completions[-1], ("trt", False, "Checksum mismatch."))
+        self.assertEqual(progress, ["Downloading TensorRT RTX..."])
+
+    def test_source_tensorrt_setup_retains_verified_build_inputs(self):
+        from zipfile import ZipFile
+        import acceleration_install as setup
+
+        with fixture() as temporary:
+            def download(archive_path):
+                with ZipFile(archive_path, "w") as archive:
+                    prefix = setup.TENSORRT_RTX_SDK_DIRECTORY
+                    for member in (*setup.TENSORRT_RTX_SDK_REQUIRED, "include/NvInferRuntime.h"):
+                        archive.writestr(f"{prefix}/{member}", member)
+                    archive.writestr(f"{prefix}/samples/unneeded.exe", "not extracted")
+
+            with patch.object(setup, "download_tensor_rt_rtx", side_effect=download) as downloader, patch.object(setup, "report"):
+                setup.install_tensor_rt_rtx(temporary)
+                setup.install_tensor_rt_rtx(temporary)
+                downloader.assert_called_once()
+            sdk = setup.tensor_rt_sdk_directory(temporary)
+            self.assertTrue(setup.tensor_rt_sdk_present(temporary))
+            self.assertTrue((sdk / "include/NvInferRuntime.h").is_file())
+            self.assertFalse((sdk / "samples").exists())
+            self.assertFalse((temporary / "engine/trt").exists())
 
     @unittest.skipUnless(os.name=='nt', 'Windows Job/pipe smoke')
     def test_source_annotation_worker_owned_ready_close(self):

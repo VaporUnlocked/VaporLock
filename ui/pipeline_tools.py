@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 import time
+from frame_rate import MAX_FRAME_RATE
 
 
 def finite(value):
@@ -41,7 +42,7 @@ def pipeline_metrics(data, *, elapsed=0, active=True, native_now=None):
     return empty
 
 
-def recommended_rates(results):
+def recommended_rates(results, *, capture_limit=MAX_FRAME_RATE, inference_limit=MAX_FRAME_RATE):
     """Conservative measured starting point; no optimality/quality claim."""
     choices = []
     for result in results:
@@ -51,12 +52,12 @@ def recommended_rates(results):
                 or result['frames'] < 8 or result['seconds'] < 2):
             continue
         # Do not extrapolate past observed completed work; reserve 10% headroom.
-        rate = max(1, min(120, math.floor(min(result['fps'], 1000 / result['inference_ms']) * .9)))
-        choices.append((rate, -result['inference_ms'], result['provider']))
+        rate = max(1, math.floor(min(result['fps'], 1000 / result['inference_ms'], MAX_FRAME_RATE) * .9))
+        choices.append((min(rate, inference_limit), -result['inference_ms'], result['provider']))
     if not choices: return None
     rate, _, provider = max(choices)
     return {'provider': provider,
-            'capture_fps': rate, 'inference_fps': rate, 'frame_skip': 0}
+            'capture_fps': min(rate, capture_limit), 'inference_fps': rate, 'frame_skip': 0}
 
 
 class IdentityUnavailable(ValueError):

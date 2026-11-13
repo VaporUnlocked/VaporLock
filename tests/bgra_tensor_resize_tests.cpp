@@ -1,4 +1,5 @@
 #include "app/BgraTensorResize.h"
+#include "app/BgraTensorCopy.h"
 #include <chrono>
 #include <algorithm>
 #include <array>
@@ -47,11 +48,13 @@ static void reference(const std::vector<std::uint8_t>& bgra, int width, int heig
 }
 
 template<class T>
-static void compare(vaporlock::image::BgraTensorResize& plan,int w,int h,int tw,int th,bool nhwc,bool letterbox){
+static void compare(vaporlock::image::BgraTensorResize& plan,int w,int h,int tw,int th,bool nhwc,bool letterbox,
+                    float shiftX = 0, float shiftY = 0){
  std::mt19937 rng(w+h+tw+th);std::vector<std::uint8_t> pixels(static_cast<size_t>(w)*h*4);
  for(auto& v:pixels)v=static_cast<uint8_t>(rng());
  float sx=float(tw)/w,sy=float(th)/h,px=0,py=0;
  if(letterbox){sx=sy=std::min(sx,sy);px=std::floor((tw-w*sx)*.5F);py=std::floor((th-h*sy)*.5F);}
+ px+=shiftX;py+=shiftY;
  std::vector<T> expected;reference<T>(pixels,w,h,nhwc,tw,th,sx,sy,px,py,expected);
  std::vector<T> out(expected.size()+2,static_cast<T>(42));
  for(int retry=0;retry<3;++retry){
@@ -63,12 +66,48 @@ static void compare(vaporlock::image::BgraTensorResize& plan,int w,int h,int tw,
  reference<T>(pixels,w,h,nhwc,tw,th,sx,sy,px,py,expected);}
  }
 }
+
+template<class T>
+static void compareIdentity(bool nhwc) {
+    constexpr int width = 257;
+    std::vector<std::uint8_t> pixels(width * 4);
+    for (int i = 0; i < width; ++i) {
+        pixels[i * 4] = static_cast<std::uint8_t>(i);
+        pixels[i * 4 + 1] = static_cast<std::uint8_t>(i * 3);
+        pixels[i * 4 + 2] = static_cast<std::uint8_t>(255 - i);
+        pixels[i * 4 + 3] = static_cast<std::uint8_t>(i ^ 0xAA);
+    }
+    std::vector<T> expected;
+    reference<T>(pixels, width, 1, nhwc, width, 1, 1, 1, 0, 0, expected);
+    std::vector<T> output(expected.size() + 2, static_cast<T>(42));
+    vaporlock::image::copyBgraToRgb<T>(pixels, std::span<T>(output).subspan(1, expected.size()), nhwc);
+    require(output.front() == 42 && output.back() == 42, "Identity output bounds changed");
+    require(!std::memcmp(output.data() + 1, expected.data(), expected.size() * sizeof(T)), "Identity copy not bit-exact");
+}
+
 int main(){try{
  vaporlock::image::BgraTensorResize plan;int cases=0;
- for(auto size:std::array<std::array<int,4>,9>{{{1000,1000,640,640},{640,480,640,640},{1,7,11,3},{17,11,23,31},{1920,1080,640,640},{640,640,320,320},{320,640,641,479},{1,1,4,3},{641,479,640,640}}})
- for(bool nhwc:{false,true})for(bool letterbox:{false,true}){
- compare<float>(plan,size[0],size[1],size[2],size[3],nhwc,letterbox);
- compare<uint8_t>(plan,size[0],size[1],size[2],size[3],nhwc,letterbox);cases+=2;
+ const std::array<std::array<int,4>,13> sizes{{
+     {1000,1000,640,640}, {640,480,640,640}, {1,7,11,3}, {17,11,23,31},
+     {1920,1080,640,640}, {640,640,320,320}, {320,640,641,479}, {1,1,4,3},
+     {641,479,640,640}, {100,100,640,640}, {320,180,640,640}, {93,6,79,23}, {7,7,19,21},
+ }};
+ for (auto [width, height, targetWidth, targetHeight] : sizes) {
+     for (bool nhwc : {false, true}) for (bool letterbox : {false, true}) {
+         compare<float>(plan, width, height, targetWidth, targetHeight, nhwc, letterbox);
+         compare<uint8_t>(plan, width, height, targetWidth, targetHeight, nhwc, letterbox);
+         cases += 2;
+     }
+ }
+ for(bool nhwc:{false,true})for(auto shift:std::array<std::array<float,2>,5>{{{24,0},{-24,0},{0,24},{0,-24},{-2.25F,1.5F}}}){
+ compare<float>(plan,9,6,13,11,nhwc,true,shift[0],shift[1]);
+ compare<uint8_t>(plan,9,6,13,11,nhwc,true,shift[0],shift[1]);cases+=2;
+ compare<float>(plan,9,6,31,21,nhwc,true,shift[0],shift[1]);
+ compare<uint8_t>(plan,9,6,31,21,nhwc,true,shift[0],shift[1]);cases+=2;
+ }
+ for (bool nhwc : {false, true}) {
+     compareIdentity<float>(nhwc);
+     compareIdentity<std::uint8_t>(nhwc);
  }
  std::vector<uint8_t> pixels(1000*1000*4);std::mt19937 rng(42);for(auto& v:pixels)v=uint8_t(rng());
  std::vector<float> out(640*640*3), old(out.size());double checksum=0;
@@ -83,5 +122,6 @@ int main(){try{
  bool rejected=false;std::vector<float> bad(2,42);try{plan.run<float>(pixels,bad,1000,1000,640,640,0,1,0,0,false);}catch(const std::invalid_argument&){rejected=true;}
  require(rejected&&bad==std::vector<float>(2,42),"Invalid geometry accepted");
  std::cout<<cases<<" bit-exact resize cases; float/byte NCHW/NHWC, crop/padding/edges, cache changes/reuse, alpha and guards passed; checksum "<<checksum<<"\n";
+ std::cout<<"4 bit-exact identity cases covering every byte value, both layouts and both tensor types\n";
  return 0;
 }catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}}

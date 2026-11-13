@@ -12,6 +12,7 @@ from types import MappingProxyType
 from threading import get_ident
 from uuid import uuid4
 
+from frame_rate import FRAME_RATE_FIELDS, valid_frame_rate
 from vlui_context import validate_context_bytes
 from vlui_live_preferences import encode_preferences
 from vlui_live_protocol import MAX_SEQUENCE, valid_display_label
@@ -104,7 +105,7 @@ def validated_native_settings(settings, field_specs):
     require(type(settings['provider']) is str and settings['provider'] in _PROVIDERS)
     require(type(settings['dataset_annotation_provider']) is str
             and settings['dataset_annotation_provider'] in _ANNOTATION_PROVIDERS)
-    require(type(settings['capture_fps']) is int and 1 <= settings['capture_fps'] <= MAX_SEQUENCE)
+    require(all(valid_frame_rate(settings[field]) for field in FRAME_RATE_FIELDS))
     for name in ('dataset_annotation_nms_iou','ultralytics_annotation_nms_iou'):
         require(.01 <= settings[name] <= .99)
     from controller_thresholds import validate_thresholds

@@ -1,7 +1,11 @@
 #include "app/InferenceCadence.h"
+#include "app/CloudCapturePacing.h"
+#include <algorithm>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using Cadence = vaporlock::InferenceCadence;
 using D = Cadence::Decision;
@@ -12,8 +16,163 @@ static Cadence::Clock::time_point at(double seconds) {
     return Cadence::Clock::time_point{} + std::chrono::duration_cast<Cadence::Clock::duration>(
         std::chrono::duration<double>(seconds));
 }
+
+static void verifyFreshCapturePacing() {
+    using Schedule = vaporlock::pipeline::FreshFrameSchedule;
+    using namespace std::chrono_literals;
+    const auto first = at(1);
+    Schedule schedule;
+    require(!schedule.hasFresh(), "Fresh capture unexpectedly has a startup deadline");
+    require(schedule.commit(first, 256), "First observation rejected");
+    const auto deadline = schedule.next(256);
+    require(deadline == first + Schedule::period(256), "Capture rate deadline drifted");
+    require(!schedule.commit(deadline - Schedule::Clock::duration(1), 256),
+            "Fresh capture exceeded the configured rate");
+    require(schedule.next(256) == deadline, "An early acquisition advanced the capture rate deadline");
+    require(schedule.next(128) == first + Schedule::period(128), "Live rate change retained the old deadline");
+    require(schedule.commit(deadline + 10ms, 256), "Delayed fresh observation was lost");
+    require(schedule.next(256) == deadline + 10ms + Schedule::period(256), "Fresh capture attempted to catch up");
+    schedule.reset();
+    require(!schedule.hasFresh() && schedule.commit(first, 256), "Fresh capture reset retained an old deadline");
+    const auto fastest = Schedule::period(std::numeric_limits<int>::max());
+    require(fastest >= Schedule::Clock::duration(1) && fastest < Schedule::period(1000000),
+            "Configured frame rate clamped to the old ceiling");
+}
+
+static int simulateDesktopPolling(bool nonblocking, int sourceFps, int configuredFps,
+                                  std::chrono::microseconds wakeDelay = {}) {
+    using Schedule = vaporlock::pipeline::FreshFrameSchedule;
+    using namespace std::chrono_literals;
+    const auto start = at(1);
+    const auto end = start + 10s;
+    const auto sourcePeriod = Schedule::period(sourceFps);
+    Schedule schedule;
+    auto now = start;
+    auto lastFrame = start;
+    long long lastSourceFrame = -1;
+    int fresh = 0;
+    while (now < end) {
+        if (schedule.hasFresh()) now = std::max(now, schedule.next(configuredFps));
+        if (now >= end) break;
+        const auto sourceFrame = (now - start) / sourcePeriod;
+        if (sourceFrame <= lastSourceFrame) {
+            // Model a coarse wait like the 13 ms acquisition delay observed on
+            // Windows. The source continues presenting during both waits.
+            now += nonblocking ? vaporlock::pipeline::desktopPollDelay(now - lastFrame) + wakeDelay : 13ms;
+            continue;
+        }
+        require(schedule.commit(now, configuredFps), "Polling exceeded configured capture rate");
+        lastSourceFrame = sourceFrame;
+        lastFrame = now;
+        ++fresh;
+        now += 3ms; // Readback and inference finish before the next 120 Hz frame.
+    }
+    return fresh;
+}
+
+static std::vector<Cadence::Clock::time_point> simulatePhasePacing(
+    vaporlock::pipeline::FreshFrameSchedule::Pacing pacing, int cap, bool pending,
+    bool irregular, std::chrono::microseconds timerOvershoot) {
+    using Schedule = vaporlock::pipeline::FreshFrameSchedule;
+    using namespace std::chrono_literals;
+    const auto end = at(10);
+    std::vector<Schedule::Time> presented;
+    for (int index = 0; index < 1200; ++index) {
+        if (irregular && index > 0 && index * 848 / 1200 == (index - 1) * 848 / 1200)
+            continue;
+        const auto jitter = index % 2 ? 0us : 120us;
+        presented.push_back(at(index / 120.0) + jitter);
+    }
+    Schedule schedule(pacing);
+    std::vector<Schedule::Time> captured;
+    std::size_t next = 0;
+    auto now = presented.front();
+    while (next < presented.size() && now < end) {
+        if (schedule.hasFresh() && now < schedule.next(cap))
+            now = schedule.next(cap) + timerOvershoot;
+        if (now >= end) break;
+        if (pending) {
+            if (now < presented[next]) {
+                now += 500us + timerOvershoot;
+                continue;
+            }
+            // Like DXGI, a poll consumes the newest image already presented.
+            next = std::upper_bound(presented.begin() + next, presented.end(), now) - presented.begin();
+        } else {
+            // Model a source that delivers only on the next presentation.
+            next = std::lower_bound(presented.begin() + next, presented.end(), now) - presented.begin();
+            if (next == presented.size()) break;
+            now = presented[next++];
+        }
+        require(schedule.commit(now, cap), "Phase capture exceeded its admission deadline");
+        captured.push_back(now);
+        now += 7ms;
+    }
+    return captured;
+}
+
+static void verifyPhaseCapturePacing() {
+    using Schedule = vaporlock::pipeline::FreshFrameSchedule;
+    using Pacing = Schedule::Pacing;
+    using namespace std::chrono_literals;
+    const auto prior = simulatePhasePacing(Pacing::MinimumSpacing, 88, false, false, 0us);
+    const auto phase = simulatePhasePacing(Pacing::KeepPhase, 88, false, false, 0us);
+    const auto latePrior = simulatePhasePacing(Pacing::MinimumSpacing, 88, true, false, 1250us);
+    const auto latePhase = simulatePhasePacing(Pacing::KeepPhase, 88, true, false, 1250us);
+    const auto irregularPrior = simulatePhasePacing(Pacing::MinimumSpacing, 88, true, true, 1250us);
+    const auto irregular = simulatePhasePacing(Pacing::KeepPhase, 88, true, true, 1250us);
+    const auto equal = simulatePhasePacing(Pacing::KeepPhase, 120, true, false, 1250us);
+    std::cout << "88 FPS on a 120 Hz source: presentation-driven " << prior.size() << " -> " << phase.size()
+              << ", pending with timer overshoot " << latePrior.size() << " -> " << latePhase.size()
+              << " frames in 10s. Irregular source: " << irregularPrior.size() << " -> " << irregular.size()
+              << " frames. Equal cap: " << equal.size() << ".\n";
+    require(prior.size() == 600 && phase.size() == 880, "88 FPS capture stayed locked to alternate 120 Hz presentations");
+    require(latePrior.size() < 800 && latePhase.size() == 880, "Timer overshoot became permanent capture drift");
+    require(irregular.size() >= 845 && irregular.size() <= 848, "Irregular 85 Hz source lost fresh captures");
+    require(equal.size() == 1200, "120 FPS limit lost updates from a 120 Hz source");
+    const auto verifyLimit = [](const auto& samples, int cap) {
+        const auto interval = Schedule::period(cap);
+        std::size_t first = 0;
+        for (std::size_t i = 0; i < samples.size(); ++i) {
+            while (samples[first] <= samples[i] - 1s) ++first;
+            require(i - first + 1 <= static_cast<std::size_t>(cap + 1), "Rolling capture cap drift exceeded one frame");
+            if (i) require(samples[i] - samples[i - 1] >= interval / 4, "Phase capture produced a burst");
+        }
+    };
+    verifyLimit(phase, 88);
+    verifyLimit(latePhase, 88);
+    verifyLimit(irregular, 88);
+    verifyLimit(equal, 120);
+    Schedule schedule(Pacing::KeepPhase);
+    const auto first = at(1);
+    const auto interval = Schedule::period(88);
+    require(schedule.commit(first, 88), "Phase schedule rejected its first frame");
+    require(schedule.commit(first + interval + 2ms, 88), "Phase schedule rejected an ordinary late frame");
+    require(schedule.next(88) == first + 2 * interval, "Ordinary jitter moved the scheduled phase");
+    const auto lowerRate = Schedule::period(60);
+    const auto changed = first + interval + 2ms + lowerRate;
+    require(schedule.next(60) == changed, "Live rate change retained the old phase");
+    require(schedule.commit(changed + 1ms, 60), "Phase schedule rejected the new rate");
+    require(schedule.next(60) == changed + 1ms + lowerRate, "Phase schedule failed to anchor the new rate");
+    const auto resumed = first + 1s;
+    require(schedule.commit(resumed, 60), "Phase schedule rejected a post-stall frame");
+    require(schedule.next(60) == resumed + lowerRate, "Phase schedule banked slots through a stall");
+}
+
 int main() {
     try {
+        verifyFreshCapturePacing();
+        verifyPhaseCapturePacing();
+        const int coarseDesktop = simulateDesktopPolling(false, 120, 256);
+        const int fastDesktop = simulateDesktopPolling(true, 120, 256);
+        require(coarseDesktop >= 600 && coarseDesktop < 700, "Coarse wait did not reproduce source loss");
+        require(fastDesktop == 1200, "Nonblocking capture missed fresh 120 Hz source frames");
+        require(simulateDesktopPolling(true, 120, 256, std::chrono::microseconds(1250)) == 1200,
+                "Nonblocking capture lost frames with measured timer wake jitter");
+        require(simulateDesktopPolling(true, 120, 60) <= 600, "Polling exceeded user's 60 FPS limit");
+        require(simulateDesktopPolling(true, 60, 256) == 600, "Polling produced duplicate desktop frames");
+        std::cout << "Desktop capture simulation: " << coarseDesktop << " -> " << fastDesktop
+                  << " fresh frames in 10s (120 Hz source, 256 FPS cap).\n";
         for (int rate : {30, 60, 120, 144, 240, 256, 360, 1000}) {
             for (int seed = 0; seed < 5; ++seed) {
                 Cadence cadence;

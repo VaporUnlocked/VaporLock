@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 import sys
+from monitoring_styles import MONITORING_CANVAS, MONITORING_PALETTE
 
 # UI Dev's explicit default roles. Other presets and saved user colors retain
 # their existing mapping; these are not migrated over user preferences.
@@ -50,6 +51,8 @@ class InterfaceTheme:
         return 98 if self.high_contrast else 94 if self.light else 90
 
     def palette(self):
+        if self.name == "Monitoring Dashboard":
+            return dict(MONITORING_PALETTE)
         if self.name == "Mission Control":
             return {"steel": "#B2C6C5", "cobalt": self.accent, "ice": "#F2F8F6",
                     "baby": self.accent, "ultraviolet": self.accent, "carbon": self.panel,
@@ -67,6 +70,7 @@ class InterfaceTheme:
 
 
 THEMES = {
+    "monitoring": InterfaceTheme("Monitoring Dashboard", MONITORING_CANVAS, MONITORING_PALETTE["carbon"], MONITORING_PALETTE["baby"]),
     "mission-control": InterfaceTheme("Mission Control", "#081516", "#102426", "#B5EF82"),
     "smoky": InterfaceTheme("Smoky glass", "#080B12", "#080B12", "#7DBCF5", atmospheric=True),
     "contrast": InterfaceTheme("Fog contrast", "#05070A", "#0B1118", "#9ED8FF", high_contrast=True),
