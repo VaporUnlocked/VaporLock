@@ -57,6 +57,17 @@ DLL. Install or refresh CUDA from Model Library to use the NVIDIA provider
 and its runtime libraries. The build reuses a verified CUDA download cache
 when it already contains the matching ONNX Runtime package.
 
+Capture and inference FPS settings are independent ceilings. The sliders cover
+common rates and the numeric fields accept higher values. Status & Diagnostics
+shows the configured limits, fresh captures, completed inferences, and desktop
+updates reported by DXGI. The source, model, and hardware determine the actual
+rate.
+
+CUDA Graph replay uses persistent GPU buffers for compatible ONNX models.
+The engine can use standard CUDA inference when replay is unavailable, and
+the CUDA Graph replay setting controls whether the engine attempts replay.
+Preparing replay can add model startup time.
+
 `-CloudDML` installs the `.cloud` Python worker. `-NativeDirectML` also builds
 `build/windows-release/Release/dml/VaporLockDml.exe` from the pinned
 Microsoft.ML.OnnxRuntime.DirectML and Microsoft.AI.DirectML packages. Use

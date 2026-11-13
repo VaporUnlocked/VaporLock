@@ -11,9 +11,9 @@
 namespace vaporlock::inference {
 
 #if ORT_API_VERSION >= 22 && !defined(ORT_MINIMAL_BUILD)
-inline std::vector<std::int64_t> specializeDmlImageInput(const Ort::Env& environment, const wchar_t* modelPath,
-                                                        std::int64_t imageSize, Ort::SessionOptions& options) {
-    // Read input metadata without compiling a second DirectML graph.
+inline std::vector<std::int64_t> specializeImageInput(const Ort::Env& environment, const wchar_t* modelPath,
+                                                     std::int64_t imageSize, Ort::SessionOptions& options) {
+    // Read the input metadata without compiling a second execution graph.
     const auto metadata = Ort::Session::CreateModelEditorSession(environment, modelPath, Ort::SessionOptions{});
     if (metadata.GetInputCount() != 1) return {};
     const auto type = metadata.GetInputTypeInfo(0);
@@ -44,12 +44,12 @@ inline std::vector<std::int64_t> specializeDmlImageInput(const Ort::Env& environ
 }
 #endif
 
-inline Ort::Session openDmlSession(const Ort::Env& environment, const wchar_t* modelPath,
-                                  const Ort::SessionOptions& options, std::int64_t imageSize) {
+inline Ort::Session openSpecializedImageSession(const Ort::Env& environment, const wchar_t* modelPath,
+                                               const Ort::SessionOptions& options, std::int64_t imageSize) {
 #if ORT_API_VERSION >= 22 && !defined(ORT_MINIMAL_BUILD)
     try {
         auto specialized = options.Clone();
-        const auto fixedShape = specializeDmlImageInput(environment, modelPath, imageSize, specialized);
+        const auto fixedShape = specializeImageInput(environment, modelPath, imageSize, specialized);
         if (!fixedShape.empty()) {
             Ort::Session session(environment, modelPath, specialized);
             if (session.GetInputCount() == 1) {
@@ -59,7 +59,7 @@ inline Ort::Session openDmlSession(const Ort::Env& environment, const wchar_t* m
             }
         }
     } catch (const Ort::Exception&) {
-        // Models that cannot be specialized still use ordinary DirectML.
+        // Unresolved or incompatible models retain the ordinary session.
     }
 #else
     (void)imageSize;

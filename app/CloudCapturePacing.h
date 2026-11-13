@@ -11,7 +11,7 @@ public:
     using Clock=std::chrono::steady_clock;
     using Time=Clock::time_point;
     static Clock::duration period(int fps) noexcept {
-        fps=std::clamp(fps,1,1000000);
+        fps=std::max(1,fps);
         return std::max(Clock::duration{1},
             std::chrono::ceil<Clock::duration>(std::chrono::duration<double>(1./fps)));
     }
@@ -30,4 +30,11 @@ private:
 };
 
 using CloudFreshFrameSchedule = FreshFrameSchedule;
+
+// DXGI's finite timeout can wake on a coarse Windows clock. Poll with a
+// high-resolution cancellable timer during motion and back off when idle.
+inline auto desktopPollDelay(FreshFrameSchedule::Clock::duration sinceFresh) noexcept {
+    using namespace std::chrono_literals;
+    return sinceFresh < 100ms ? 500us : 4ms;
+}
 }

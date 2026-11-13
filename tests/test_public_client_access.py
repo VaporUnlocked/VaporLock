@@ -56,6 +56,57 @@ class PublicClientTests(unittest.TestCase):
         for path in (ROOT/'ui').glob('*.py'):
             with self.subTest(path=path.name):compile(path.read_bytes(),str(path),'exec')
 
+    def test_configured_frame_rate_reaches_the_native_engine(self):
+        from frame_rate import MAX_FRAME_RATE
+        from vapor_lock_gui import ControlCenter, EngineBridge
+        from vlui_live_protocol import CommandRejected, validate_command
+        from vlui_numeric_catalog import parse_numeric_value
+
+        def profile(capture, inference):
+            return ControlCenter.prepare_profile_bytes(None, json.dumps({
+                "capture_fps": capture, "inference_fps": inference,
+            }).encode())
+
+        def capture_command(rate):
+            return validate_command("setCaptureRate", json.dumps({"requestId": "1", "fps": rate}))
+
+        for capture, inference in ((256, 240), (144, 360), (MAX_FRAME_RATE, MAX_FRAME_RATE)):
+            with self.subTest(capture=capture, inference=inference):
+                arguments = EngineBridge.arguments_for(profile(capture, inference), "cpu")
+                self.assertEqual(arguments[arguments.index("--capture-fps") + 1], str(capture))
+                self.assertEqual(arguments[arguments.index("--inference-fps") + 1], str(inference))
+                self.assertEqual(capture_command(capture).payload["fps"], capture)
+                self.assertEqual(parse_numeric_value("numeric.inference_fps", str(inference), "expert"), inference)
+
+        self.assertEqual(profile(256, 0).inference_fps, 1)
+        for rate in (False, 0, -1, MAX_FRAME_RATE + 1):
+            with self.subTest(rate=rate):
+                with self.assertRaises(ValueError):
+                    profile(rate, 256)
+                with self.assertRaises(CommandRejected):
+                    capture_command(rate)
+        for rate in (False, -1, MAX_FRAME_RATE + 1):
+            with self.subTest(inference=rate), self.assertRaises(ValueError):
+                profile(256, rate)
+
+    def test_measured_rate_recommendation_keeps_user_ceilings(self):
+        from pipeline_tools import recommended_rates
+
+        results = [{"provider": "dml", "fps": 240, "inference_ms": 3, "frames": 480, "seconds": 2}]
+        self.assertEqual(recommended_rates(results)["inference_fps"], 216)
+        proposal = recommended_rates(results, capture_limit=120, inference_limit=144)
+        self.assertEqual((proposal["capture_fps"], proposal["inference_fps"]), (120, 144))
+
+    def test_engine_capabilities_accepts_legacy_and_cuda_graph_responses(self):
+        from engine_capabilities import EngineCapabilities
+
+        response = {"type": "capabilities", "protocol_version": 1, "cuda_preprocess": False}
+        self.assertEqual(EngineCapabilities.decode(json.dumps(response).encode()), (False, False))
+        response["cuda_graph_replay"] = True
+        self.assertEqual(EngineCapabilities.decode(json.dumps(response).encode()), (False, True))
+        response["cuda_graph_replay"] = 1
+        self.assertIsNone(EngineCapabilities.decode(json.dumps(response).encode()))
+
     def test_enforcement_removed_not_only_disabled(self):
         for name in RETIRED:self.assertFalse((ROOT/'ui'/(name+'.py')).exists(),name)
         for path in (ROOT/'ui').glob('*.py'):

@@ -7,6 +7,7 @@ from types import MappingProxyType
 
 from vlui_numeric_catalog import parse_numeric_value
 from vlui_discrete_catalog import parse_value as parse_discrete_value
+from frame_rate import valid_frame_rate
 
 
 MAX_REQUEST_BYTES = 4096
@@ -169,7 +170,7 @@ def validate_command(name: str, wire: str) -> Command:
     elif name == 'selectProfile':
         _require(valid_display_id(value['profileId']))
     elif name == 'setCaptureRate':
-        _require(type(value['fps']) is int and 1 <= value['fps'] <= 120)
+        _require(valid_frame_rate(value['fps']))
     elif name == 'setTextScale':
         _require(type(value['scale']) is str and value['scale'] in SCALES)
     elif name == 'setNumericSetting':

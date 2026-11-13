@@ -1318,11 +1318,56 @@ _ROWS.update({
         "{stage}: медиана {median} мс · 95-й процентиль {p95} мс",
         "{stage} : médiane {median} ms · 95e percentile {p95} ms",
     ),
-    "DXGI updates combined before acquisition: {count}": (
-        "采集前合并的 DXGI 更新：{count}",
-        "Vor der Erfassung zusammengefasste DXGI-Updates: {count}",
-        "Обновления DXGI, объединённые до захвата: {count}",
-        "Mises à jour DXGI regroupées avant la capture : {count}",
+    "DXGI updates combined since start: {count}": (
+        "启动以来合并的 DXGI 更新：{count}",
+        "Seit dem Start zusammengefasste DXGI-Updates: {count}",
+        "Обновления DXGI, объединённые с начала сеанса: {count}",
+        "Mises à jour DXGI regroupées depuis le démarrage : {count}",
+    ),
+    "Configured limits: {capture} capture fps · {inference} inference fps": (
+        "设定上限：采集 {capture} 帧/秒 · 推理 {inference} 帧/秒",
+        "Eingestellte Obergrenzen: {capture} FPS Erfassung · {inference} FPS Inferenz",
+        "Заданные ограничения: захват {capture} кадр/с · вывод {inference} кадр/с",
+        "Limites configurées : capture {capture} i/s · inférence {inference} i/s",
+    ),
+    "DXGI desktop updates: {rate}/s": (
+        "DXGI 桌面更新：{rate} 次/秒", "DXGI-Desktopaktualisierungen: {rate}/s",
+        "Обновления рабочего стола DXGI: {rate}/с", "Mises à jour du bureau DXGI : {rate}/s",
+    ),
+    "DXGI updates combined before acquisition: {rate}/s": (
+        "采集前合并的 DXGI 更新：{rate} 次/秒",
+        "Vor der Erfassung zusammengefasste DXGI-Updates: {rate}/s",
+        "Обновления DXGI, объединённые до захвата: {rate}/с",
+        "Mises à jour DXGI regroupées avant la capture : {rate}/s",
+    ),
+    "Inference skips: {explicit} by frame skip · {limited} by FPS limit": (
+        "推理跳过：跳帧设置 {explicit} · 帧率限制 {limited}",
+        "Übersprungene Inferenzen: {explicit} durch Bildsprung · {limited} durch FPS-Limit",
+        "Пропуски вывода: {explicit} по настройке пропуска · {limited} по лимиту FPS",
+        "Inférences ignorées : {explicit} par saut d’image · {limited} par limite de débit",
+    ),
+    "CUDA Graph replay active": ("CUDA 图重放已启用", "CUDA-Graph-Wiedergabe aktiv", "Повтор CUDA-графа активен", "Relecture de graphe CUDA active"),
+    "Standard CUDA inference": ("标准 CUDA 推理", "Standard-CUDA-Inferenz", "Стандартный вывод CUDA", "Inférence CUDA standard"),
+    "Select CUDA to use CUDA Graph replay.": ("选择 CUDA 以使用 CUDA 图重放。", "CUDA für die CUDA-Graph-Wiedergabe auswählen.", "Выберите CUDA для повтора CUDA-графа.", "Sélectionnez CUDA pour utiliser la relecture de graphe CUDA."),
+    "Checking this engine's CUDA Graph replay support...": ("正在检查引擎是否支持 CUDA 图重放…", "Unterstützung für CUDA-Graph-Wiedergabe wird geprüft…", "Проверяется поддержка повтора CUDA-графа…", "Vérification de la prise en charge de la relecture de graphe CUDA…"),
+    "CUDA Graph replay is unavailable in this engine.": ("此引擎不支持 CUDA 图重放。", "Diese Engine unterstützt keine CUDA-Graph-Wiedergabe.", "Этот движок не поддерживает повтор CUDA-графа.", "Ce moteur ne prend pas en charge la relecture de graphe CUDA."),
+    "Reduces launch overhead on compatible CUDA models. Changes take effect on the next start.": (
+        "减少兼容 CUDA 模型的启动开销。更改在下次启动时生效。",
+        "Verringert den Ausführungsaufwand für kompatible CUDA-Modelle. Änderungen greifen beim nächsten Start.",
+        "Снижает издержки запуска для совместимых моделей CUDA. Изменения вступят в силу при следующем запуске.",
+        "Réduit le coût de lancement sur les modèles CUDA compatibles. Le changement prend effet au prochain démarrage.",
+    ),
+    "Compatible models use CUDA Graph replay after restart. Other models use standard CUDA.": (
+        "重启后，兼容模型使用 CUDA 图重放。其他模型使用标准 CUDA。",
+        "Kompatible Modelle nutzen nach dem Neustart CUDA-Graph-Wiedergabe. Andere Modelle nutzen Standard-CUDA.",
+        "После перезапуска совместимые модели используют повтор CUDA-графа, а остальные — стандартный вывод CUDA.",
+        "Après redémarrage, les modèles compatibles utilisent la relecture de graphe CUDA. Les autres utilisent CUDA standard.",
+    ),
+    "Loading the selected model and preparing CUDA Graph replay.": (
+        "正在加载所选模型并准备 CUDA 图重放。",
+        "Das ausgewählte Modell wird geladen und die CUDA-Graph-Wiedergabe vorbereitet.",
+        "Загружается выбранная модель и подготавливается повтор CUDA-графа.",
+        "Chargement du modèle sélectionné et préparation de la relecture de graphe CUDA.",
     ),
 })
 _CASEFOLDED_ROWS = {source.casefold(): row for source, row in _ROWS.items()}

@@ -94,8 +94,8 @@
       "file": "ui_system/runtime/live-adapter.js",
       "mime": "text/javascript",
       "requestType": "Script",
-      "bytes": 139882,
-      "sha256": "a623b94a472606de4a1b6534366ed07b30bfaf6681fd07086d79f003e1da8d68"
+      "bytes": 138836,
+      "sha256": "598501fcbe5ba42821bc47cc875a6db4848b983c17a5d45bb0e0e6dfecd83eb8"
     },
     {
       "url": "vlapp://client/ui/live.html",
@@ -133,8 +133,8 @@
       "url": "vlapp://client/ui/native-component-renderer.js",
       "mime": "text/javascript",
       "requestType": "Script",
-      "bytes": 64745,
-      "sha256": "37672626453abea6685fdeaa93e0de1dae879f7773ff8bbb930756b87b1f5c02",
+      "bytes": 64563,
+      "sha256": "99366e58bcb7060de65ea5d18fb1c60a4236cd831af4862f1c24507780507d22",
       "file": "ui_system/runtime/native-component-renderer-014.js"
     },
     {

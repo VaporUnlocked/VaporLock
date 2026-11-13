@@ -20,6 +20,7 @@
 #include "app/InferenceCadence.h"
 #include "app/PipelineTiming.h"
 #include "app/PipelineScheduler.h"
+#include "app/FrameRate.h"
 #include "app/CloudCapturePacing.h"
 #include "app/CaptureRecovery.h"
 #include "app/ControllerTrigger.h"
@@ -32,13 +33,13 @@
 #if VAPORLOCK_HAS_ONNXRUNTIME
 #define ORT_API_MANUAL_INIT
 #include <onnxruntime_cxx_api.h>
+#include "app/DmlSession.h"
 #include "app/InferenceRuntime.h"
 #if VAPORLOCK_HAS_DML
 #include <dml_provider_factory.h>
 #endif
 #if VAPORLOCK_FORCE_DML
 #include "app/DmlAdapter.h"
-#include "app/DmlSession.h"
 #endif
 #if VAPORLOCK_FORCE_TENSORRT_RTX
 #include "app/TensorRtRtxRuntime.h"
@@ -66,6 +67,7 @@
 #include <deque>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <locale>
 #include <map>
 #include <memory>
@@ -94,7 +96,6 @@ double legacyDurationMs(int frames, int explicitMs) {
     return explicitMs >= 0 ? explicitMs : std::max(0, frames) * 1000.0 / kLegacyResponseHz;
 }
 
-constexpr int kFrameTimer = 1001;
 constexpr COLORREF kWindow = RGB(13, 18, 27);
 constexpr COLORREF kSidebar = RGB(17, 25, 38);
 constexpr COLORREF kPanel = RGB(23, 33, 48);
@@ -1182,8 +1183,8 @@ private:
             resetDxgi();
             return recoverGdi(monitor, region, "dxgi-release-failed", true);
         }
-        // Bounded waits let the source wake an idle inference pipeline as
-        // soon as it publishes an image. The Win32 timer UI still polls.
+        // Native desktop ONNX uses a nonblocking poll and schedules retries
+        // with a high-resolution timer. The Cloud worker can request a wait.
         if(cancelled())return true;
         const auto acquiring=AimClock::now();
         const HRESULT acquired = m_duplication->AcquireNextFrame(waitMs, &frameInfo, resource.GetAddressOf());
@@ -1534,6 +1535,9 @@ public:
             auto environment = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "VaporLock");
             m_cpuPlacement.configure(requestedProvider==InferenceProvider::Cpu ? cpuSets : L"");
             Ort::SessionOptions options;
+#if VAPORLOCK_HAS_CUDA
+            bool tryCudaReplay = false;
+#endif
             options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
             if (intraOpThreads > 0) options.SetIntraOpNumThreads(intraOpThreads);
             if (interOpThreads > 0) options.SetInterOpNumThreads(interOpThreads);
@@ -1573,12 +1577,8 @@ public:
 #else
 #if VAPORLOCK_HAS_CUDA
             if (requestedProvider == InferenceProvider::Cuda) {
-                Ort::CUDAProviderOptions cudaOptions;
-                // Session::Run below does not bind persistent CUDA outputs. ORT
-                // graph replay requires stable device addresses via I/O binding.
-                cudaOptions.Update({{"device_id", std::to_string(m_inferenceDevice)}, {"do_copy_in_default_stream", "1"}, {"enable_cuda_graph", "0"}});
-                options.AppendExecutionProvider_CUDA_V2(*cudaOptions);
-                providerName = cudaGraphReplay ? L"CUDA (graph replay unavailable)" : L"CUDA";
+                tryCudaReplay = cudaGraphReplay;
+                providerName = L"CUDA";
             } else if (requestedProvider == InferenceProvider::DirectMl) {
                 error = L"DirectML uses the VaporLockDml engine. Choose DirectML from the control center so it launches that engine.";
                 return false;
@@ -1596,9 +1596,33 @@ public:
             constexpr int defaultImageSize = 640;
 #if VAPORLOCK_FORCE_DML
             auto session = std::make_unique<Ort::Session>(
-                vaporlock::inference::openDmlSession(*environment, path.c_str(), options, defaultImageSize));
+                vaporlock::inference::openSpecializedImageSession(*environment, path.c_str(), options, defaultImageSize));
 #else
-            auto session = std::make_unique<Ort::Session>(*environment, path.c_str(), options);
+            std::unique_ptr<Ort::Session> session;
+#if VAPORLOCK_HAS_CUDA
+            if (requestedProvider == InferenceProvider::Cuda) {
+                auto regularOptions = options.Clone();
+                vaporlock::inference::appendCudaProvider(regularOptions, m_inferenceDevice, false);
+                if (tryCudaReplay) {
+                    try {
+                        auto graphOptions = options.Clone();
+#if ORT_API_VERSION >= 22 && !defined(ORT_MINIMAL_BUILD)
+                        vaporlock::inference::specializeImageInput(*environment, path.c_str(), defaultImageSize, graphOptions);
+#endif
+                        vaporlock::inference::appendCudaProvider(graphOptions, m_inferenceDevice, true);
+                        session = std::make_unique<Ort::Session>(*environment, path.c_str(), graphOptions);
+                    } catch (const Ort::Exception&) {
+                        tryCudaReplay = false;
+                    }
+                }
+                if (!session) {
+                    session = std::make_unique<Ort::Session>(vaporlock::inference::openSpecializedImageSession(
+                        *environment, path.c_str(), regularOptions, defaultImageSize));
+                    if (cudaGraphReplay) providerName += L" (graph replay unavailable for this model)";
+                }
+            }
+#endif
+            if (!session) session = std::make_unique<Ort::Session>(*environment, path.c_str(), options);
 #endif
             if (session->GetInputCount() < 1 || session->GetOutputCount() < 1) {
                 error = L"A supported detector must expose at least one image input and one output (found "
@@ -1770,6 +1794,20 @@ public:
             m_runtime = std::make_unique<vaporlock::inference::Runtime>(
                 std::move(environment), std::move(session), m_inputName,
                 m_outputNames, m_inputShape, m_inputType,&m_cpuPlacement);
+#if VAPORLOCK_HAS_CUDA
+            if (tryCudaReplay) {
+                try {
+                    m_runtime->enableCudaGraph(ortRuntimeState().module, m_inferenceDevice);
+                } catch (const std::exception&) {
+                    // Unsupported graph capture must not block ordinary CUDA.
+                    if (!loadModel(path, requestedProvider, intraOpThreads, interOpThreads,
+                                   false, cudaPreprocess, error, deviceIndex, cpuSets, cloudPipe, cloudWorkerPid))
+                        return false;
+                    m_providerName += L" (graph replay unavailable for this model)";
+                    return true;
+                }
+            }
+#endif
 #if VAPORLOCK_FORCE_TENSORRT_RTX
             if (m_tensorRt) {
                 m_runtime->retireMetadataSession();
@@ -1855,6 +1893,7 @@ public:
             std::wstring layout = m_prototypeOutputIndex >= 0 ? L"; instance segmentation" : m_semanticOutputIndex >= 0 ? L"; semantic segmentation" : L"";
             if (m_modelEndToEnd) layout += L"; end-to-end xyxy output";
             return L"Model ready: " + std::filesystem::path(m_modelPath).filename().wstring() + L" (" + m_providerName
+                   + (cudaGraphActive() ? L" + CUDA Graph replay" : L"")
                    + L"; input " + std::to_wstring(m_inputWidth) + L" x " + std::to_wstring(m_inputHeight)
                    + (m_inputNhwc ? L" NHWC" : L" NCHW")
                    + (shape.empty() ? L"; non-tensor output" : L"; output " + shape) + classes + layout + L")";
@@ -1868,6 +1907,13 @@ public:
     double postprocessMilliseconds() const { return m_postprocessMs; }
     const std::wstring& deviceName() const noexcept { return m_deviceName; }
     int deviceIndex() const noexcept { return m_inferenceDevice; }
+    bool cudaGraphActive() const noexcept {
+#if VAPORLOCK_HAS_ONNXRUNTIME && VAPORLOCK_HAS_CUDA
+        return m_runtime && m_runtime->cudaGraphActive();
+#else
+        return false;
+#endif
+    }
     int cpuPlacementCount() const noexcept {
 #if VAPORLOCK_HAS_ONNXRUNTIME
         return static_cast<int>(m_cpuPlacement.ids.size());
@@ -3511,8 +3557,8 @@ bool applyLiveSetting(AppConfig& config, const std::wstring& field, const std::w
     if (field == L"region_y") return integer(config.captureRegion.yOffset, -1000000, 1000000);
     if (field == L"region_width") return integer(config.captureRegion.width, 1, 1000000);
     if (field == L"region_height") return integer(config.captureRegion.height, 1, 1000000);
-    if (field == L"capture_fps") return integer(config.captureFps, 1, 1000000);
-    if (field == L"inference_fps") return integer(config.inferenceFps, 1, 1000000);
+    if (field == L"capture_fps") return vaporlock::pipeline::parseFrameRate(value, config.captureFps);
+    if (field == L"inference_fps") return vaporlock::pipeline::parseFrameRate(value, config.inferenceFps);
     if (field == L"frame_skip") return integer(config.frameSkip, 0, 600);
 
     if (field == L"match_iou") return decimal(config.matchIou, 0.01, 1.0);
@@ -4069,6 +4115,12 @@ int runHeadless(int argc, wchar_t* argv[]) {
 #else
                   << "false"
 #endif
+                  << ",\"cuda_graph_replay\":"
+#if VAPORLOCK_HAS_ONNXRUNTIME && VAPORLOCK_HAS_CUDA && !VAPORLOCK_FORCE_DML && !VAPORLOCK_FORCE_TENSORRT_RTX
+                  << "true"
+#else
+                  << "false"
+#endif
                   << "}" << std::endl;
         return 0;
     }
@@ -4259,8 +4311,13 @@ int runHeadless(int argc, wchar_t* argv[]) {
                 std::cout << "{\"type\":\"error\",\"message\":\"Invalid crosshair calibration\"}" << std::endl;return 2;
             }
         }
-        else if (argument == L"--capture-fps") config.captureFps = std::max(1, _wtoi(next().c_str()));
-        else if (argument == L"--inference-fps") config.inferenceFps = std::max(1, _wtoi(next().c_str()));
+        else if (argument == L"--capture-fps" || argument == L"--inference-fps") {
+            auto& rate = argument == L"--capture-fps" ? config.captureFps : config.inferenceFps;
+            if (!vaporlock::pipeline::parseFrameRate(next(), rate)) {
+                std::cout << "{\"type\":\"error\",\"message\":\"Capture and inference rates must be positive native integers.\"}" << std::endl;
+                return 2;
+            }
+        }
         else if (argument == L"--frame-skip") config.frameSkip = std::clamp(_wtoi(next().c_str()), 0, 60);
         else if (argument == L"--predict-lost") config.predictLost = true;
         else if (argument == L"--no-predict-lost") config.predictLost = false;
@@ -4420,6 +4477,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
 
     OnnxDetector detector;
     if (!config.modelPath.empty()) {
+        const bool requestedCudaGraph = config.provider == InferenceProvider::Cuda && config.cudaGraphReplay
+            && std::filesystem::path(config.modelPath).extension() == L".onnx";
+        if (requestedCudaGraph && !inspectModel)
+            std::cout << "{\"type\":\"notice\",\"message\":\"Preparing CUDA Graph replay for this model.\"}" << std::endl;
         std::wstring error;
         if (!detector.loadModel(config.modelPath, config.provider, config.ortIntraOpThreads, config.ortInterOpThreads, config.cudaGraphReplay, config.cudaPreprocess, error, config.inferenceDevice, config.cpuSets, config.cloudPipe, config.cloudWorkerPid)) {
             std::cout << "{\"type\":\"error\",\"message\":\"" << wideToUtf8(jsonEscape(error)) << "\"}" << std::endl;
@@ -4429,6 +4490,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
             std::cout << "{\"type\":\"model\",\"message\":\"" << wideToUtf8(jsonEscape(detector.status())) << "\"}" << std::endl;
             return 0;
         }
+        if (requestedCudaGraph && !detector.cudaGraphActive())
+            std::cout << "{\"type\":\"notice\",\"message\":\"CUDA Graph replay is unavailable for this model. Standard CUDA inference will be used.\"}" << std::endl;
     } else if (inspectModel) {
         std::cout << "{\"type\":\"error\",\"message\":\"Choose an ONNX model before inspecting it\"}" << std::endl;
         return 2;
@@ -4493,8 +4556,12 @@ int runHeadless(int argc, wchar_t* argv[]) {
     long long obsoleteInferences = 0;
     std::uint64_t trackingGeneration = 0, trackingSource = 0;
     long long freshCaptures = 0;
-    struct RateSample { AimTime time; long long captures, inferences; std::uint64_t outputs; };
-    std::deque<RateSample> rateSamples{{started, 0, 0, 0}};
+    struct RateSample {
+        AimTime time;
+        long long captures, inferences;
+        std::uint64_t outputs, sourceGeneration, dxgiFrames, dxgiCoalesced;
+    };
+    std::deque<RateSample> rateSamples{{started, 0, 0, 0, 0, 0, 0}};
     double inferenceWorkMs = 0.0, modelWorkMs = 0.0;
     double captureMs = 0.0;
     double inferenceMs = 0.0;
@@ -4595,6 +4662,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
     vaporlock::crosshair::Matcher crosshairMatcher;
     vaporlock::crosshair::Reference previousReference;
     while (running) {
+        if (telemetry.failed()) return fail("{\"type\":\"error\",\"message\":\"The control center connection was closed.\"}", 1);
         const auto frameStarted = std::chrono::steady_clock::now();
         const auto now = frameStarted;
         const bool timingReady = now - started >= std::chrono::seconds(2);
@@ -4604,7 +4672,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const auto outputGeneration = liveConfig.read(config);
         if(trackingGeneration==outputGeneration)config.frameReference=previousReference;
         const bool cloudCapturePaced=!config.cloudPipe.empty();
-        const bool freshCapturePaced = cloudCapturePaced || (!config.modelPath.empty() && config.captureMonitor > 0);
+        const bool desktopModelCapture = !cloudCapturePaced && !config.modelPath.empty() && config.captureMonitor > 0;
+        const bool freshCapturePaced = cloudCapturePaced || desktopModelCapture;
         auto frameDeadline = freshCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
         if(freshCapturePaced && freshCaptureSchedule.hasFresh()) {
             if(!frameWait.until(freshCaptureSchedule.next(config.captureFps),liveConfig.changedEvent(),
@@ -4614,12 +4683,12 @@ int runHeadless(int argc, wchar_t* argv[]) {
         previewWorker.configure(config.previewEnabled);
         if (!config.previewEnabled) telemetry.clear(Telemetry::Kind::Preview);
         if (!config.overlayMetadata && !config.previewEnabled) telemetry.clear(Telemetry::Kind::Overlay);
-        if (telemetry.failed()) return fail("{\"type\":\"error\",\"message\":\"The control center connection was closed.\"}", 1);
         const auto captureStarted = std::chrono::steady_clock::now();
         const auto captureCancelled=[&] {
             return telemetry.failed() || !liveConfig.current(outputGeneration);
         };
-        const bool captureOk=freshCapturePaced ? capture.capture(config,4,captureCancelled) : capture.capture(config);
+        const bool captureOk = freshCapturePaced
+            ? capture.capture(config, cloudCapturePaced ? 4 : 0, captureCancelled) : capture.capture(config);
         const auto afterCapture=std::chrono::steady_clock::now();
         if(freshCapturePaced && capture.freshFrame() && !freshCaptureSchedule.commit(capture.acquiredAt(),config.captureFps))
             return fail("{\"type\":\"error\",\"message\":\"Capture violated its fresh-frame rate boundary.\"}",1);
@@ -4793,7 +4862,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
                                     && controller.connected
                                     && controller.slot != 0;
             std::ostringstream report;
-            rateSamples.push_back({reportNow, freshCaptures, completedInferences, outputStatus.sent});
+            rateSamples.push_back({reportNow, freshCaptures, completedInferences, outputStatus.sent,
+                sourceIdentity.sourceGeneration, capture.dxgiFrames(), capture.dxgiCoalescedFrames()});
             while (rateSamples.size() > 2 && reportNow - rateSamples[1].time >= std::chrono::seconds(1)) rateSamples.pop_front();
             const auto& previousRate = rateSamples.front();
             const double rateSeconds = std::max(0.001, std::chrono::duration<double>(reportNow - previousRate.time).count());
@@ -4810,6 +4880,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
                       << ",\"inference_obsolete_total\":" << obsoleteInferences
                       << ",\"inference_device\":\"" << wideToUtf8(jsonEscape(detector.deviceName())) << "\""
                       << ",\"inference_device_index\":" << detector.deviceIndex()
+                      << ",\"cuda_graph_replay_active\":" << (detector.cudaGraphActive() ? "true" : "false")
                       << ",\"cpu_placement_count\":" << detector.cpuPlacementCount()
                       << ",\"high_resolution_pacing\":" << (frameWait.highResolution() ? "true" : "false")
                       << ",\"inference_explicit_skip_total\":" << explicitSkippedFrames
@@ -4902,15 +4973,37 @@ int runHeadless(int argc, wchar_t* argv[]) {
                    << ",\"capture_recovery_transitions\":" << capture.recoveryTransitions()
                    << ",\"capture_dxgi_timeouts\":" << capture.dxgiTimeouts()
                    << ",\"capture_dxgi_frames\":" << capture.dxgiFrames()
-                   << ",\"capture_dxgi_coalesced_frames\":" << capture.dxgiCoalescedFrames()
-                   << ",\"timing\":";
+                   << ",\"capture_dxgi_coalesced_frames\":" << capture.dxgiCoalescedFrames();
+            const auto& currentRate = rateSamples.back();
+            const auto previousSourceRate = std::find_if(rateSamples.begin(), rateSamples.end(), [&](const RateSample& sample) {
+                return sample.sourceGeneration == currentRate.sourceGeneration;
+            });
+            if (capture.hasCommittedFrame() && std::string_view(capture.backend()) == "dxgi"
+                    && previousSourceRate != std::prev(rateSamples.end())) {
+                const double sourceSeconds = std::chrono::duration<double>(reportNow - previousSourceRate->time).count();
+                const auto captured = currentRate.dxgiFrames - previousSourceRate->dxgiFrames;
+                const auto coalesced = currentRate.dxgiCoalesced - previousSourceRate->dxgiCoalesced;
+                report << ",\"capture_dxgi_update_fps\":" << (captured + coalesced) / sourceSeconds
+                       << ",\"capture_dxgi_coalesced_fps\":" << coalesced / sourceSeconds;
+            } else {
+                report << ",\"capture_dxgi_update_fps\":null,\"capture_dxgi_coalesced_fps\":null";
+            }
+            report << ",\"timing\":";
             pipelineTiming.json(report);
             report << ",\"model\":\"" << (config.modelPath.empty() ? "test signal" : "loaded") << "\"}";
             telemetry.publish(Telemetry::Kind::Stats, report.str());
             lastReport = reportNow;
         }
 
-        if(freshCapturePaced) {
+        if (desktopModelCapture) {
+            if (!capture.freshFrame()) {
+                const auto lastFresh = previousObservation == AimTime{} ? started : previousObservation;
+                frameWait.until(captureStarted + vaporlock::pipeline::desktopPollDelay(afterCapture - lastFresh),
+                    liveConfig.changedEvent(), [&] { return telemetry.failed(); });
+            }
+            continue;
+        }
+        if (cloudCapturePaced) {
             // Keep waiting for the next desktop image without spending another
             // rate slot. Back off only when the source returned immediately.
             if(!capture.freshFrame() && afterCapture-captureStarted<std::chrono::milliseconds(1))
@@ -4958,8 +5051,40 @@ public:
             CW_USEDEFAULT, CW_USEDEFAULT, 1480, 920, nullptr, nullptr, instance, this);
         ShowWindow(m_hwnd, show);
         UpdateWindow(m_hwnd);
+        HANDLE frameTimer = CreateWaitableTimerExW(nullptr, nullptr,
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
         MSG message{};
-        while (GetMessageW(&message, nullptr, 0, 0)) { TranslateMessage(&message); DispatchMessageW(&message); }
+        while (true) {
+            if (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+                if (message.message == WM_QUIT) break;
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+            const auto now = AimClock::now();
+            if (m_running && now >= m_nextFrame) {
+                m_nextFrame = now + vaporlock::pipeline::FreshFrameSchedule::period(m_config.captureFps);
+                step();
+                continue;
+            }
+            DWORD timeout = INFINITE;
+            bool armed = false;
+            if (m_running) {
+                const double remainingMs = std::chrono::duration<double, std::milli>(m_nextFrame - now).count();
+                LARGE_INTEGER due{};
+                due.QuadPart = -std::max<LONGLONG>(1, static_cast<LONGLONG>(std::ceil(remainingMs * 10'000.0)));
+                armed = frameTimer && SetWaitableTimer(frameTimer, &due, 0, nullptr, nullptr, FALSE);
+                timeout = static_cast<DWORD>(std::ceil(remainingMs)) + 1;
+            }
+            const DWORD waitResult = MsgWaitForMultipleObjectsEx(armed ? 1 : 0,
+                armed ? &frameTimer : nullptr, timeout, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            if (waitResult == WAIT_FAILED) {
+                if (frameTimer) CloseHandle(frameTimer);
+                frameTimer = nullptr;
+                if (MsgWaitForMultipleObjectsEx(0, nullptr, timeout, QS_ALLINPUT, MWMO_INPUTAVAILABLE) == WAIT_FAILED)
+                    break;
+            }
+        }
+        if (frameTimer) CloseHandle(frameTimer);
         return static_cast<int>(message.wParam);
     }
 
@@ -4982,13 +5107,12 @@ private:
         case WM_SIZE: layout(); return 0;
         case WM_GETMINMAXINFO: reinterpret_cast<MINMAXINFO*>(lparam)->ptMinTrackSize = {1100, 700}; return 0;
         case WM_COMMAND: command(LOWORD(wparam), HIWORD(wparam)); return 0;
-        case WM_TIMER: if (wparam == kFrameTimer) step(); return 0;
         case WM_DRAWITEM: drawButton(reinterpret_cast<DRAWITEMSTRUCT*>(lparam)); return TRUE;
         case WM_CTLCOLORSTATIC: return controlColor(reinterpret_cast<HDC>(wparam), false);
         case WM_CTLCOLOREDIT: return controlColor(reinterpret_cast<HDC>(wparam), true);
         case WM_CTLCOLORLISTBOX: return controlColor(reinterpret_cast<HDC>(wparam), true);
         case WM_PAINT: paint(); return 0;
-        case WM_DESTROY: KillTimer(m_hwnd, kFrameTimer); destroyResources(); PostQuitMessage(0); return 0;
+        case WM_DESTROY: m_running = false; destroyResources(); PostQuitMessage(0); return 0;
         default: return DefWindowProcW(m_hwnd, message, wparam, lparam);
         }
     }
@@ -5218,14 +5342,12 @@ private:
         m_output.stop();
         if (!m_running) return;
         m_running = false;
-        KillTimer(m_hwnd, kFrameTimer);
         m_stats.outputActive = false;
         appendLog(L"Capture pipeline stopped");
         InvalidateRect(m_hwnd, nullptr, FALSE);
     }
     void refreshTimer() {
-        KillTimer(m_hwnd, kFrameTimer);
-        SetTimer(m_hwnd, kFrameTimer, static_cast<UINT>(std::max(1, 1000 / std::max(1, m_config.captureFps))), nullptr);
+        m_nextFrame = AimClock::now();
     }
 
     std::wstring chooseFile(const wchar_t* title, const wchar_t* filter, bool save) {
@@ -5290,8 +5412,8 @@ private:
         m_config.iou = number(m_nmsIou, m_config.iou, 0.01, 1.0);
         m_config.classFilter = value(m_classFilter);
         m_config.captureMonitor = SendMessageW(m_captureSource, CB_GETCURSEL, 0, 0) == 1 ? 1 : 0;
-        m_config.captureFps = integer(m_captureFps, m_config.captureFps, 1, 240);
-        m_config.inferenceFps = integer(m_inferenceFps, m_config.inferenceFps, 1, 240);
+        vaporlock::pipeline::parseFrameRate(value(m_captureFps), m_config.captureFps);
+        vaporlock::pipeline::parseFrameRate(value(m_inferenceFps), m_config.inferenceFps);
         m_config.frameSkip = integer(m_frameSkip, m_config.frameSkip, 0, 60);
         m_config.matchIou = number(m_trackIou, m_config.matchIou, 0.01, 1.0);
         m_config.smoothing = number(m_smoothing, m_config.smoothing, 0.0, 0.95);
@@ -5444,8 +5566,17 @@ private:
             std::array<int*, 4> targets{&loaded.captureRegion.xOffset, &loaded.captureRegion.yOffset, &loaded.captureRegion.width, &loaded.captureRegion.height};
             for (auto* target : targets) if (std::getline(values, value, L',')) *target = _wtoi(value.c_str());
         }
-        loaded.captureFps = static_cast<int>(jsonNumber(capture, L"fps", loaded.captureFps));
-        loaded.inferenceFps = static_cast<int>(jsonNumber(performance, L"inferenceFps", loaded.inferenceFps));
+        const double captureRate = jsonNumber(capture, L"fps", loaded.captureFps);
+        const double inferenceRate = jsonNumber(performance, L"inferenceFps", loaded.inferenceFps);
+        const auto validFrameRate = [](double fps) {
+            return fps >= 1 && fps <= vaporlock::pipeline::kMaximumFrameRate && std::trunc(fps) == fps;
+        };
+        if (!validFrameRate(captureRate) || !validFrameRate(inferenceRate == 0 ? 1 : inferenceRate)) {
+            MessageBoxW(m_hwnd, L"Capture and inference rates must be positive native integers.", L"Profile error", MB_ICONWARNING);
+            return;
+        }
+        loaded.captureFps = static_cast<int>(captureRate);
+        loaded.inferenceFps = inferenceRate == 0 ? 1 : static_cast<int>(inferenceRate);
         loaded.frameSkip = static_cast<int>(jsonNumber(performance, L"frameSkipping", loaded.frameSkip));
         loaded.ortIntraOpThreads = static_cast<int>(jsonNumber(performance, L"ortIntraOpThreads", loaded.ortIntraOpThreads));
         loaded.ortInterOpThreads = static_cast<int>(jsonNumber(performance, L"ortInterOpThreads", loaded.ortInterOpThreads));
@@ -5754,6 +5885,7 @@ private:
     std::uint64_t m_outputGeneration = 0;
     long long m_frames = 0;
     vaporlock::InferenceCadence m_inferenceCadence;
+    AimTime m_nextFrame{};
     std::chrono::steady_clock::time_point m_started = std::chrono::steady_clock::now();
 };
 

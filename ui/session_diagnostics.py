@@ -16,6 +16,8 @@ METRICS = frozenset({
     'inference_obsolete_total','high_resolution_pacing',
     'capture_backend','capture_recovery_reason','capture_recovery_probes',
     'capture_recovery_transitions','capture_dxgi_timeouts','capture_dxgi_frames',
+    'capture_dxgi_coalesced_frames','capture_dxgi_update_fps','capture_dxgi_coalesced_fps',
+    'cuda_graph_replay_active',
 })
 STAGES = ('capture','preprocess','model','postprocess','tracking','loop_interval',
           'observation_interval','completion_interval','observation_age')

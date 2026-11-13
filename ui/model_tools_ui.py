@@ -368,14 +368,16 @@ class ModelTools(QDialog):
 
     def _measure_ready(self, identity):
         c=self.center; settings=deepcopy(self._settings)
-        settings.capture_fps=max(120,settings.capture_fps); settings.inference_fps=max(120,settings.inference_fps)
         settings.frame_skip=0; results=[]; failures=[]; input_details=''
+        def recommend():
+            return recommended_rates(results, capture_limit=settings.capture_fps,
+                                     inference_limit=settings.inference_fps)
         providers=[p for p in ('dml','cuda','trt','cpu') if c.engine.executable_for(p)]
         self._failures=[(p,'Unavailable') for p in ('dml','cuda','trt','cpu') if p not in providers]
         def next_provider():
             if not self._current(): return
             if not providers:
-                proposal=recommended_rates(results)
+                proposal=recommend()
                 if proposal is None: self._fail('No provider produced usable live timing data.',failures); return
                 def inspected(result):
                     nonlocal input_details
@@ -397,7 +399,7 @@ class ModelTools(QDialog):
             c._probe_model(settings,provider,done)
         def finish(latest):
             if latest!=identity: self._fail('Model changed. Rerun measurements.'); return
-            proposal=recommended_rates(results)
+            proposal=recommend()
             if proposal is None: self._fail('No provider produced usable live timing data.'); return
             self._recommendation=(identity,self._stamp,proposal,self._session_generation,time.monotonic())
             self._measured_display=(results,proposal,self._settings,input_details)
@@ -439,8 +441,6 @@ class ModelTools(QDialog):
                     failures.append(self.center.engine.provider_label(provider)+': '+self.center.t(result.reason))
                     next_provider(); return
                 validation=deepcopy(candidate)
-                validation.capture_fps=max(30,validation.capture_fps)
-                validation.inference_fps=max(30,validation.inference_fps)
                 validation.frame_skip=0
                 self.center._probe_model(validation,provider,measured)
             def measured(result):

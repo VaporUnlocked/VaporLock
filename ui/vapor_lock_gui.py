@@ -29,6 +29,7 @@ from batch3_settings import FIELDS as BATCH3_FIELDS, validate as validate_batch3
 from guide_links import add_guide_button, guide_topic
 from vlui_live_context import validated_native_settings
 from vlui_c014_settings import CAPTURE_FIELDS, validated_capture_field, validated_capture_settings
+from frame_rate import FRAME_RATE_FIELDS, MAX_FRAME_RATE, valid_frame_rate
 from annotation_provider import BACKENDS as ANNOTATION_BACKENDS
 _NATIVE_INJECTION = native_injection()
 from dataset_storage import atomic_text, dataset_lock, recover_annotations
@@ -1047,12 +1048,12 @@ class InitializationWizard(QDialog):
         rates_layout = QHBoxLayout(rates)
         rates_layout.setContentsMargins(0, 0, 0, 0)
         self.capture_rate = QSpinBox()
-        self.capture_rate.setRange(1, 1000)
-        self.capture_rate.setValue(max(1, self.settings.capture_fps))
+        self.capture_rate.setRange(1, MAX_FRAME_RATE)
+        self.capture_rate.setValue(self.settings.capture_fps)
         self.capture_rate.setSuffix(" fps capture")
         self.inference_rate = QSpinBox()
-        self.inference_rate.setRange(1, 1000)
-        self.inference_rate.setValue(max(1, self.settings.inference_fps))
+        self.inference_rate.setRange(1, MAX_FRAME_RATE)
+        self.inference_rate.setValue(self.settings.inference_fps)
         self.inference_rate.setSuffix(" fps inference")
         rates_layout.addWidget(self.capture_rate)
         rates_layout.addWidget(self.inference_rate)
@@ -1193,7 +1194,8 @@ class RangeControl(QWidget):
     _accent_index = 0
     _accents = ("baby", "pink", "ultraviolet", "highlight", "cobalt")
 
-    def __init__(self, low: float, high: float, value: float, decimals: int = 0, suffix: str = "") -> None:
+    def __init__(self, low: float, high: float, value: float, decimals: int = 0, suffix: str = "",
+                 *, expert_range: tuple[int, int] | None = None) -> None:
         super().__init__()
         self.scale = 10 ** decimals
         layout = QHBoxLayout(self)
@@ -1209,7 +1211,7 @@ class RangeControl(QWidget):
         self.spin.setKeyboardTracking(False)
         # The slider exposes the product's tested range. Typed values retain
         # a broad expert range so experienced users can tune beyond it.
-        self.spin.setRange(-1_000_000 if low < 0 else 0, 1_000_000)
+        self.spin.setRange(*(expert_range or (-1_000_000 if low < 0 else 0, 1_000_000)))
         self.spin.setSingleStep(1 / self.scale)
         self.spin.setSuffix(suffix)
         self.spin.setMinimumWidth(100)
@@ -2724,6 +2726,8 @@ class EngineBridge(QObject):
 
     def apply_live_setting(self, field: str, value: object) -> bool:
         """Mirror a safe setting into the running native session, if any."""
+        if field in FRAME_RATE_FIELDS and not valid_frame_rate(value):
+            return False
         if field in CAPTURE_FIELDS:
             value = validated_capture_field(field, value)
         if self._observe_only and field in {
@@ -2877,6 +2881,8 @@ class EngineBridge(QObject):
         api_observations: bool = False,
     ) -> list[str]:
         validate_batch3(asdict(settings))
+        if not (valid_frame_rate(settings.capture_fps) and valid_frame_rate(settings.inference_fps)):
+            raise ValueError("Capture and inference rates must be positive native integers.")
         from crosshair_reference import wire as crosshair_wire
         calibration_wire = crosshair_wire(settings)
         from batch6_settings import device_for
@@ -4843,10 +4849,7 @@ class ControlCenter(QMainWindow):
         self.section(layout, "ONNX Runtime")
         self.setting(layout, "Intra-operation threads", "0 lets ONNX Runtime choose automatically. A positive value caps work inside each model operation.", self.range("ort_intra_op_threads", 0, 64))
         self.setting(layout, "Inter-operation threads", "0 lets ONNX Runtime choose automatically. A positive value caps parallel model graph work.", self.range("ort_inter_op_threads", 0, 32))
-        cuda_graph = QCheckBox("Enable CUDA Graph replay")
-        cuda_graph.setChecked(False)
-        cuda_graph.setEnabled(False)
-        self.setting(layout, "CUDA Graph replay", "Unavailable in this engine: persistent CUDA I/O buffers are required. Standard CUDA inference remains available.", cuda_graph)
+        self.setting(layout, "CUDA Graph replay", "Reduces launch overhead on compatible CUDA models. Changes take effect on the next start.", self.cuda_graph_control("Enable CUDA Graph replay"))
         cuda_preprocess = self.cuda_preprocess_control("Use GPU preprocessing")
         self.setting(layout, "GPU preprocessing", "Requires a compatible CUDA or TensorRT RTX engine and a float NCHW model. Other models use CPU preprocessing.", cuda_preprocess)
         self.refresh_cuda_preprocess_controls()
@@ -4886,11 +4889,12 @@ class ControlCenter(QMainWindow):
             high: float,
             decimals: int = 0,
             suffix: str = "",
+            detail: str = "",
         ) -> None:
             control = self.range(field, low, high, decimals, suffix)
             control.setObjectName("policyInspectorRange")
             control.pass_slider_wheel_to_parent()
-            labeled_control(parent, title, control, title)
+            labeled_control(parent, title, control, detail or title)
 
         source = card("SOURCE")
         monitor = QComboBox()
@@ -4912,18 +4916,16 @@ class ControlCenter(QMainWindow):
         source.addWidget(self._tuning_lock.wrap(picker))
 
         rate = card("RATE")
-        compact_range(rate, "Capture rate", "capture_fps", 1, 120, 0, " fps")
-        compact_range(rate, "Inference rate", "inference_fps", 1, 120, 0, " fps")
+        compact_range(rate, "Capture rate", "capture_fps", 1, 120, 0, " fps",
+                      "Slider values top out at 120 fps; type a higher value when your source and hardware support it.")
+        compact_range(rate, "Inference rate", "inference_fps", 1, 120, 0, " fps",
+                      "Slider values top out at 120 fps; type a higher value when your model can sustain it.")
         compact_range(rate, "Frame skip", "frame_skip", 0, 60)
 
         runtime = card("RUNTIME")
         compact_range(runtime, "Intra-operation threads", "ort_intra_op_threads", 0, 64)
         compact_range(runtime, "Inter-operation threads", "ort_inter_op_threads", 0, 32)
-        cuda_graph = QCheckBox("CUDA Graph replay")
-        cuda_graph.setChecked(False)
-        cuda_graph.setEnabled(False)
-        cuda_graph.setToolTip("Unavailable in this engine: persistent CUDA I/O buffers are required. Standard CUDA inference remains available.")
-        runtime.addWidget(cuda_graph)
+        runtime.addWidget(self._tuning_lock.wrap(self.cuda_graph_control("CUDA Graph replay")))
         cuda_preprocess = self.cuda_preprocess_control("CUDA preprocessing")
         runtime.addWidget(cuda_preprocess)
         self.refresh_cuda_preprocess_controls()
@@ -4937,6 +4939,16 @@ class ControlCenter(QMainWindow):
         binding = {'CUDA preprocessing': 'discrete.cuda_preprocess.1',
                    'Use GPU preprocessing': 'discrete.cuda_preprocess.2'}[title]
         self._discrete_registry.register(binding, 'cuda_preprocess', control)
+        return control
+
+    def cuda_graph_control(self, title: str) -> QCheckBox:
+        control = QCheckBox(title)
+        control.setObjectName("cudaGraphChoice")
+        control.setProperty("_vaporlock_i18n_skip", True)
+        control.setChecked(self.settings.cuda_graph_replay)
+        control.setEnabled(False)
+        control.toggled.connect(lambda state: self.change("cuda_graph_replay", state))
+        control.setProperty("graphTitle", title)
         return control
 
     def refresh_cuda_preprocess_controls(self) -> None:
@@ -4961,6 +4973,22 @@ class ControlCenter(QMainWindow):
             control.setEnabled(status == "available")
             control.setChecked(status == "available" and self.settings.cuda_preprocess)
             control.setToolTip(self.t(detail))
+            control.blockSignals(blocked)
+        graph_available = self.settings.provider == "cuda" and getattr(self.engine_capabilities, "cuda_graph_replay", None) is True
+        if self.settings.provider != "cuda":
+            graph_detail = "Select CUDA to use CUDA Graph replay."
+        elif graph_available:
+            graph_detail = "Compatible models use CUDA Graph replay after restart. Other models use standard CUDA."
+        elif status == "checking":
+            graph_detail = "Checking this engine's CUDA Graph replay support..."
+        else:
+            graph_detail = "CUDA Graph replay is unavailable in this engine."
+        for control in self.findChildren(QCheckBox, "cudaGraphChoice"):
+            blocked = control.blockSignals(True)
+            control.setEnabled(graph_available)
+            control.setChecked(self.settings.cuda_graph_replay)
+            control.setText(self.t(control.property("graphTitle")))
+            control.setToolTip(self.t(graph_detail))
             control.blockSignals(blocked)
 
     def apply_region(self, editor: QLineEdit) -> None:
@@ -7398,7 +7426,9 @@ class ControlCenter(QMainWindow):
         return page
 
     def range(self, field: str, low: float, high: float, decimals: int = 0, suffix: str = "") -> RangeControl:
-        control = RangeControl(low, high, float(getattr(self.settings, field)), decimals, suffix)
+        expert_range = (1, MAX_FRAME_RATE) if field in FRAME_RATE_FIELDS else None
+        control = RangeControl(low, high, float(getattr(self.settings, field)), decimals, suffix,
+                               expert_range=expert_range)
         if field.startswith('cloud_'):
             control.spin.setRange(low,high)
         if field in {'dataset_annotation_nms_iou','ultralytics_annotation_nms_iou'}:
@@ -7488,6 +7518,8 @@ class ControlCenter(QMainWindow):
 
     @tuning_guard
     def change(self, field: str, value: object) -> None:
+        if field in FRAME_RATE_FIELDS and not valid_frame_rate(value):
+            raise ValueError("Capture and inference rates must be positive native integers.")
         if field.startswith('cloud_'):
             from cloud_settings import validate as validate_cloud
             validate_cloud({**vars(self.settings),field:value})
@@ -7569,6 +7601,8 @@ class ControlCenter(QMainWindow):
                 self._last_edit = (field, now)
                 self.undo_button.setEnabled(True)
             setattr(self.settings, field, value)
+            if field == "cuda_graph_replay":
+                self.refresh_cuda_preprocess_controls()
             if field in {"confidence", "acquire_confidence", "retain_confidence"}:
                 self.refresh_target_confidence_summary()
             if field.endswith(('_effects_enabled','_effects_extra_copies')):
@@ -8025,6 +8059,8 @@ class ControlCenter(QMainWindow):
             return []
 
     def coerce_remote_setting(self, field: str, value: object) -> object | None:
+        if field in FRAME_RATE_FIELDS:
+            return value if valid_frame_rate(value) else None
         if field in BATCH3_FIELDS:
             try: validate_batch3({field: value})
             except ValueError: return None
@@ -9349,10 +9385,25 @@ class ControlCenter(QMainWindow):
             return summary
 
         data = self._last_output_data or {}
+        lines = [summary]
+        capture_cap = data.get('configured_capture_fps')
+        inference_cap = data.get('configured_inference_fps')
+        if all(type(rate) is int and rate > 0 for rate in (capture_cap, inference_cap)):
+            lines.append(self.tf('Configured limits: {capture} capture fps · {inference} inference fps',
+                capture=capture_cap, inference=inference_cap))
+        source_rate = data.get('capture_dxgi_update_fps')
+        if finite(source_rate):
+            lines.append(self.tf('DXGI desktop updates: {rate}/s', rate=f'{source_rate:.1f}'))
+        coalesced_rate = data.get('capture_dxgi_coalesced_fps')
+        if finite(coalesced_rate):
+            lines.append(self.tf('DXGI updates combined before acquisition: {rate}/s', rate=f'{coalesced_rate:.1f}'))
+        graph_active = data.get('cuda_graph_replay_active')
+        if type(graph_active) is bool and self.engine.active_provider == 'cuda' and data.get('model') == 'loaded':
+            lines.append(self.t('CUDA Graph replay active' if graph_active else 'Standard CUDA inference'))
+
         timing = data.get('timing')
         if not isinstance(timing, dict):
-            return summary
-        lines = [summary]
+            timing = {}
         for key, caption in (
             ('observation_interval', 'Fresh frame interval'),
             ('capture_acquire', 'Capture wait'),
@@ -9369,7 +9420,13 @@ class ControlCenter(QMainWindow):
                     stage=self.t(caption), median=f'{median:.1f}', p95=f'{p95:.1f}'))
         coalesced = data.get('capture_dxgi_coalesced_frames')
         if type(coalesced) is int and coalesced >= 0:
-            lines.append(self.tf('DXGI updates combined before acquisition: {count}', count=coalesced))
+            lines.append(self.tf('DXGI updates combined since start: {count}', count=coalesced))
+        frame_skip = data.get('inference_explicit_skip_total')
+        rate_limited = data.get('inference_rate_limited_total')
+        if (all(type(count) is int and count >= 0 for count in (frame_skip, rate_limited))
+                and (frame_skip or rate_limited)):
+            lines.append(self.tf('Inference skips: {explicit} by frame skip · {limited} by FPS limit',
+                explicit=frame_skip, limited=rate_limited))
         return '\n'.join(lines)
 
     def model_probe_busy(self) -> bool:
@@ -9474,8 +9531,6 @@ class ControlCenter(QMainWindow):
             return
         settings = Settings(**asdict(self.settings))
         settings.model_path = str(model)
-        settings.capture_fps = max(120, settings.capture_fps)
-        settings.inference_fps = max(120, settings.inference_fps)
         settings.frame_skip = 0
         settings.preview_enabled = False
         settings.dataset_enabled = False
@@ -9561,8 +9616,6 @@ class ControlCenter(QMainWindow):
         self.model_validation.setText("Preparing runtime validation…")
         validation_settings = Settings(**asdict(self.settings))
         validation_settings.model_path = str(model)
-        validation_settings.capture_fps = max(30, validation_settings.capture_fps)
-        validation_settings.inference_fps = max(30, validation_settings.inference_fps)
         validation_settings.preview_enabled = False
         validation_settings.dataset_enabled = False
         validation_settings.movement_enabled = False
@@ -11056,6 +11109,8 @@ class ControlCenter(QMainWindow):
             # Preserve the old snap exception, now visible and explicitly switchable.
             allowed.setdefault("snap_bypasses_confirmation", True)
             allowed.setdefault("max_speed", float(allowed.get("max_step", 24)) * 60.0)
+            if type(allowed.get("inference_fps")) is int and allowed["inference_fps"] == 0:
+                allowed["inference_fps"] = 1  # Effective rate of older profiles with a zero value.
             from ultralytics_credentials import validate_envelope
             validate_envelope(allowed.get('ultralytics_key_protected', ''))
             for path_field in ("model_path", "dataset_directory", "dataset_annotation_model", "ultralytics_annotation_model", "ultralytics_output_directory", "training_base_model", "training_dataset", "motion_compensation_library", "cloud_project", "cloud_output", "cloud_initial_model", "cloud_checkpoint"):
@@ -11083,8 +11138,8 @@ class ControlCenter(QMainWindow):
             if (not 1<=replacement.ultralytics_annotation_passes<=10 or not 1<=replacement.ultralytics_image_limit<=10000
                     or not .01<=replacement.ultralytics_annotation_confidence<=.99 or not .05<=replacement.ultralytics_annotation_iou<=.99):
                 raise ValueError('Invalid Ultralytics profile settings.')
-            if not 1 <= replacement.capture_fps <= 2**53-1:
-                raise ValueError('Profile capture rate must be a positive safe integer.')
+            if not (valid_frame_rate(replacement.capture_fps) and valid_frame_rate(replacement.inference_fps)):
+                raise ValueError("Profile capture and inference rates must be positive native integers.")
             validated_native_settings(asdict(replacement), tuple((name, str(spec.type))
                 for name, spec in Settings.__dataclass_fields__.items()))
             return replacement
@@ -11153,7 +11208,11 @@ class ControlCenter(QMainWindow):
     def update_model_start_feedback(self, state: str) -> None:
         previous = getattr(self, '_last_engine_state', '')
         if state.startswith('Starting'):
-            self.show_model_selection_status('Loading the selected model…', {})
+            if (self.engine.active_provider == 'cuda' and self.settings.cuda_graph_replay
+                    and Path(self.settings.model_path).suffix.lower() == '.onnx'):
+                self.show_model_selection_status('Loading the selected model and preparing CUDA Graph replay.', {})
+            else:
+                self.show_model_selection_status('Loading the selected model…', {})
         elif state.startswith('Running'):
             self._model_selection_status_copy = None
             self.render_model_selection_status()

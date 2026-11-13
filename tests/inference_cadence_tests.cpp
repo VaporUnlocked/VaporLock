@@ -1,6 +1,7 @@
 #include "app/InferenceCadence.h"
 #include "app/CloudCapturePacing.h"
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -31,11 +32,55 @@ static void verifyFreshCapturePacing() {
     require(schedule.next(256) == deadline + 10ms + Schedule::period(256), "Fresh capture attempted to catch up");
     schedule.reset();
     require(!schedule.hasFresh() && schedule.commit(first, 256), "Fresh capture reset retained an old deadline");
+    const auto fastest = Schedule::period(std::numeric_limits<int>::max());
+    require(fastest >= Schedule::Clock::duration(1) && fastest < Schedule::period(1000000),
+            "Configured frame rate clamped to the old ceiling");
+}
+
+static int simulateDesktopPolling(bool nonblocking, int sourceFps, int configuredFps,
+                                  std::chrono::microseconds wakeDelay = {}) {
+    using Schedule = vaporlock::pipeline::FreshFrameSchedule;
+    using namespace std::chrono_literals;
+    const auto start = at(1);
+    const auto end = start + 10s;
+    const auto sourcePeriod = Schedule::period(sourceFps);
+    Schedule schedule;
+    auto now = start;
+    auto lastFrame = start;
+    long long lastSourceFrame = -1;
+    int fresh = 0;
+    while (now < end) {
+        if (schedule.hasFresh()) now = std::max(now, schedule.next(configuredFps));
+        if (now >= end) break;
+        const auto sourceFrame = (now - start) / sourcePeriod;
+        if (sourceFrame <= lastSourceFrame) {
+            // Model a coarse wait like the 13 ms acquisition delay observed on
+            // Windows. The source continues presenting during both waits.
+            now += nonblocking ? vaporlock::pipeline::desktopPollDelay(now - lastFrame) + wakeDelay : 13ms;
+            continue;
+        }
+        require(schedule.commit(now, configuredFps), "Polling exceeded configured capture rate");
+        lastSourceFrame = sourceFrame;
+        lastFrame = now;
+        ++fresh;
+        now += 3ms; // Readback and inference finish before the next 120 Hz frame.
+    }
+    return fresh;
 }
 
 int main() {
     try {
         verifyFreshCapturePacing();
+        const int coarseDesktop = simulateDesktopPolling(false, 120, 256);
+        const int fastDesktop = simulateDesktopPolling(true, 120, 256);
+        require(coarseDesktop >= 600 && coarseDesktop < 700, "Coarse wait did not reproduce source loss");
+        require(fastDesktop == 1200, "Nonblocking capture missed fresh 120 Hz source frames");
+        require(simulateDesktopPolling(true, 120, 256, std::chrono::microseconds(1250)) == 1200,
+                "Nonblocking capture lost frames with measured timer wake jitter");
+        require(simulateDesktopPolling(true, 120, 60) <= 600, "Polling exceeded user's 60 FPS limit");
+        require(simulateDesktopPolling(true, 60, 256) == 600, "Polling produced duplicate desktop frames");
+        std::cout << "Desktop capture simulation: " << coarseDesktop << " -> " << fastDesktop
+                  << " fresh frames in 10s (120 Hz source, 256 FPS cap).\n";
         for (int rate : {30, 60, 120, 144, 240, 256, 360, 1000}) {
             for (int seed = 0; seed < 5; ++seed) {
                 Cadence cadence;
