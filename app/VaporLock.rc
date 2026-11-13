@@ -1,3 +1,13 @@
 #define IDI_VAPORLOCK_ICON 101
 
 IDI_VAPORLOCK_ICON ICON "..\\assets\\VaporLock.ico"
+
+// The desktop can read these flags from the image without starting the engine.
+// Bit 0 is ONNX Runtime support and bit 1 is the CUDA provider API.
+#if defined(VAPORLOCK_HAS_ONNXRUNTIME) && VAPORLOCK_HAS_ONNXRUNTIME && defined(VAPORLOCK_HAS_CUDA) && VAPORLOCK_HAS_CUDA
+201 RCDATA { 3 }
+#elif defined(VAPORLOCK_HAS_ONNXRUNTIME) && VAPORLOCK_HAS_ONNXRUNTIME
+201 RCDATA { 1 }
+#else
+201 RCDATA { 0 }
+#endif

@@ -1263,29 +1263,27 @@ class PreviewCanvas(QLabel):
         return QSize(640, 230)
 
     def paintEvent(self, event) -> None:
-        painter = QPainter(self)
         from interface_themes import painted_role
-        painter.fillRect(self.contentsRect(), QColor(painted_role(self,'input','#080d16')))
-        painter.end()
-        super().paintEvent(event)
+        bounds = self.contentsRect()
+        with QPainter(self) as painter:
+            painter.fillRect(bounds, QColor(painted_role(self, 'input', '#080d16')))
+            if not self._frame.isNull() and not bounds.isEmpty():
+                size = self._frame.size().scaled(bounds.size(), Qt.AspectRatioMode.KeepAspectRatio)
+                target = QRect(
+                    bounds.x() + (bounds.width() - size.width()) // 2,
+                    bounds.y() + (bounds.height() - size.height()) // 2,
+                    size.width(), size.height(),
+                )
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                painter.drawImage(target, self._frame)
+        if self._frame.isNull():
+            super().paintEvent(event)
 
     def set_frame(self, frame: QImage) -> None:
-        if frame.isNull():
-            self._frame = QImage()
-            self.clear()
+        if frame.isNull() and self._frame.isNull():
             return
         self._frame = frame
-        self._render_frame()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._render_frame()
-
-    def _render_frame(self) -> None:
-        if self._frame.isNull() or self.contentsRect().size().isEmpty():
-            return
-        pixmap = QPixmap.fromImage(self._frame)
-        self.setPixmap(pixmap.scaled(self.contentsRect().size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.update()
 
     def save_snapshot(self, path: Path) -> bool:
         """Write the most recent annotated native preview without resizing it."""
@@ -2052,9 +2050,11 @@ class AccelerationManager(QObject):
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
         self.process.readyReadStandardOutput.connect(self._read_output)
         self.process.readyReadStandardError.connect(self._read_errors)
+        self.process.errorOccurred.connect(self._process_error)
         self.process.finished.connect(self._finished)
         self._provider = ""
-        self._messages: list[str] = []
+        self._installer_message = ""
+        self._installer_error = ""
 
     @staticmethod
     def supports(provider: str) -> bool:
@@ -2091,12 +2091,50 @@ class AccelerationManager(QObject):
             return all((trt_root / name).is_file() for name in ("VaporLockTensorRt.exe", "onnxruntime.dll", "onnxruntime_providers_shared.dll", "tensorrt_rtx_1_6.dll", "tensorrt_onnxparser_rtx_1_6.dll"))
         return True
 
+    @staticmethod
+    def setup_files_present(provider: str) -> bool:
+        if provider == "trt" and not getattr(sys, "frozen", False):
+            from acceleration_install import tensor_rt_sdk_present
+
+            return tensor_rt_sdk_present(ROOT)
+        files = {
+            "dml": ("onnxruntime.dll", "DirectML.dll"),
+            "trt": ("tensorrt_rtx_1_6.dll", "tensorrt_onnxparser_rtx_1_6.dll"),
+        }.get(provider, ())
+        directory = ROOT / "engine" / provider
+        return bool(files) and all((directory / name).is_file() for name in files)
+
+    @staticmethod
+    def native_build_message(provider: str) -> str:
+        if getattr(sys, "frozen", False):
+            return "Repair the installation to restore the native engine and its matching dependencies."
+        if provider == "trt":
+            from acceleration_install import tensor_rt_sdk_directory
+
+            sdk = tensor_rt_sdk_directory(ROOT).relative_to(ROOT)
+            return (f"Run .\\BuildCommunity.ps1 -TensorRtRoot .\\{sdk} to build VaporLockTensorRt.exe. "
+                    "Use -CudaToolkit if CMake cannot locate your CUDA Toolkit.")
+        if provider == "dml":
+            return "Run BuildCommunity.ps1 -NativeDirectML to build VaporLockDml.exe and stage its dependencies."
+        if provider in {"cpu", "cuda"}:
+            return "Run BuildCommunity.ps1 to build the native CPU/CUDA engine with ONNX Runtime."
+        return "The native backend is unavailable. Rebuild the engine and retry setup."
+
+    @staticmethod
+    def cuda_engine_available() -> bool:
+        from native_engine_layout import has_model_support
+        executable, _ = EngineBridge.launch_for("cpu", require_model=True)
+        return has_model_support(executable, "cuda")
+
     @property
     def active(self) -> bool:
         return self.process.state() != QProcess.ProcessState.NotRunning
 
     def install(self, provider: str) -> None:
         if self.active or provider not in {"cuda", "dml", "trt"}:
+            return
+        if provider == "cuda" and not self.cuda_engine_available():
+            self.completed.emit(provider, False, self.native_build_message(provider))
             return
         packaged_installer = COMPONENT_ROOT / "VaporLockAccelerationSetup.exe"
         runtime = ROOT / "runtime" / "python.exe"
@@ -2109,7 +2147,8 @@ class AccelerationManager(QObject):
             self.completed.emit(provider, False, "The bundled acceleration installer is missing.")
             return
         self._provider = provider
-        self._messages = []
+        self._installer_message = ""
+        self._installer_error = ""
         self.status.emit(f"Preparing {EngineBridge.provider_label(provider)} acceleration download...")
         arguments = ["--provider", provider, "--root", str(ROOT)]
         if installer is not None:
@@ -2129,23 +2168,42 @@ class AccelerationManager(QObject):
         marker.write_text(json.dumps({"offered": True}), encoding="utf-8")
 
     def _read_output(self) -> None:
-        for line in bytes(self.process.readAllStandardOutput()).decode("utf-8", errors="replace").splitlines():
-            try:
-                message = str(json.loads(line).get("message", "")).strip()
-            except json.JSONDecodeError:
-                message = line.strip()
-            if message:
-                self._messages.append(message)
+        while self.process.canReadLine():
+            self._read_status_line(bytes(self.process.readLine()))
+
+    def _read_status_line(self, raw: bytes) -> None:
+        line = raw.decode("utf-8", errors="replace").strip()
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            payload = None
+        message = str(payload.get("message", "")).strip() if isinstance(payload, dict) else line
+        if message:
+            self._installer_message = message
+            if not isinstance(payload, dict) or payload.get("terminal") is not True:
                 self.status.emit(message)
 
     def _read_errors(self) -> None:
         text = bytes(self.process.readAllStandardError()).decode("utf-8", errors="replace").strip()
         if text:
-            self._messages.append(text[-500:])
+            self._installer_error = text[-500:]
 
-    def _finished(self, exit_code: int, _status: QProcess.ExitStatus) -> None:
-        message = self._messages[-1] if self._messages else "The installer stopped without a status message."
-        self.completed.emit(self._provider, exit_code == 0 and self.is_installed(self._provider), message)
+    def _process_error(self, error: QProcess.ProcessError) -> None:
+        if error == QProcess.ProcessError.FailedToStart:
+            self.completed.emit(self._provider, False, self.process.errorString())
+
+    def _finished(self, exit_code: int, status: QProcess.ExitStatus) -> None:
+        self._read_output()
+        self._read_status_line(bytes(self.process.readAllStandardOutput()))
+        self._read_errors()
+        succeeded = status == QProcess.ExitStatus.NormalExit and exit_code == 0
+        if succeeded:
+            message = self._installer_message or "Runtime setup completed."
+        elif status == QProcess.ExitStatus.CrashExit:
+            message = self._installer_error or "The runtime installer stopped unexpectedly."
+        else:
+            message = self._installer_error or self._installer_message or f"The installer exited with code {exit_code}."
+        self.completed.emit(self._provider, succeeded, message)
 
 
 class ControllerBridgeManager(QObject):
@@ -2558,20 +2616,22 @@ class EngineBridge(QObject):
         return environment
 
     @staticmethod
-    def launch_for(provider: str):
+    def launch_for(provider: str, *, require_model: bool = False, status_only: bool = False):
         if not getattr(sys, 'frozen', False):
             from native_engine_layout import source_engine, provider_ready, native_environment
-            source = source_engine(ROOT, provider)
-            if provider_ready(source, provider):
+            source = source_engine(ROOT, provider, require_model=require_model)
+            if provider_ready(source, provider, require_model=require_model):
                 environment = QProcessEnvironment()
                 for key, value in native_environment(source.parent, dict(os.environ)).items():
                     environment.insert(key, value)
                 return source, environment
         if provider != "cuda":
-            return EngineBridge.executable_for(provider), EngineBridge.process_environment(provider)
-        from runtime_generations import resolve_cuda, RuntimeIntegrityError
+            return EngineBridge.executable_for(provider, require_model=require_model), EngineBridge.process_environment(provider)
+        from runtime_generations import cached_cuda_runtime, resolve_cuda, RuntimeIntegrityError
         try:
-            runtime = resolve_cuda(ROOT)
+            runtime = cached_cuda_runtime(ROOT) if status_only else resolve_cuda(ROOT)
+            if runtime is None:
+                return None, QProcessEnvironment.systemEnvironment()
             environment = QProcessEnvironment()
             for key, value in runtime.environment(dict(os.environ)).items(): environment.insert(key, value)
             return runtime.executable, environment
@@ -2579,15 +2639,17 @@ class EngineBridge(QObject):
             return None, QProcessEnvironment.systemEnvironment()
 
     @staticmethod
-    def executable_for(provider: str) -> Path | None:
+    def executable_for(provider: str, *, require_model: bool = False) -> Path | None:
         if provider == "cuda":
-            return EngineBridge.launch_for(provider)[0]
+            return EngineBridge.launch_for(provider, status_only=True)[0]
         executable_name = "VaporLockTensorRt.exe" if provider == "trt" else "VaporLockDml.exe" if provider == "dml" else "VaporLock.exe"
         bundled = ROOT / "engine"
         executable = bundled / ("trt" if provider == "trt" else "dml" if provider == "dml" else "") / executable_name
         if executable.is_file():
-            if provider == "cuda" and not (bundled / "onnxruntime_providers_cuda.dll").is_file():
-                return None
+            if provider == "cpu" and require_model:
+                from native_engine_layout import provider_ready
+                if not provider_ready(executable, provider, require_model=True):
+                    return None
             if provider == "dml" and not AccelerationManager.is_installed("dml"):
                 return None
             if provider == "trt" and not AccelerationManager.is_installed("trt"):
@@ -2596,8 +2658,8 @@ class EngineBridge(QObject):
         if getattr(sys, "frozen", False):
             return None
         from native_engine_layout import source_engine, provider_ready
-        source = source_engine(ROOT, provider)
-        return source if provider_ready(source, provider) else None
+        source = source_engine(ROOT, provider, require_model=require_model)
+        return source if provider_ready(source, provider, require_model=require_model) else None
 
     @staticmethod
     def candidate_providers(settings: Settings) -> list[str]:
@@ -2960,9 +3022,14 @@ class EngineBridge(QObject):
                 self.state_changed.emit("Stopped");self._release_manual_lock_event();self.startup_rejected.emit();return
         while self._provider_index < len(self._providers):
             provider = self._providers[self._provider_index]
-            executable, environment = self.launch_for('cpu' if self._cloud_session else provider)
+            needs_onnx = bool(self._settings.model_path) and self._cloud_session is None
+            executable, environment = self.launch_for('cpu' if self._cloud_session else provider, require_model=needs_onnx)
             if executable is None:
                 missing = f"The bundled {self.provider_label(provider)} engine is unavailable."
+                if not getattr(sys, "frozen", False) and provider == "cpu" and needs_onnx:
+                    missing = "The native CPU engine needs ONNX Runtime. Run BuildCommunity.ps1 to build it."
+                elif not getattr(sys, "frozen", False) and provider == "cuda":
+                    missing = "CUDA needs the native CPU/CUDA engine and its matching runtime. Run BuildCommunity.ps1 and refresh CUDA in Model Library."
                 if self._settings.provider != "auto":
                     self.message.emit(missing)
                     self.state_changed.emit("Stopped")
@@ -3041,8 +3108,6 @@ class EngineBridge(QObject):
             return
         if self._try_fallback(self._last_error or f"exit code {exit_code}"):
             return
-        if not self._has_telemetry and self._last_error:
-            self.message.emit(self._last_error)
         self.state_changed.emit("Stopped")
         self._release_manual_lock_event()
         self._controller_host_session = None
@@ -3205,7 +3270,8 @@ class EngineBridge(QObject):
         if message:
             message = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", message).strip()
             if "Some nodes were not assigned to the preferred execution providers" in message:
-                self.message.emit("DirectML initialized; ONNX Runtime kept shape-only operations on the CPU.")
+                provider = self.provider_label(self._active_provider)
+                self.message.emit(f"{provider} initialized; ONNX Runtime assigned some operations to the CPU.")
             elif message:
                 self.message.emit(message)
 
@@ -3400,7 +3466,7 @@ PAGE_TITLES = {
     "diagnostics": "Status & Diagnostics",
 }
 
-PRIMARY_PAGES = ("overview", "capture", "detection", "selection", "output", "dataset")
+PRIMARY_PAGES = ("overview", "capture", "detection", "selection", "output", "dataset", "diagnostics")
 
 
 class ControlCenter(QMainWindow):
@@ -3917,6 +3983,16 @@ class ControlCenter(QMainWindow):
         footer_layout.setContentsMargins(0, 0, 14, 4)
         footer_layout.setSpacing(8)
         footer_layout.addWidget(scroll, 1)
+
+        self.language_choice = QComboBox()
+        self.language_choice.setObjectName("languageChoice")
+        self.language_choice.setProperty("_vaporlock_i18n_skip", True)
+        for name, code in LANGUAGE_OPTIONS:
+            self.language_choice.addItem(name, code)
+        self.language_choice.setCurrentIndex(self.language_choice.findData(self.ui_language))
+        self.language_choice.currentIndexChanged.connect(self.language_changed)
+        footer_layout.addWidget(self.language_choice, 0, Qt.AlignmentFlag.AlignBottom)
+
         self.more_tabs_button = QToolButton()
         self.more_tabs_button.setObjectName("monitoringMore")
         self.more_tabs_button.setText("More tabs")
@@ -3924,7 +4000,7 @@ class ControlCenter(QMainWindow):
         self.more_tabs_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         menu = QMenu(self.more_tabs_button)
         menu.setObjectName("monitoringPageMenu")
-        for key in ("model", "games", "profiles", "shortcuts", "automation", "diagnostics", "misc", "interface"):
+        for key in ("model", "games", "profiles", "shortcuts", "automation", "misc", "interface"):
             action = menu.addAction(PAGE_TITLES[key])
             action.setCheckable(True)
             action.triggered.connect(lambda _checked=False, page=key: self.show_page(page))
@@ -4407,6 +4483,8 @@ class ControlCenter(QMainWindow):
             self.language_choice.blockSignals(True)
             self.language_choice.setCurrentIndex(max(0, self.language_choice.findData(self.ui_language)))
             self.language_choice.blockSignals(False)
+            self.language_choice.setAccessibleName(self.t("Display language"))
+            self.language_choice.setToolTip(self.t("Display language"))
         if hasattr(self, "controller_tester"):
             self.controller_tester.refresh()
         self.refresh_readiness()
@@ -4442,6 +4520,8 @@ class ControlCenter(QMainWindow):
         if not save_preferred_language(language):
             self.log("WARN", "Windows could not save the interface language preference.")
         self.apply_interface_language()
+        if self._live_owner is not None:
+            self._live_owner.native_changed()
 
     @disposable_deny('external-open')
     def open_settings_guide(self, topic=None) -> bool:
@@ -4667,24 +4747,8 @@ class ControlCenter(QMainWindow):
         self._refresh_monitoring_activity()
 
         self._interface_page, interface_outer = self.new_page('Interface & Language','Configure the display language, theme and setup preferences.')
-        from mission_layout import TaskColumns,TaskCard
-        interface_columns=TaskColumns(proportions=(1,1))
-        for panel in (interface_columns.left,interface_columns.right):panel.setObjectName('missionTaskColumn')
-        interface_outer.addWidget(interface_columns)
-        language_card=TaskCard('Language','globe')
         theme_card=TaskCard('Interface mode','display')
-        interface_columns.left_layout.addWidget(language_card)
-        interface_columns.right_layout.addWidget(theme_card)
-        layout=language_card.body
-        language = QComboBox()
-        language.setObjectName("languageChoice")
-        language.setProperty("_vaporlock_i18n_skip", True)
-        for name, code in LANGUAGE_OPTIONS:
-            language.addItem(name, code)
-        language.setCurrentIndex(max(0, language.findData(self.ui_language)))
-        language.currentIndexChanged.connect(self.language_changed)
-        self.language_choice = language
-        self.setting(layout, "Display language", "Choose the language used throughout Control Center.", language)
+        interface_outer.addWidget(theme_card)
         layout=theme_card.body
         interface_layout = QComboBox()
         for identifier, theme in THEMES.items():
@@ -4882,7 +4946,7 @@ class ControlCenter(QMainWindow):
         status = "other-provider"
         if self.settings.provider in {"cuda", "trt"}:
             status = self.engine_capabilities.request(
-                *self.engine.launch_for(self.settings.provider)
+                *self.engine.launch_for(self.settings.provider, status_only=True)
             )
         detail = {
             "other-provider": "Select CUDA or TensorRT RTX to use GPU preprocessing. CPU and DirectML use CPU preprocessing.",
@@ -8178,6 +8242,13 @@ class ControlCenter(QMainWindow):
                 self.log('INFO', '.cloud requires its bundled CPU, DirectML or CUDA component and native capture engine. TensorRT is not supported for .cloud.')
                 self.show_model_start_failure()
                 return
+        elif requested == "trt" and not self.acceleration.is_installed(requested):
+            if self.acceleration.setup_files_present(requested):
+                self.log("WARN", self.acceleration.native_build_message(requested))
+            else:
+                self.log("INFO", "Open Model Library to set up TensorRT RTX.")
+            self.show_model_start_failure()
+            return
         elif requested in {"cuda", "dml"} and not self.acceleration.is_installed(requested):
             self.log("INFO", f"{self.engine.provider_label(requested)} is not installed yet. Install it from Model Library or use CPU.")
             self.show_model_start_failure()
@@ -8329,9 +8400,14 @@ class ControlCenter(QMainWindow):
             return
         requested = self.acceleration.recommended_provider() if self.settings.provider == "auto" else self.settings.provider
         if requested == "cpu":
-            self.acceleration_button.setText("CPU ready")
             self.acceleration_button.setEnabled(False)
-            self.set_acceleration_detail("CPU inference is ready. Select CUDA or DirectML to install that provider when the computer supports it.")
+            needs_onnx = Path(self.settings.model_path).suffix.lower() == ".onnx"
+            engine = self.engine.launch_for("cpu", require_model=needs_onnx)[0]
+            self.acceleration_button.setText(self.t("CPU ready" if engine else "CPU engine required"))
+            if engine:
+                self.set_acceleration_detail("CPU inference is ready. Select CUDA or DirectML to install that provider when the computer supports it.")
+            else:
+                self.set_acceleration_detail(self.acceleration.native_build_message(requested))
             return
         if not self.acceleration.supports(requested):
             title = self.engine.provider_label(requested)
@@ -8341,6 +8417,21 @@ class ControlCenter(QMainWindow):
             return
         title = self.engine.provider_label(requested)
         installed = self.acceleration.is_installed(requested)
+        if not installed and (
+            (requested == "cuda" and not self.acceleration.cuda_engine_available())
+            or self.acceleration.setup_files_present(requested)
+        ):
+            self.acceleration_button.setText(f"{title} engine required")
+            self.acceleration_button.setEnabled(False)
+            self.set_acceleration_detail(self.acceleration.native_build_message(requested))
+            return
+        if requested == "cuda" and not installed:
+            from runtime_generations import cuda_setup_present
+            if cuda_setup_present(ROOT):
+                self.acceleration_button.setText(self.t("Refresh CUDA"))
+                self.acceleration_button.setEnabled(not self.acceleration.active)
+                self.set_acceleration_detail("Refresh CUDA to match this build. Existing verified runtime files are reused.")
+                return
         self.acceleration_button.setText(f"{title} {'ready' if installed else 'install'}")
         self.acceleration_button.setEnabled(not self.acceleration.active and not installed)
         self.set_acceleration_detail(
@@ -8618,7 +8709,10 @@ class ControlCenter(QMainWindow):
         provider = self.acceleration.recommended_provider() if self.settings.provider == "auto" else self.settings.provider
         if provider == "cpu":
             return
-        if self.acceleration.is_installed(provider):
+        if (
+            self.acceleration.is_installed(provider) or self.acceleration.setup_files_present(provider)
+            or (provider == "cuda" and not self.acceleration.cuda_engine_available())
+        ):
             self.refresh_acceleration_controls()
             return
         self.acceleration_button.setEnabled(False)
@@ -8634,16 +8728,22 @@ class ControlCenter(QMainWindow):
         if provider in {"cuda", "trt"}:
             self.engine_capabilities.stop()
         title = self.engine.provider_label(provider)
-        if successful:
-            self.log("INFO", f"{title} acceleration is ready.")
-            self.set_acceleration_detail(f"{title} acceleration installed successfully. It will be used on the next capture session.")
-        else:
-            self.log("WARN", f"{title} acceleration installation failed: {message}")
-            self.set_acceleration_detail(f"{title} installation failed: {message}")
         self.refresh_acceleration_controls()
+        if successful and self.acceleration.is_installed(provider):
+            detail = f"{title} acceleration is ready."
+        elif successful:
+            detail = f"{message} {self.acceleration.native_build_message(provider)}"
+        else:
+            detail = f"{title} runtime setup failed: {message}"
+        self.log("INFO" if successful else "WARN", detail)
+        selected = self.acceleration.recommended_provider() if self.settings.provider == "auto" else self.settings.provider
+        if provider == selected:
+            self.set_acceleration_detail(detail)
 
     def show_page(self, key: str) -> None:
         route = key
+        if self._live_coordinator is not None:
+            self._live_coordinator.show_native_page()
         if key == "capture":
             key = "selection"
         self.current_page = key
@@ -8675,9 +8775,9 @@ class ControlCenter(QMainWindow):
         if hasattr(self, "header_page"):
             self.header_page.setText(self.t(PAGE_TITLES.get(route, "Control Center")))
 
-    def settings_search_targets(self) -> list[tuple[str, str, QLabel]]:
+    def settings_search_targets(self) -> list[tuple[str, str, QWidget]]:
         """Index visible setting labels without maintaining a second schema."""
-        targets: list[tuple[str, str, QLabel]] = []
+        targets = [(self.t(PAGE_TITLES["interface"]), self.t("Display language"), self.language_choice)]
         searchable_objects = {"fieldTitle", "policyControlLabel", "policyCardTitle", "pageTitle"}
         for page_key, page in self.pages.items():
             page_title = self.t(PAGE_TITLES.get(page_key, page_key.title()))
@@ -8694,6 +8794,9 @@ class ControlCenter(QMainWindow):
         return sorted(targets, key=lambda item: (item[0].casefold(), item[1].casefold()))
 
     def reveal_setting(self, page_key: str, target: QWidget) -> None:
+        if target is self.language_choice:
+            target.setFocus(Qt.FocusReason.OtherFocusReason)
+            return
         page = self.pages.get(page_key)
         if page is None:
             return
@@ -9234,12 +9337,40 @@ class ControlCenter(QMainWindow):
             self._live_owner.native_changed()
 
     def pipeline_diagnostic_text(self):
+        from pipeline_tools import finite
+
         values = self.pipeline_display_metrics()
         def number(key, unit):
             return self.t('Unavailable') if values[key] is None else f'{values[key]:.1f} {unit}'
-        return self.tf('Fresh frames: {capture} · Completed inferences: {inference}\nSelected observation age: {age} · Accepted output writes: {writes}\nAccepted writes are software reports, not measured physical delivery.',
+        summary = self.tf('Fresh frames: {capture} · Completed inferences: {inference}\nSelected observation age: {age} · Accepted output writes: {writes}\nAccepted writes are software reports, not measured physical delivery.',
             capture=number('capture','/s'), inference=number('inference','/s'),
             age=number('age','ms'), writes=number('writes','/s'))
+        if values['capture'] is None and values['inference'] is None:
+            return summary
+
+        data = self._last_output_data or {}
+        timing = data.get('timing')
+        if not isinstance(timing, dict):
+            return summary
+        lines = [summary]
+        for key, caption in (
+            ('observation_interval', 'Fresh frame interval'),
+            ('capture_acquire', 'Capture wait'),
+            ('model', 'Model execution'),
+            ('completion_interval', 'Inference completion interval'),
+            ('observation_age', 'Frame age after tracking'),
+        ):
+            sample = timing.get(key)
+            if not isinstance(sample, dict) or type(sample.get('count')) is not int or sample['count'] <= 0:
+                continue
+            median, p95 = sample.get('p50_ms'), sample.get('p95_ms')
+            if finite(median) and finite(p95):
+                lines.append(self.tf('{stage}: {median} ms median · {p95} ms p95',
+                    stage=self.t(caption), median=f'{median:.1f}', p95=f'{p95:.1f}'))
+        coalesced = data.get('capture_dxgi_coalesced_frames')
+        if type(coalesced) is int and coalesced >= 0:
+            lines.append(self.tf('DXGI updates combined before acquisition: {count}', count=coalesced))
+        return '\n'.join(lines)
 
     def model_probe_busy(self) -> bool:
         if self.cloud_background_busy():return True
@@ -9272,7 +9403,7 @@ class ControlCenter(QMainWindow):
 
     def _probe_model(self, settings, provider, completed, *, inspection=False):
         from model_probe import ModelProbe, inert_settings
-        executable, environment = self.engine.launch_for(provider)
+        executable, environment = self.engine.launch_for(provider, require_model=True)
         if executable is None:
             from model_probe import ProbeResult
             completed(ProbeResult(False, 'Native engine is unavailable'))

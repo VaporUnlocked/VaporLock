@@ -150,6 +150,20 @@ QPushButton#monitoringMore:disabled, QToolButton#monitoringMore:disabled {{
     color:{muted};
     border-color:{outline};
 }}
+QComboBox#languageChoice {{
+    background:{raised};
+    color:{text};
+    border:{border};
+    border-radius:4px;
+    min-height:24px;
+    padding:3px 10px;
+    font-size:10pt;
+    font-weight:650;
+}}
+QComboBox#languageChoice:hover, QComboBox#languageChoice:focus {{
+    background:{hover};
+    border-color:{accent};
+}}
 QMenu#monitoringPageMenu {{
     background:{panel};
     color:{text};

@@ -1307,6 +1307,24 @@ _ROWS.update({
     'Configure the display language, theme and setup preferences.': ('配置显示语言、主题和设置偏好。', 'Anzeigesprache, Design und Einrichtung konfigurieren.', 'Настройте язык интерфейса, тему и параметры установки.', 'Configurez la langue, le thème et les préférences de configuration.'),
     'Configure the shared calibration shortcut and Windows-wide controls stored with the current profile.': ('配置通用校准快捷键以及随当前配置保存的 Windows 全局控制。', 'Gemeinsames Kalibrierungskürzel und profilgebundene Windows-weite Steuerung konfigurieren.', 'Настройте общий ярлык калибровки и глобальные команды Windows, сохраняемые в текущем профиле.', 'Configurez le raccourci de calibration commun et les commandes globales de Windows enregistrées dans le profil actuel.'),
 })
+_ROWS.update({
+    "Fresh frame interval": ("新帧间隔", "Abstand neuer Bilder", "Интервал между новыми кадрами", "Intervalle entre nouvelles images"),
+    "Capture wait": ("采集等待", "Wartezeit der Erfassung", "Ожидание захвата", "Attente de capture"),
+    "Inference completion interval": ("推理完成间隔", "Abstand zwischen Inferenzabschlüssen", "Интервал между завершениями вывода", "Intervalle entre inférences terminées"),
+    "Frame age after tracking": ("跟踪后的帧龄", "Bildalter nach der Verfolgung", "Возраст кадра после отслеживания", "Âge de l’image après le suivi"),
+    "{stage}: {median} ms median · {p95} ms p95": (
+        "{stage}：中位数 {median} 毫秒 · 第 95 百分位 {p95} 毫秒",
+        "{stage}: {median} ms Median · {p95} ms 95. Perzentil",
+        "{stage}: медиана {median} мс · 95-й процентиль {p95} мс",
+        "{stage} : médiane {median} ms · 95e percentile {p95} ms",
+    ),
+    "DXGI updates combined before acquisition: {count}": (
+        "采集前合并的 DXGI 更新：{count}",
+        "Vor der Erfassung zusammengefasste DXGI-Updates: {count}",
+        "Обновления DXGI, объединённые до захвата: {count}",
+        "Mises à jour DXGI regroupées avant la capture : {count}",
+    ),
+})
 _CASEFOLDED_ROWS = {source.casefold(): row for source, row in _ROWS.items()}
 
 

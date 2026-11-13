@@ -46,6 +46,27 @@ class NativeDirectMLRestore(unittest.TestCase):
                 build.restore_nuget(cache, 'Microsoft.AI.DirectML', build.DIRECTML_VERSION, build.DIRECTML_FILES)
             self.assertEqual(list(cache.iterdir()), [])
 
+    def test_native_onnx_sdk_uses_verified_existing_cuda_archive(self):
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            archive = root / 'cuda-cache.nupkg'
+            with zipfile.ZipFile(archive, 'w') as package:
+                for member in build.ORT_BASE_FILES:
+                    package.writestr(member, b'test')
+                package.writestr(build.ORT_DML_NATIVE + 'onnxruntime_providers_cuda.dll', b'optional')
+            checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+            args = (root / 'build-cache', build.ORT_BASE_PACKAGE, build.ORT_BASE_VERSION, build.ORT_BASE_FILES)
+            with patch.object(build, 'urlopen') as download:
+                with self.assertRaisesRegex(ValueError, 'SHA-256'):
+                    build.restore_nuget(*args, local_archive=archive, sha256='0' * 64)
+                sdk = build.restore_nuget(*args, local_archive=archive, sha256=checksum)
+                download.assert_not_called()
+            self.assertTrue((sdk / 'buildTransitive/native/include/onnxruntime_cxx_api.h').is_file())
+            self.assertTrue((sdk / (build.ORT_DML_NATIVE + 'onnxruntime.dll')).is_file())
+            self.assertFalse((sdk / (build.ORT_DML_NATIVE + 'onnxruntime_providers_cuda.dll')).exists())
+
 
 class PublicManifests(unittest.TestCase):
     def test_refresh_uses_current_source_and_no_private_intake_fields(self):

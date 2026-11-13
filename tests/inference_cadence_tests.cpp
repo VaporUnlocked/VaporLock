@@ -1,4 +1,5 @@
 #include "app/InferenceCadence.h"
+#include "app/CloudCapturePacing.h"
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -12,8 +13,29 @@ static Cadence::Clock::time_point at(double seconds) {
     return Cadence::Clock::time_point{} + std::chrono::duration_cast<Cadence::Clock::duration>(
         std::chrono::duration<double>(seconds));
 }
+
+static void verifyFreshCapturePacing() {
+    using Schedule = vaporlock::pipeline::FreshFrameSchedule;
+    using namespace std::chrono_literals;
+    const auto first = at(1);
+    Schedule schedule;
+    require(!schedule.hasFresh(), "Fresh capture unexpectedly has a startup deadline");
+    require(schedule.commit(first, 256), "First observation rejected");
+    const auto deadline = schedule.next(256);
+    require(deadline == first + Schedule::period(256), "Capture rate deadline drifted");
+    require(!schedule.commit(deadline - Schedule::Clock::duration(1), 256),
+            "Fresh capture exceeded the configured rate");
+    require(schedule.next(256) == deadline, "An early acquisition advanced the capture rate deadline");
+    require(schedule.next(128) == first + Schedule::period(128), "Live rate change retained the old deadline");
+    require(schedule.commit(deadline + 10ms, 256), "Delayed fresh observation was lost");
+    require(schedule.next(256) == deadline + 10ms + Schedule::period(256), "Fresh capture attempted to catch up");
+    schedule.reset();
+    require(!schedule.hasFresh() && schedule.commit(first, 256), "Fresh capture reset retained an old deadline");
+}
+
 int main() {
     try {
+        verifyFreshCapturePacing();
         for (int rate : {30, 60, 120, 144, 240, 256, 360, 1000}) {
             for (int seed = 0; seed < 5; ++seed) {
                 Cadence cadence;

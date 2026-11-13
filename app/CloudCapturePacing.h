@@ -4,10 +4,9 @@
 
 namespace vaporlock::pipeline {
 
-// Rate-limit committed fresh acquisitions. An unsuccessful desktop poll must
-// not consume another image's rate slot. The caller separately bounds its
-// source wait, cancellation and retry work. The caller checks hasFresh() before waiting on the initial deadline.
-class CloudFreshFrameSchedule {
+// Rate-limit committed acquisitions. Pointer updates and unsuccessful polls
+// leave the next image's slot available. The caller bounds the source wait.
+class FreshFrameSchedule {
 public:
     using Clock=std::chrono::steady_clock;
     using Time=Clock::time_point;
@@ -29,4 +28,6 @@ private:
     Time m_last{};
     bool m_valid=false;
 };
+
+using CloudFreshFrameSchedule = FreshFrameSchedule;
 }

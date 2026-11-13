@@ -139,7 +139,7 @@ class NativeLiveCoordinator:
         legacy_layout = QVBoxLayout(self._legacy)
         legacy_layout.setContentsMargins(0, 0, 0, 0)
         legacy_layout.setSpacing(0)
-        while self._layout.count() > 2:
+        while self._layout.count() > 3:
             item = self._layout.takeAt(2)
             widget = item.widget()
             if widget is None:
@@ -147,7 +147,7 @@ class NativeLiveCoordinator:
             legacy_layout.addWidget(widget, 1 if widget.objectName() == 'workspaceShell' else 0)
         self._stack = QStackedWidget(root)
         self._stack.addWidget(self._legacy)
-        self._layout.addWidget(self._stack, 1)
+        self._layout.insertWidget(2, self._stack, 1)
 
         # Overflow scrolls within the existing row. Start, Stop and recovery
         # stay pinned at the right at compact widths and 200% text size.
@@ -520,6 +520,10 @@ class NativeLiveCoordinator:
             self._last_focus = None
         self._center.header_page.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._center.header_page.setFocus()
+
+    def show_native_page(self):
+        if self._stack.currentWidget() is not self._legacy:
+            self._stack.setCurrentWidget(self._legacy)
 
     def _native_focus_changed(self, _old, current):
         if not self._closing and current is not None:

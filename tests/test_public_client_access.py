@@ -128,11 +128,88 @@ class PublicClientTests(unittest.TestCase):
             exe.unlink();single=temporary/'build/windows-release/dml/VaporLockDml.exe';single.parent.mkdir();single.write_bytes(b'not executed')
             self.assertEqual(source_engine(temporary,'dml'),single)
 
+    def test_legacy_synthetic_engine_cannot_admit_cpu_models_or_cuda(self):
+        from native_engine_layout import provider_ready, source_engine
+        from runtime_generations import RuntimeIntegrityError, current_binding
+
+        with fixture() as temporary:
+            release = temporary / 'build/windows-release/Release'
+            release.mkdir(parents=True)
+            engine = release / 'VaporLock.exe'
+            dos_header = bytearray(64)
+            dos_header[:2] = b'MZ'
+            dos_header[60:64] = (64).to_bytes(4, 'little')
+            engine.write_bytes(dos_header + b'PE\x00\x00\x64\x86'
+                               + 'ONNX Runtime was not found when Vapor Lock was built.'.encode('utf-16-le'))
+            for name in ('onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'onnxruntime_providers_cuda.dll'):
+                (release / name).write_bytes(b'not loaded')
+            self.assertEqual(source_engine(temporary, 'cpu'), engine)
+            self.assertTrue(provider_ready(engine, 'cpu'))
+            self.assertFalse(provider_ready(engine, 'cpu', require_model=True))
+            self.assertFalse(provider_ready(engine, 'cuda'))
+            with self.assertRaisesRegex(RuntimeIntegrityError, 'lacks CUDA ONNX support'):
+                current_binding(temporary, require_cuda=True)
+
     def test_native_environment_excludes_inherited_dll_paths(self):
         from native_engine_layout import native_environment
         value=native_environment(Path('C:/source/engine'),{'PATH':'C:/untrusted','PYTHONPATH':'C:/injected','CUDA_PATH':'C:/cuda','USERPROFILE':'safe'})
         self.assertNotIn('C:/untrusted',value['PATH']);self.assertNotIn('PYTHONPATH',value);self.assertNotIn('CUDA_PATH',value)
         self.assertEqual(value['USERPROFILE'],'safe')
+
+    def test_runtime_setup_distinguishes_download_from_engine_readiness(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import vapor_lock_gui as gui
+
+        manager = gui.AccelerationManager(None)
+        manager._provider = "trt"
+        progress, completions = [], []
+        manager.status.connect(progress.append)
+        manager.completed.connect(lambda *result: completions.append(result))
+        manager._read_status_line(b'{"message":"Downloading TensorRT RTX..."}\n')
+        manager._read_status_line(b'{"message":"TensorRT RTX runtime files are installed.","terminal":true}\n')
+        manager._finished(0, gui.QProcess.ExitStatus.NormalExit)
+        self.assertEqual(progress, ["Downloading TensorRT RTX..."])
+        self.assertEqual(completions, [("trt", True, "TensorRT RTX runtime files are installed.")])
+
+        acceleration = Mock()
+        acceleration.is_installed.return_value = False
+        acceleration.native_build_message.return_value = "Build VaporLockTensorRt.exe."
+        center = SimpleNamespace(
+            acceleration=acceleration, engine=SimpleNamespace(provider_label=lambda _provider: "TensorRT RTX"),
+            engine_capabilities=Mock(), log=Mock(), settings=SimpleNamespace(provider="trt"),
+            refresh_acceleration_controls=Mock(), set_acceleration_detail=Mock(),
+        )
+        gui.ControlCenter.acceleration_completed(center, *completions[0])
+        center.log.assert_called_once_with("INFO", "TensorRT RTX runtime files are installed. Build VaporLockTensorRt.exe.")
+        center.set_acceleration_detail.assert_called_once_with(center.log.call_args.args[1])
+
+        manager._read_status_line(b'{"message":"Checksum mismatch.","terminal":true}\n')
+        manager._finished(1, gui.QProcess.ExitStatus.NormalExit)
+        self.assertEqual(completions[-1], ("trt", False, "Checksum mismatch."))
+        self.assertEqual(progress, ["Downloading TensorRT RTX..."])
+
+    def test_source_tensorrt_setup_retains_verified_build_inputs(self):
+        from zipfile import ZipFile
+        import acceleration_install as setup
+
+        with fixture() as temporary:
+            def download(archive_path):
+                with ZipFile(archive_path, "w") as archive:
+                    prefix = setup.TENSORRT_RTX_SDK_DIRECTORY
+                    for member in (*setup.TENSORRT_RTX_SDK_REQUIRED, "include/NvInferRuntime.h"):
+                        archive.writestr(f"{prefix}/{member}", member)
+                    archive.writestr(f"{prefix}/samples/unneeded.exe", "not extracted")
+
+            with patch.object(setup, "download_tensor_rt_rtx", side_effect=download) as downloader, patch.object(setup, "report"):
+                setup.install_tensor_rt_rtx(temporary)
+                setup.install_tensor_rt_rtx(temporary)
+                downloader.assert_called_once()
+            sdk = setup.tensor_rt_sdk_directory(temporary)
+            self.assertTrue(setup.tensor_rt_sdk_present(temporary))
+            self.assertTrue((sdk / "include/NvInferRuntime.h").is_file())
+            self.assertFalse((sdk / "samples").exists())
+            self.assertFalse((temporary / "engine/trt").exists())
 
     @unittest.skipUnless(os.name=='nt', 'Windows Job/pipe smoke')
     def test_source_annotation_worker_owned_ready_close(self):

@@ -38,6 +38,7 @@
 #endif
 #if VAPORLOCK_FORCE_DML
 #include "app/DmlAdapter.h"
+#include "app/DmlSession.h"
 #endif
 #if VAPORLOCK_FORCE_TENSORRT_RTX
 #include "app/TensorRtRtxRuntime.h"
@@ -966,7 +967,7 @@ public:
         m_maskedContent = false; m_recoveryReason = "none";
         m_recovery = vaporlock::CaptureRecovery{};
         m_recovery.reset(AimClock::now());
-        m_dxgiFrames = m_dxgiTimeouts = 0;
+        m_dxgiFrames = m_dxgiTimeouts = m_dxgiCoalescedFrames = 0;
         ++m_sourceGeneration; // Frame IDs remain monotonic on this object.
     }
 
@@ -979,6 +980,7 @@ public:
         const auto started = std::chrono::steady_clock::now();
         m_frameUpdated = false;
         m_presentedAt = {}; m_acquiredAt = {}; m_acquisitionMs = 0;
+        m_dxgiAttempted = false;
         if(cancelled()){m_captureMs=0;return true;}
         const auto geometry = std::make_tuple(config.captureMonitor, config.captureRegion.xOffset,
             config.captureRegion.yOffset, config.captureRegion.width, config.captureRegion.height);
@@ -1012,6 +1014,7 @@ public:
     }
 
     AimTime acquiredAt() const { return m_acquiredAt; }
+    bool dxgiAttempted() const { return m_dxgiAttempted; }
     double acquisitionMilliseconds() const { return m_acquisitionMs; }
     double workMilliseconds() const { return std::max(0.,m_captureMs-m_acquisitionMs); }
     HBITMAP bitmap() const { return m_bitmap; }
@@ -1027,6 +1030,7 @@ public:
     std::uint64_t recoveryTransitions() const { return m_recovery.transitions; }
     std::uint64_t dxgiTimeouts() const { return m_dxgiTimeouts; }
     std::uint64_t dxgiFrames() const { return m_dxgiFrames; }
+    std::uint64_t dxgiCoalescedFrames() const { return m_dxgiCoalescedFrames; }
     AimTime observedAt() const { return m_observedAt; }
     std::int64_t capturedAtMs() const { return m_capturedAtMs; }
     const std::vector<unsigned char>& bgra() const { return m_bgra; }
@@ -1178,12 +1182,13 @@ private:
             resetDxgi();
             return recoverGdi(monitor, region, "dxgi-release-failed", true);
         }
-        // Only the fresh-image-paced Cloud caller supplies a finite wait;
-        // other model paths keep their existing zero-wait polling behavior.
+        // Bounded waits let the source wake an idle inference pipeline as
+        // soon as it publishes an image. The Win32 timer UI still polls.
         if(cancelled())return true;
         const auto acquiring=AimClock::now();
         const HRESULT acquired = m_duplication->AcquireNextFrame(waitMs, &frameInfo, resource.GetAddressOf());
         const auto acquiredAt=AimClock::now();
+        m_dxgiAttempted = true;
         m_acquisitionMs=std::chrono::duration<double,std::milli>(acquiredAt-acquiring).count();
         // AcquireNextFrame cannot be cancelled. Retire an intervening config,
         // shutdown or revocation before copying/committing any image.
@@ -1275,6 +1280,7 @@ private:
         m_acquiredBackend = 1;
         m_maskedContent = frameInfo.ProtectedContentMaskedOut != FALSE;
         ++m_dxgiFrames;
+        if (frameInfo.AccumulatedFrames > 1) m_dxgiCoalescedFrames += frameInfo.AccumulatedFrames - 1;
         m_recovery.presented(AimClock::now());
         m_recoveryReason = "none";
         return true;
@@ -1374,13 +1380,13 @@ private:
     int m_left = 0, m_top = 0;
     double m_captureMs = 0.0, m_acquisitionMs=0.0;
     bool m_frameUpdated = false;
-    bool m_frameAcquired = false;
+    bool m_frameAcquired = false, m_dxgiAttempted = false;
     int m_acquiredBackend = 0, m_committedBackend = 0;
     bool m_maskedContent = false;
     int m_requestedMonitor = 0;
     AimTime m_nextDxgiAttempt{};
     vaporlock::CaptureRecovery m_recovery;
-    std::uint64_t m_dxgiTimeouts = 0, m_dxgiFrames = 0;
+    std::uint64_t m_dxgiTimeouts = 0, m_dxgiFrames = 0, m_dxgiCoalescedFrames = 0;
     const char* m_recoveryReason = "none";
     std::vector<unsigned char> m_bgra;
     Microsoft::WRL::ComPtr<IDXGIAdapter1> m_adapter;
@@ -1587,7 +1593,13 @@ public:
 #endif
 #endif
 #endif
+            constexpr int defaultImageSize = 640;
+#if VAPORLOCK_FORCE_DML
+            auto session = std::make_unique<Ort::Session>(
+                vaporlock::inference::openDmlSession(*environment, path.c_str(), options, defaultImageSize));
+#else
             auto session = std::make_unique<Ort::Session>(*environment, path.c_str(), options);
+#endif
             if (session->GetInputCount() < 1 || session->GetOutputCount() < 1) {
                 error = L"A supported detector must expose at least one image input and one output (found "
                         + std::to_wstring(session->GetInputCount()) + L" input(s), "
@@ -1708,8 +1720,8 @@ public:
                 error = L"This detector supports float or uint8 image inputs. This model uses an unsupported input type.";
                 return false;
             }
-            const int inputHeight = static_cast<int>((nchw ? shape[2] : shape[1]) > 0 ? (nchw ? shape[2] : shape[1]) : 640);
-            const int inputWidth = static_cast<int>((nchw ? shape[3] : shape[2]) > 0 ? (nchw ? shape[3] : shape[2]) : 640);
+            const int inputHeight = static_cast<int>((nchw ? shape[2] : shape[1]) > 0 ? (nchw ? shape[2] : shape[1]) : defaultImageSize);
+            const int inputWidth = static_cast<int>((nchw ? shape[3] : shape[2]) > 0 ? (nchw ? shape[3] : shape[2]) : defaultImageSize);
             if (inputWidth <= 0 || inputHeight <= 0) {
                 error = L"The model input dimensions could not be resolved.";
                 return false;
@@ -4469,7 +4481,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
     vaporlock::InferenceCadence inferenceCadence;
     vaporlock::pipeline::PipelineTiming pipelineTiming;
     vaporlock::pipeline::FrameSchedule frameSchedule;
-    vaporlock::pipeline::CloudFreshFrameSchedule cloudCaptureSchedule;
+    vaporlock::pipeline::FreshFrameSchedule freshCaptureSchedule;
     vaporlock::pipeline::DeadlineWait frameWait;
     AimTime previousLoop{}, previousObservation{}, previousCompletion{};
     const auto started = std::chrono::steady_clock::now();
@@ -4592,9 +4604,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const auto outputGeneration = liveConfig.read(config);
         if(trackingGeneration==outputGeneration)config.frameReference=previousReference;
         const bool cloudCapturePaced=!config.cloudPipe.empty();
-        auto frameDeadline = cloudCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
-        if(cloudCapturePaced && cloudCaptureSchedule.hasFresh()) {
-            if(!frameWait.until(cloudCaptureSchedule.next(config.captureFps),liveConfig.changedEvent(),
+        const bool freshCapturePaced = cloudCapturePaced || (!config.modelPath.empty() && config.captureMonitor > 0);
+        auto frameDeadline = freshCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
+        if(freshCapturePaced && freshCaptureSchedule.hasFresh()) {
+            if(!frameWait.until(freshCaptureSchedule.next(config.captureFps),liveConfig.changedEvent(),
                                [&]{return telemetry.failed();}))continue;
             if(!liveConfig.current(outputGeneration))continue;
         }
@@ -4606,12 +4619,13 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const auto captureCancelled=[&] {
             return telemetry.failed() || !liveConfig.current(outputGeneration);
         };
-        const bool captureOk=cloudCapturePaced ? capture.capture(config,4,captureCancelled) : capture.capture(config);
-        if(!captureOk)return fail("{\"type\":\"error\",\"message\":\"Desktop capture failed\"}",1);
+        const bool captureOk=freshCapturePaced ? capture.capture(config,4,captureCancelled) : capture.capture(config);
         const auto afterCapture=std::chrono::steady_clock::now();
-        if(cloudCapturePaced && capture.freshFrame() && !cloudCaptureSchedule.commit(capture.acquiredAt(),config.captureFps))
-            return fail("{\"type\":\"error\",\"message\":\"Cloud capture violated its fresh-frame rate boundary.\"}",1);
-        if(cloudCapturePaced && captureCancelled()) {++retiredCaptureAttempts;continue;}
+        if(freshCapturePaced && capture.freshFrame() && !freshCaptureSchedule.commit(capture.acquiredAt(),config.captureFps))
+            return fail("{\"type\":\"error\",\"message\":\"Capture violated its fresh-frame rate boundary.\"}",1);
+        if(freshCapturePaced && captureCancelled()) {++retiredCaptureAttempts;continue;}
+        if(!captureOk)return fail("{\"type\":\"error\",\"message\":\"Desktop capture failed\"}",1);
+        if (timingReady && capture.dxgiAttempted()) pipelineTiming.captureAcquire.record(capture.acquisitionMilliseconds());
         const auto sourceIdentity = capture.frameIdentity(outputGeneration);
         const bool sourceChanged = capture.freshFrame() && (trackingSource != sourceIdentity.sourceGeneration
             || trackingGeneration != outputGeneration);
@@ -4635,9 +4649,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
         if (capture.freshFrame()) {
             if (timingReady) {
                 const double wall=std::chrono::duration<double,std::milli>(afterCapture-captureStarted).count();
-                pipelineTiming.capture.record(cloudCapturePaced?capture.workMilliseconds():wall);
+                pipelineTiming.capture.record(capture.workMilliseconds());
                 pipelineTiming.captureWall.record(wall);
-                pipelineTiming.captureAcquire.record(cloudCapturePaced?capture.acquisitionMilliseconds():0.);
                 if (previousObservation >= started + std::chrono::seconds(2))
                     pipelineTiming.observationInterval.record(std::chrono::duration<double,std::milli>(capture.observedAt()-previousObservation).count());
             }
@@ -4716,8 +4729,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
             const auto afterTracking = std::chrono::steady_clock::now();
             detections = static_cast<int>(currentDetections.size());
             captureWallMs=std::chrono::duration<double,std::milli>(afterCapture-captureStarted).count();
-            captureAcquireMs=cloudCapturePaced?capture.acquisitionMilliseconds():0.;
-            captureMs=cloudCapturePaced?capture.workMilliseconds():captureWallMs;
+            captureAcquireMs=capture.acquisitionMilliseconds();
+            captureMs=capture.workMilliseconds();
             inferenceMs = std::chrono::duration<double, std::milli>(afterInference - afterCapture).count();
             preprocessMs = detector.preprocessMilliseconds();
             modelMs = detector.modelMilliseconds();
@@ -4811,6 +4824,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
                       << ",\"capture_acquire_ms\":" << captureAcquireMs
                       << ",\"capture_config_retired_total\":" << retiredCaptureAttempts
                       << ",\"cloud_fresh_capture_pacing\":" << (cloudCapturePaced?"true":"false")
+                      << ",\"fresh_capture_pacing\":" << (freshCapturePaced?"true":"false")
                       << ",\"preprocess_ms\":" << preprocessMs
                       << ",\"model_ms\":" << modelMs
                       << ",\"postprocess_ms\":" << postprocessMs
@@ -4888,6 +4902,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
                    << ",\"capture_recovery_transitions\":" << capture.recoveryTransitions()
                    << ",\"capture_dxgi_timeouts\":" << capture.dxgiTimeouts()
                    << ",\"capture_dxgi_frames\":" << capture.dxgiFrames()
+                   << ",\"capture_dxgi_coalesced_frames\":" << capture.dxgiCoalescedFrames()
                    << ",\"timing\":";
             pipelineTiming.json(report);
             report << ",\"model\":\"" << (config.modelPath.empty() ? "test signal" : "loaded") << "\"}";
@@ -4895,10 +4910,9 @@ int runHeadless(int argc, wchar_t* argv[]) {
             lastReport = reportNow;
         }
 
-        if(cloudCapturePaced) {
-            // A zero/pointer-only return must neither consume a fresh-frame
-            // rate slot nor cause a spin. A normal 4ms source wait needs no
-            // extra delay; a very short unsuccessful call gets a bounded retry.
+        if(freshCapturePaced) {
+            // Keep waiting for the next desktop image without spending another
+            // rate slot. Back off only when the source returned immediately.
             if(!capture.freshFrame() && afterCapture-captureStarted<std::chrono::milliseconds(1))
                 frameWait.until(AimClock::now()+std::chrono::milliseconds(1),liveConfig.changedEvent(),[&]{return telemetry.failed();});
             continue;
