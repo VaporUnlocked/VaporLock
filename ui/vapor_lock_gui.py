@@ -82,6 +82,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -400,7 +401,7 @@ DEFAULT_UI_OPACITIES = {name: 100 for name, _label, _value in UI_COLOR_ROLES}
 
 @dataclass
 class UiAppearance:
-    layout: str = "mission-control"
+    layout: str = "monitoring"
     colors: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_UI_COLORS))
     opacities: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_UI_OPACITIES))
     custom_palettes: dict[str, dict] = field(default_factory=dict)
@@ -1014,7 +1015,11 @@ class InitializationWizard(QDialog):
         for model in models:
             self.model_choice.addItem(model.relative_to(ROOT / "models").as_posix(), str(model))
         current_model = str(resolve_product_path(self.settings.model_path)) if self.settings.model_path else ""
-        self.model_choice.setCurrentIndex(max(0, self.model_choice.findData(aliases.get(current_model, current_model))))
+        current_index = self.model_choice.findData(aliases.get(current_model, current_model))
+        if current_model and current_index < 0:
+            self.model_choice.addItem(f"{Path(current_model).name} ({self.t('Unavailable')})", current_model)
+            current_index = self.model_choice.count() - 1
+        self.model_choice.setCurrentIndex(max(0, current_index))
         self._field(layout, "Detection model", "Models already in the local models folder are available here.", self.model_choice)
         self.provider_choice = QComboBox()
         for label, value in (("DirectML (recommended default)", "dml"), ("Automatic", "auto"), ("CPU", "cpu"), ("CUDA", "cuda"), ("TensorRT", "tensorrt")):
@@ -3395,6 +3400,8 @@ PAGE_TITLES = {
     "diagnostics": "Status & Diagnostics",
 }
 
+PRIMARY_PAGES = ("overview", "capture", "detection", "selection", "output", "dataset")
+
 
 class ControlCenter(QMainWindow):
     # HTTP worker threads never touch Qt widgets directly. Commands cross this
@@ -3414,7 +3421,7 @@ class ControlCenter(QMainWindow):
         self._live_close = None
         self._native_closing = False
         self._profile_transition_pending = False
-        self.settings = Settings()
+        self.settings = self.prepare_default_profile()
         self._tuning_lock = TuningLock(self)
         self._policy_start_pending = False
         self.ui_appearance = load_ui_appearance()
@@ -3438,8 +3445,9 @@ class ControlCenter(QMainWindow):
         self._last_output_data = None
         self.dirty = False
         self.pages: dict[str, QWidget] = {}
-        self.nav: dict[str, QPushButton] = {}
-        self.current_page = "games"
+        self.nav: dict[str, QPushButton | QAction] = {}
+        self.current_page = "overview"
+        self.current_route = "overview"
         self._model_selection = None
         self._pipeline_received_at = 0.0
         self._model_probes = []
@@ -3538,7 +3546,7 @@ class ControlCenter(QMainWindow):
         install_window_guard(self)
         self.sync_local_api()
         self.refresh_local_api_snapshot()
-        self.show_page("games")
+        self.show_page("overview")
         self.log("INFO", "Qt control center ready. Native engine is idle.")
         if _NATIVE_INJECTION is None:
             QTimer.singleShot(0, self.register_global_hotkeys)
@@ -3549,18 +3557,14 @@ class ControlCenter(QMainWindow):
             self._initialization_timer.setSingleShot(True)
             self._initialization_timer.timeout.connect(self.offer_initialization)
             self._initialization_timer.start(250)
-        if live_resources is not None:
-            from vlui_native_owner import NativeLiveOwner
-            from vlui_native_shell import NativeLiveCoordinator
-            self._live_owner = NativeLiveOwner(self)
-            self._live_coordinator = NativeLiveCoordinator(self, self._live_owner, live_resources)
-            from vlui_native_close import NativeCloseOwner
-            self._live_close = NativeCloseOwner(self)
+        from vlui_native_owner import NativeLiveOwner
+        from vlui_native_shell import NativeLiveCoordinator
+        from vlui_native_close import NativeCloseOwner
+        self._live_owner = NativeLiveOwner(self)
+        self._live_coordinator = NativeLiveCoordinator(self, self._live_owner, live_resources)
+        self._live_close = NativeCloseOwner(self)
 
     def build_shell(self) -> None:
-        # One continuous Vapor Lock image sits behind the entire command deck.
-        # The command bar, navigation, and workspace each carry only a smoked
-        # glass layer so the product feels like a single control surface.
         root = WorkspaceBackdrop()
         root.setObjectName("root")
         self.workspace_root = root
@@ -3570,6 +3574,7 @@ class ControlCenter(QMainWindow):
         layout.setSpacing(0)
         top = QFrame()
         top.setObjectName("commandBar")
+        top.setProperty("monitoringToolbar", True)
         top.setFixedHeight(72)
         self.command_bar = top
         from mission_layout import MeasuredHeaderLayout
@@ -3672,7 +3677,7 @@ class ControlCenter(QMainWindow):
         self.start_button = QPushButton("Start")
         self.start_button.setObjectName("primaryButton")
         self.start_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-        self.start_button.setMinimumWidth(140)
+        self.start_button.setMinimumWidth(94)
         self.start_button.setToolTip("Start capture")
         self.start_button.clicked.connect(self.start_capture)
         top_layout.addWidget(self.start_button)
@@ -3685,7 +3690,7 @@ class ControlCenter(QMainWindow):
         layout.addWidget(top)
         shell = QFrame()
         shell.setObjectName("workspaceShell")
-        shell_layout = QHBoxLayout(shell)
+        shell_layout = QVBoxLayout(shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
         self.navigation_deck = self.make_navigation_deck()
@@ -3707,8 +3712,7 @@ class ControlCenter(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, "command_bar"):
             self.update_header_density()
-        if hasattr(self, "session_cockpit_grid") and hasattr(self, "session_cockpit_cards"):
-            self.update_overview_grid()
+        self.update_overview_grid()
         if hasattr(self, "policy_reason_scroll"):
             self.size_policy_reason()
         self.update_targeting_layout()
@@ -3767,7 +3771,7 @@ class ControlCenter(QMainWindow):
         if not hasattr(self, "policy_deck_layout"):
             return
         scale = float(getattr(self._live_owner, '_scale', '1'))
-        stacked = self.width() - self.navigation_deck.width() < round(1000 * scale)
+        stacked = self.stack.width() < round(1000 * scale)
         rules_active=(getattr(self,'current_page','')=='selection' and hasattr(self,'targeting_tabs')
                       and self.targeting_tabs.currentIndex()==self.targeting_tabs.index_of('Class rules'))
         self.policy_deck_layout.setDirection(QHBoxLayout.Direction.TopToBottom if stacked else QHBoxLayout.Direction.LeftToRight)
@@ -3806,19 +3810,8 @@ class ControlCenter(QMainWindow):
         compact = self.width() < 1160
         self.save_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly if compact else Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.save_button.setText(self.t('Save profile'))
-        if hasattr(self, 'navigation_deck'):
-            factor = float(getattr(self._live_owner, '_scale', '1'))
-            base = 220 if self.ui_appearance.layout=='mission-control' else 210 if theme_for(self.ui_appearance.layout).high_contrast else 196
-            self.navigation_deck.setFixedWidth(min(round(base * factor), max(base, round(self.width() * .3))))
-        if hasattr(self, 'guide_link'):
-            title = self.t('Settings guide')
-            width = max(80, self.navigation_deck.width() - 40 - self.guide_link.iconSize().width())
-            multiline = self.guide_link.fontMetrics().horizontalAdvance(title) > width and ' ' in title
-            self.guide_link.setText(title.replace(' ', '\n', 1) if multiline else title)
-            self.guide_link.setAccessibleName(title)
-            self.guide_link.setMinimumHeight(max(36, self.guide_link.fontMetrics().lineSpacing() * (2 if multiline else 1) + 10))
-        for label in (self.context_kicker, self.quick_profile_label, self.session_mode_label, self.quick_model_label):
-            label.setVisible(not compact or self.ui_appearance.layout=='mission-control')
+        for label in (self.quick_profile_label, self.session_mode_label, self.quick_model_label):
+            label.show()
         self.command_bar.layout().setContentsMargins(*(14, 10, 14, 10) if compact else (24, 10, 24, 10))
         self.command_bar.layout().setSpacing(8 if compact else 11)
         if hasattr(self, "overview_release"):
@@ -3828,96 +3821,34 @@ class ControlCenter(QMainWindow):
             coordinator._size_command_row()
 
     def update_overview_grid(self) -> None:
-        columns = 1 if self.width() < 1100 else 3
-        grid = self.session_cockpit_grid
-        if getattr(self, "_overview_grid_columns", None) == columns and grid.count() == len(self.session_cockpit_cards):
-            return
-        for card in self.session_cockpit_cards:
-            grid.removeWidget(card)
-        for index, card in enumerate(self.session_cockpit_cards):
-            grid.addWidget(card, index // columns, index % columns)
-        for column in range(4):
-            grid.setColumnStretch(column, 1 if column < columns else 0)
-        self._overview_grid_columns = columns
+        if hasattr(self, "_monitoring_preview_viewport"):
+            width = self._monitoring_columns.left.width()
+            self._monitoring_preview_viewport.setMinimumHeight(max(270, min(420, width * 9 // 16)))
 
     def make_navigation_deck(self) -> QWidget:
+        from mission_layout import ActionFlow, ActionRow
+
         deck = QFrame()
-        deck.setObjectName("navigationDeck")
-        deck.setFixedWidth(196)
-        deck_layout = QVBoxLayout(deck)
-        deck_layout.setContentsMargins(0, 0, 0, 0)
-        deck_layout.setSpacing(0)
-        identity = QWidget()
-        identity_layout = QVBoxLayout(identity)
-        identity_layout.setContentsMargins(16, 16, 16, 10)
-        identity_layout.setSpacing(6)
-        logo = QLabel()
-        logo.setObjectName("navigationLogo")
-        logo.setAccessibleName("VaporLock")
-        logo.setProperty("_vaporlock_i18n_skip", True)
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        assets = Path(sys._MEIPASS) / "assets" if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1] / "assets"
-        logo.setPixmap(QPixmap(str(assets / "VaporLock.png")).scaled(
-            104, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        identity_layout.addWidget(logo)
-        deck_layout.addWidget(identity)
-        scroll = QScrollArea()
-        scroll.setObjectName("navigationScroll")
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        content = QWidget()
-        content.setObjectName("navigationContent")
-        content.setMinimumWidth(0)
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(8, 14, 8, 14)
-        layout.setSpacing(2)
-        for group, items in (
-            ("LIBRARY", (("games", "Games"), ("profiles", "Profiles"), ("model", "Model Library"))),
-            ("WORKSPACE", (("overview", "Overview"), ("detection", "Detection"), ("selection", "Targeting"), ("output", "Movement"))),
-            ("TOOLS", (("dataset", "Training Data"), ("shortcuts", "Shortcuts"), ("automation", "API Suite"), ("diagnostics", "Status & Diagnostics"), ("misc", "Misc"))),
-        ):
-            label = QLabel(group)
-            label.setObjectName("navGroup")
-            layout.addWidget(label)
-            for key, title in items:
-                button = QPushButton(title)
-                button.setCheckable(True)
-                button.setFlat(True)
-                button.setObjectName("navButton")
-                button.setIcon(self.navigation_icon(key))
-                button.setToolTip(title)
-                button.setMinimumHeight(36)
-                button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-                button.clicked.connect(lambda _checked=False, page=key: self.show_page(page))
-                self.nav[key] = button
-                layout.addWidget(button)
-            if group != "TOOLS":
-                layout.addSpacing(7)
-        layout.addStretch(1)
-        scroll.setWidget(content)
-        deck_layout.addWidget(scroll)
-        footer = QWidget()
-        footer_layout = QVBoxLayout(footer)
-        footer_layout.setContentsMargins(8, 8, 8, 14)
-        guide = QPushButton("Settings guide")
-        guide.setObjectName("guideLink")
-        guide.setFlat(True)
-        guide.setMinimumHeight(36)
-        guide.clicked.connect(lambda: self.open_settings_guide())
-        guide.setToolTip("Open the bundled guide in your browser.")
-        self.guide_link = guide
-        guide.setProperty("missionIcon", "book")
-        footer_layout.addWidget(guide)
-        for title, attribute in (("Appearance", "interface_layout_choice"), ("Language", "language_choice")):
+        deck.setObjectName("monitoringNavigation")
+        deck_layout = QHBoxLayout(deck)
+        deck_layout.setContentsMargins(18, 7, 18, 7)
+        deck_layout.setSpacing(15)
+        brand = QLabel("VaporLock")
+        brand.setObjectName("monitoringBrand")
+        deck_layout.addWidget(brand)
+        tabs = ActionRow()
+        layout = ActionFlow(tabs)
+        layout.setSpacing(5)
+        for key in PRIMARY_PAGES:
+            title = PAGE_TITLES[key]
             button = QPushButton(title)
-            button.setObjectName("navButton")
-            button.setMinimumHeight(36)
-            button.setProperty("missionIcon", "display" if title == "Appearance" else "globe")
-            button.clicked.connect(lambda _checked=False, name=attribute: self.reveal_setting("interface", getattr(self, name)))
-            footer_layout.addWidget(button)
-        deck_layout.addWidget(footer)
+            button.setObjectName("monitoringTab")
+            button.setCheckable(True)
+            button.setToolTip(title)
+            button.clicked.connect(lambda _checked=False, page=key: self.show_page(page))
+            self.nav[key] = button
+            layout.addWidget(button)
+        deck_layout.addWidget(tabs, 1)
         return deck
 
     def make_telemetry_strip(self) -> QWidget:
@@ -3969,9 +3900,6 @@ class ControlCenter(QMainWindow):
         edition.setWordWrap(True)
         layout.addWidget(edition, 0, len(self.telemetry_widgets))
         self.telemetry_widgets.append(edition)
-        for title,symbol,callback in (('Settings guide','book',self.open_settings_guide),('Diagnostics','pulse',lambda:self.show_page('diagnostics'))):
-            link=QPushButton(title);link.setProperty('missionIcon',symbol);link.clicked.connect(callback)
-            layout.addWidget(link,0,len(self.telemetry_widgets));self.telemetry_widgets.append(link)
         scroll = self.telemetry_scroll = QScrollArea()
         scroll.setObjectName('telemetryScroll')
         scroll.setAccessibleName('Session status')
@@ -3983,13 +3911,35 @@ class ControlCenter(QMainWindow):
         scroll.setWidget(strip)
         scroll.viewport().installEventFilter(self)
         strip.setAutoFillBackground(False)
+        footer = QFrame()
+        footer.setObjectName("monitoringFooter")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(0, 0, 14, 4)
+        footer_layout.setSpacing(8)
+        footer_layout.addWidget(scroll, 1)
+        self.more_tabs_button = QToolButton()
+        self.more_tabs_button.setObjectName("monitoringMore")
+        self.more_tabs_button.setText("More tabs")
+        self.more_tabs_button.setToolTip("Open the remaining Vapor Lock tabs")
+        self.more_tabs_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(self.more_tabs_button)
+        menu.setObjectName("monitoringPageMenu")
+        for key in ("model", "games", "profiles", "shortcuts", "automation", "diagnostics", "misc", "interface"):
+            action = menu.addAction(PAGE_TITLES[key])
+            action.setCheckable(True)
+            action.triggered.connect(lambda _checked=False, page=key: self.show_page(page))
+            self.nav[key] = action
+        menu.addSeparator()
+        menu.addAction("Settings guide", lambda: self.open_settings_guide())
+        self.more_tabs_button.setMenu(menu)
+        footer_layout.addWidget(self.more_tabs_button, 0, Qt.AlignmentFlag.AlignBottom)
         self.update_telemetry_layout()
-        return scroll
+        return footer
 
     def navigation_icon(self, page: str):
         from mission_icons import icon, NAVIGATION
         palette = appearance_palette(self.ui_appearance, True)
-        return icon(NAVIGATION[page], palette['ice'], palette['baby'], palette['steel'])
+        return icon(NAVIGATION.get(page, 'display'), palette['ice'], palette['baby'], palette['steel'])
 
     def new_page(self, title: str, subtitle: str, include_heading: bool = True) -> tuple[QScrollArea, QVBoxLayout]:
         scroll = QScrollArea()
@@ -4218,16 +4168,19 @@ class ControlCenter(QMainWindow):
         if save and not save_ui_appearance(self.ui_appearance):
             self.log("WARN", "Windows could not save the interface appearance preference.")
         scale = getattr(self._live_owner, '_scale', '1')
-        self.setStyleSheet(scaled_native_stylesheet(ui_stylesheet(self.ui_appearance, True), scale))
+        from monitoring_styles import monitoring_stylesheet
+        palette = appearance_palette(self.ui_appearance, True)
+        self.setStyleSheet(scaled_native_stylesheet(ui_stylesheet(self.ui_appearance, True), scale)
+                           + monitoring_stylesheet(self.ui_appearance, palette, scale))
         if hasattr(self, "workspace_root"):
             self.workspace_root.set_appearance(self.ui_appearance, True)
         self.refresh_session_cockpit()
-        palette = appearance_palette(self.ui_appearance, True)
         cloud_workspace=getattr(getattr(self,'_cloud_suite',None),'workspace',None)
         if cloud_workspace is not None:cloud_workspace.apply_palette()
         for page, button in self.nav.items():
             button.setIcon(self.navigation_icon(page))
-            button.setIconSize(QSize(round(20*float(scale)), round(20*float(scale))))
+            if isinstance(button, QPushButton):
+                button.setIconSize(QSize(round(16*float(scale)), round(16*float(scale))))
         from mission_icons import apply as apply_icon
         for name, symbol in (("start_button", "start"), ("stop_button", "stop"),
                 ("save_button", "save"), ("undo_button", "undo"),
@@ -4264,9 +4217,6 @@ class ControlCenter(QMainWindow):
             self.palette_status.setText(self.t("Customized palette" if customized else "Theme defaults"))
         if hasattr(self, "command_bar"):
             self.command_bar.setFixedHeight(round((78 if contrast else 72) * float(scale)))
-        if hasattr(self, "navigation_deck"):
-            base = 210 if contrast else 196
-            self.navigation_deck.setFixedWidth(min(round(base * float(scale)), max(base, round(self.width() * .3))))
         margins = (22, 18, 22, 25) if contrast else (27, 12, 27, 12)
         for content in self.findChildren(QWidget, "pageContent"):
             if content.layout() is not None:
@@ -4442,7 +4392,7 @@ class ControlCenter(QMainWindow):
             source_title = kicker.property("_vaporlock_i18n_page_title")
             if source_title:
                 kicker.setText(f"VAPOR LOCK / {self.t(str(source_title)).upper()}")
-        self.header_page.setText(self.t(PAGE_TITLES.get(self.current_page, "Control Center")))
+        self.header_page.setText(self.t(PAGE_TITLES.get(self.current_route, "Control Center")))
         self.setWindowTitle(f"Vapor Lock · {self.t('Control Center')}")
         self.edition_summary.setText(PRODUCT_VERSION)
         self.edition_summary.setToolTip(f"Vapor Lock {PRODUCT_VERSION}")
@@ -4541,6 +4491,7 @@ class ControlCenter(QMainWindow):
         self.apply_ui_appearance(save=False)
 
     def rebuild_pages(self) -> None:
+        route = self.current_route
         dialog=getattr(self,"_crosshair_dialog",None)
         if dialog:dialog.reject()
         for name in ('annotation_assist','observation_sharing'):
@@ -4572,12 +4523,13 @@ class ControlCenter(QMainWindow):
                 getattr(self, name).setText(text)
         self.capture_interface_copy()
         self.apply_interface_language()
-        self.show_page(self.current_page)
+        self.show_page(route)
         self.set_targeting_inspector_tab(inspector_index)
         for index, value in enumerate(inspector_scrolls):
             scroll = self.targeting_inspector_stack.widget(index)
             QTimer.singleShot(0, lambda scroll=scroll, value=value: scroll.verticalScrollBar().setValue(value))
         self.log_view.setPlainText(log_text)
+        self._refresh_monitoring_activity()
         for attribute in ("preview_view", "policy_preview_view"):
             if hasattr(self, attribute):
                 getattr(self, attribute).set_frame(frame)
@@ -4588,117 +4540,132 @@ class ControlCenter(QMainWindow):
                 QTimer.singleShot(0, lambda page=page, value=scrolls[key]: page.verticalScrollBar().setValue(value))
 
     def overview_page(self) -> QWidget:
-        page, layout = self.new_page("Session overview", "Review capture, model and movement setup before starting a session.")
-        from mission_layout import TaskColumns,TaskCard
-        overview_columns=TaskColumns(proportions=(60,40))
-        for panel in (overview_columns.left,overview_columns.right):panel.setObjectName('missionTaskColumn')
-        preview_card=TaskCard('Live preview','display')
-        config_card=TaskCard('Current configuration','gear')
-        overview_columns.left_layout.addWidget(preview_card,1)
-        overview_columns.right_layout.addWidget(config_card)
-        self._overview_preview_slot=preview_card.body
-        notice = QFrame()
-        notice.setObjectName("signalPanel")
-        notice_layout = QVBoxLayout(notice)
-        notice_layout.setContentsMargins(10, 8, 10, 8)
-        notice_layout.setSpacing(6)
-        signal_copy = QVBoxLayout()
-        signal_copy.setSpacing(3)
-        signal_label = QLabel("LOCAL SESSION")
-        signal_label.setObjectName("signalCaption")
+        page, overview_layout = self.new_page("Session monitor", "Monitor live capture, pipeline timing and output status.")
+        from mission_layout import ActionFlow, ActionRow, TaskCard, TaskColumns
+
+        overview_columns = TaskColumns(proportions=(60, 40))
+        self._monitoring_columns = overview_columns
+        overview_layout.addWidget(overview_columns, 1)
+        for panel in (overview_columns.left, overview_columns.right):
+            panel.setObjectName("missionTaskColumn")
+
+        preview_card = TaskCard("Live preview", "display")
+        preview_card.setObjectName("monitoringPreview")
+        self._monitoring_preview_viewport = QWidget()
+        self._monitoring_preview_viewport.setMinimumHeight(300)
+        self._overview_preview_slot = QVBoxLayout(self._monitoring_preview_viewport)
+        self._overview_preview_slot.setContentsMargins(0, 0, 0, 0)
+        preview_card.body.addWidget(self._monitoring_preview_viewport, 1)
+        overview_columns.left_layout.addWidget(preview_card)
+
+        activity_card = TaskCard("Session activity", "pulse")
+        activity_card.setObjectName("monitoringActivity")
+        self._monitoring_activity = QLabel()
+        self._monitoring_activity.setObjectName("detail")
+        self._monitoring_activity.setProperty("_vaporlock_i18n_skip", True)
+        self._monitoring_activity.setTextFormat(Qt.TextFormat.PlainText)
+        self._monitoring_activity.setWordWrap(True)
+        self._monitoring_activity.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        activity_card.body.addWidget(self._monitoring_activity)
+        overview_columns.left_layout.addWidget(activity_card)
+        overview_columns.left_layout.addStretch(1)
+
+        metrics = QFrame()
+        metrics.setObjectName("monitoringMetrics")
+        metrics_grid = QGridLayout(metrics)
+        metrics_grid.setContentsMargins(0, 0, 0, 0)
+        metrics_grid.setSpacing(8)
+        self._monitoring_metrics = {}
+        for index, (key, title) in enumerate((
+            ("capture", "Capture rate"), ("inference", "Inference time"),
+            ("tracks", "Active tracks"), ("output", "Output state"),
+        )):
+            card, value = self.metric_card(title)
+            card.setObjectName("monitoringMetric")
+            value.setObjectName("monitoringValue")
+            value.setWordWrap(True)
+            self._monitoring_metrics[key] = value
+            metrics_grid.addWidget(card, index // 2, index % 2)
+        metrics_grid.setColumnStretch(0, 1)
+        metrics_grid.setColumnStretch(1, 1)
+        self.metric_tracks = self._monitoring_metrics["tracks"]
+        overview_columns.right_layout.addWidget(metrics)
+
+        def add_readout(card: QVBoxLayout, title: str) -> QLabel:
+            row = QHBoxLayout()
+            caption = QLabel(title)
+            caption.setObjectName("detail")
+            caption.setWordWrap(True)
+            value = QLabel()
+            value.setObjectName("monitoringTimingValue")
+            value.setWordWrap(True)
+            value.setTextFormat(Qt.TextFormat.PlainText)
+            value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(caption, 1)
+            row.addWidget(value, 1)
+            card.addLayout(row)
+            return value
+
+        timing = TaskCard("Pipeline timing", "pulse")
+        timing.setObjectName("monitoringPipeline")
+        timing.body.setContentsMargins(14, 12, 14, 12)
+        timing.body.setSpacing(5)
+        self._monitoring_timing = {
+            key: add_readout(timing.body, title) for key, title in (
+                ("capture_ms", "Capture"), ("preprocess_ms", "Preprocessing"),
+                ("model_ms", "Model"), ("postprocess_ms", "Postprocessing"), ("tracking_ms", "Tracking"),
+            )
+        }
+        self.metric_fps = add_readout(timing.body, "Processing rate")
+        self.metric_fps.setText("-")
+        overview_columns.right_layout.addWidget(timing)
+
+        config_card = TaskCard("Current configuration", "gear")
+        config_card.setObjectName("monitoringReadiness")
+        config_card.body.setContentsMargins(14, 12, 14, 12)
+        config_card.body.setSpacing(5)
+        self.metric_state = add_readout(config_card.body, "Session state")
+        self.metric_state.setText(self.localized_engine_state(self._last_engine_state))
+        self.metric_target = add_readout(config_card.body, "Current lock")
+        self.metric_target.setText(self.t("No lock"))
         self.readiness = QLabel()
         self.readiness.setObjectName("signalValue")
+        self.readiness.setTextFormat(Qt.TextFormat.PlainText)
         self.readiness.setWordWrap(True)
-        self.readiness_detail = QLabel("Local session status")
+        config_card.body.addWidget(self.readiness)
+        self.readiness_detail = QLabel("Local session status", config_card)
         self.readiness_detail.setObjectName("detail")
         self.readiness_detail.setToolTip("The control center exchanges lightweight commands and telemetry with the native engine.")
-        signal_copy.addWidget(signal_label)
-        signal_copy.addWidget(self.readiness)
-        notice_layout.addWidget(self.readiness)
-        signal_label.setParent(notice);signal_label.hide()
-        details = QHBoxLayout()
-        details.setSpacing(24)
-        provider = QVBoxLayout()
-        provider.setSpacing(3)
-        provider_label = QLabel("PROVIDER")
-        provider_label.setObjectName("signalCaption")
-        self.overview_provider = QLabel()
-        self.overview_provider.setObjectName("signalValue")
-        provider.addWidget(provider_label)
-        provider.addWidget(self.overview_provider)
-        model = QVBoxLayout()
-        model.setSpacing(3)
-        model_label = QLabel("MODEL")
-        model_label.setObjectName("signalCaption")
-        self.overview_model = QLabel()
-        self.overview_model.setObjectName("signalValue")
-        model.addWidget(model_label)
-        model.addWidget(self.overview_model)
-        details.addLayout(provider)
-        details.addLayout(model)
-        # Model/provider are shown as configuration rows below, not a second
-        # oversized summary. Keep the existing readout objects for updates.
-        for item in (provider_label,self.overview_provider,model_label,self.overview_model):
-            item.setParent(notice);item.hide()
-        release = QLabel(f"Vapor Lock {PRODUCT_VERSION}")
-        release.setObjectName("signalCaption")
-        release.setProperty("_vaporlock_i18n_skip", True)
-        self.overview_release = release
-        release.setParent(notice);release.hide()
-        self.overview_configuration=QLabel()
+        self.readiness_detail.hide()
+        self.overview_configuration = QLabel()
         self.overview_configuration.setTextFormat(Qt.TextFormat.PlainText)
         self.overview_configuration.setWordWrap(True)
         config_card.body.addWidget(self.overview_configuration)
-        config_card.body.addWidget(notice)
-        cockpit = QGridLayout()
-        cockpit.setHorizontalSpacing(9)
-        cockpit.setVerticalSpacing(9)
-        self.session_cockpit: dict[str, tuple[QLabel, QPushButton]] = {}
+        self.session_cockpit = {
+            key: (add_readout(config_card.body, caption), None)
+            for key, caption in (("frame", "Capture source"), ("output", "Movement output"))
+        }
+        self.session_cockpit["pipeline"] = (add_readout(config_card.body, "Model readiness"), None)
+        overview_columns.right_layout.addWidget(config_card)
+        overview_columns.right_layout.addStretch(1)
 
-        def cockpit_card(key: str, caption: str, action: str, callback) -> QFrame:
-            card=TaskCard(caption,{'pipeline':'model','frame':'display','output':'movement','setup':'gear'}[key])
-            value=QLabel();value.setObjectName('detail');card.body.addWidget(value)
-            value.setWordWrap(True)
-            button = QPushButton(action)
-            button.setObjectName("compactButton")
-            button.clicked.connect(callback)
-            card.layout().addWidget(button)
-            self.session_cockpit[key] = (value, button)
-            return card
-
-        cards = [
-            cockpit_card("frame", "Capture source", "Capture settings", lambda: self.show_page("capture")),
-            cockpit_card("pipeline", "Model", "Model library", lambda: self.show_page("model")),
-            cockpit_card("output", "Movement output", "Movement settings", lambda: self.show_page("output")),
-        ]
-        layout.addLayout(cockpit)
-        self.session_cockpit_grid = cockpit
-        self.session_cockpit_cards = cards
-        self.update_overview_grid()
-        layout.addWidget(overview_columns,1)
-        setup_card=cockpit_card('setup','Initialization','Setup and calibration',self.open_setup_and_calibration)
-        from mission_layout import ActionFlow
-        setup_actions=QWidget();setup_flow=ActionFlow(setup_actions)
-        setup_flow.addWidget(self.session_cockpit['setup'][1])
-        # Keep the readiness text associated with its existing action.
-        setup_flow.addWidget(self.session_cockpit['setup'][0])
-        setup_card.deleteLater()
-        layout.addWidget(setup_actions)
+        setup_actions = ActionRow()
+        setup_flow = ActionFlow(setup_actions)
+        setup_button = QPushButton("Setup and calibration")
+        setup_button.setObjectName("compactButton")
+        setup_button.clicked.connect(self.open_setup_and_calibration)
+        setup_flow.addWidget(setup_button)
         self.testing_suite_button = QPushButton("Open testing grounds")
         self.testing_suite_button.setObjectName("openTestingGrounds")
         self.testing_suite_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.testing_suite_button.clicked.connect(self.open_testing_suite)
         self.testing_suite_button.setToolTip('Open the standalone practice range. Capture and movement remain under your control.')
         setup_flow.addWidget(self._tuning_lock.wrap(self.testing_suite_button))
-        metrics = QGridLayout()
-        state, self.metric_state = self.metric_card("Session state")
-        fps, self.metric_fps = self.metric_card("Processing rate")
-        tracks, self.metric_tracks = self.metric_card("Active tracks")
-        target, self.metric_target = self.metric_card("Current lock")
-        for index,card in enumerate((state, fps, tracks, target)):
-            metrics.addWidget(card,index//2,index%2)
-        config_card.body.addLayout(metrics)
-        overview_layout=layout
+        activity_card.body.addWidget(setup_actions)
+        self.session_cockpit["setup"] = (add_readout(config_card.body, "Initialization"), setup_button)
+        self._refresh_monitoring_metrics()
+        self._refresh_monitoring_activity()
+
         self._interface_page, interface_outer = self.new_page('Interface & Language','Configure the display language, theme and setup preferences.')
         from mission_layout import TaskColumns,TaskCard
         interface_columns=TaskColumns(proportions=(1,1))
@@ -5310,7 +5277,7 @@ class ControlCenter(QMainWindow):
         inspector_tabs.setContentsMargins(0, 0, 0, 0)
         inspector_tabs.setSpacing(2)
         self.targeting_inspector_buttons: list[QPushButton] = []
-        for tab_index, title in enumerate(("Capture", "Policy", "Tuning")):
+        for tab_index, title in ((1, "Controls"), (2, "Tuning")):
             button = QPushButton(title)
             button.setObjectName("secondaryTabButton")
             button.setCheckable(True)
@@ -5574,10 +5541,12 @@ class ControlCenter(QMainWindow):
         policy_body=self.targeting_inspector_stack.widget(1).widget().layout()
         policy_body.insertWidget(max(0,policy_body.count()-1),policy_content)
         def show_task(index):
+            if index != 0 and self.current_route == "capture":
+                self._select_navigation("selection")
             self.targeting_inspector_stack.setVisible(index==0)
             task_tabs.setVisible(index!=0)
-            for button in self.targeting_inspector_buttons:button.setVisible(index==0)
             if index==0:self.set_targeting_inspector_tab(1)
+            self._update_targeting_navigation()
             self.update_targeting_layout()
             inspector.updateGeometry()
         task_tabs._stack.currentChanged.connect(show_task)
@@ -5605,12 +5574,25 @@ class ControlCenter(QMainWindow):
             return
         if not 0 <= index < self.targeting_inspector_stack.count():
             return
-        if getattr(self,'_mission_target_routes_ready',False):self.targeting_tabs.setCurrentIndex(0)
+        routes_ready = getattr(self, "_mission_target_routes_ready", False)
+        if routes_ready:
+            self.targeting_tabs.setCurrentIndex(0)
         self.targeting_inspector_stack.setCurrentIndex(index)
-        for button_index, button in enumerate(self.targeting_inspector_buttons):
+        for button_index, button in enumerate(self.targeting_inspector_buttons, start=1):
             button.blockSignals(True)
             button.setChecked(button_index == index)
             button.blockSignals(False)
+        if routes_ready and self.current_page == "selection":
+            self._select_navigation("capture" if index == 0 else "selection")
+        self._update_targeting_navigation()
+
+    def _update_targeting_navigation(self) -> None:
+        if not hasattr(self, "targeting_tabs"):
+            return
+        show_targeting = self.current_route != "capture"
+        self.targeting_tabs._tab_scroll.setVisible(show_targeting)
+        for button in self.targeting_inspector_buttons:
+            button.setVisible(show_targeting and self.targeting_tabs.currentIndex() == 0)
 
     def reset_target_policy(self) -> None:
         defaults = Settings()
@@ -8661,11 +8643,8 @@ class ControlCenter(QMainWindow):
         self.refresh_acceleration_controls()
 
     def show_page(self, key: str) -> None:
-        # Capture now lives beside Policy inside Targeting. Keep the former
-        # route working for integrations and saved actions without maintaining
-        # a second copy of the controls.
-        requested_inspector = 0 if key == "capture" else None
-        if requested_inspector is not None:
+        route = key
+        if key == "capture":
             key = "selection"
         self.current_page = key
         panel_name = {'games': 'game_cards', 'profiles': 'profile_cards'}.get(key)
@@ -8676,13 +8655,25 @@ class ControlCenter(QMainWindow):
             if key=='overview':self._overview_preview_slot.addWidget(self._shared_preview_shell)
             else:self._target_preview_layout.insertWidget(1,self._shared_preview_shell)
             self._shared_preview_shell.show()
-        for name, button in self.nav.items():
-            button.setChecked(name == key)
-        if hasattr(self, "header_page"):
-            self.header_page.setText(self.t(PAGE_TITLES.get(key, "Control Center")))
+        if route == "capture":
+            self.set_targeting_inspector_tab(0)
+        elif key == "selection" and self.targeting_inspector_stack.currentIndex() == 0:
+            self.set_targeting_inspector_tab(1)
+        self._select_navigation(route)
+        self._update_targeting_navigation()
         self.update_targeting_layout()
-        if requested_inspector is not None:
-            self.set_targeting_inspector_tab(requested_inspector)
+
+    def _select_navigation(self, route: str) -> None:
+        self.current_route = route
+        for name, button in self.nav.items():
+            button.setChecked(name == route)
+        more_active = isinstance(self.nav.get(route), QAction)
+        if self.more_tabs_button.property("hiddenPageActive") != more_active:
+            self.more_tabs_button.setProperty("hiddenPageActive", more_active)
+            self.more_tabs_button.style().unpolish(self.more_tabs_button)
+            self.more_tabs_button.style().polish(self.more_tabs_button)
+        if hasattr(self, "header_page"):
+            self.header_page.setText(self.t(PAGE_TITLES.get(route, "Control Center")))
 
     def settings_search_targets(self) -> list[tuple[str, str, QLabel]]:
         """Index visible setting labels without maintaining a second schema."""
@@ -9197,6 +9188,37 @@ class ControlCenter(QMainWindow):
         if hasattr(self,'diag_freshness'):
             age=self._pipeline_snapshot.get('age')
             self.diag_freshness.setText('—' if age is None else f'{age:.1f} ms')
+        self._refresh_monitoring_metrics()
+
+    def _refresh_monitoring_metrics(self):
+        if not hasattr(self, "_monitoring_metrics"):
+            return
+        from pipeline_tools import finite
+
+        sample = self.pipeline_display_metrics()
+        active = any(sample[key] is not None for key in ("capture", "inference", "inference_ms"))
+        data = (self._last_output_data or {}) if active else {}
+
+        def formatted(value, unit):
+            return f"{value:.1f} {unit}" if finite(value) else "-"
+
+        track_count = data.get("tracks")
+        output = (self.t("Observe only") if data.get("observe_only") is True else
+                  self.t("Active") if data.get("output_active") is True else self.t("Idle"))
+        values = {
+            "capture": formatted(sample["capture"], "fps"),
+            "inference": formatted(sample["inference_ms"], "ms"),
+            "tracks": str(track_count) if type(track_count) is int and track_count >= 0 else "-",
+            "output": output if active else "-",
+        }
+        for key, value in values.items():
+            label = self._monitoring_metrics[key]
+            if label.text() != value:
+                label.setText(value)
+        for key, label in self._monitoring_timing.items():
+            value = formatted(data.get(key), "ms")
+            if label.text() != value:
+                label.setText(value)
 
     def refresh_pipeline_diagnostics(self):
         if hasattr(self, 'policy_preview_status'):
@@ -10634,7 +10656,10 @@ class ControlCenter(QMainWindow):
                     ('NMS overlap threshold',f'{self.settings.nms_iou:.2f}' if self.settings.nms_enabled else self.t('Off')),
                     ('Acquisition radius',f'{self.settings.acquisition_radius} px'),
                     ('Retention radius',f'{self.settings.retention_radius} px'))
-            self.overview_configuration.setText('\n'.join(self.t(label)+': '+str(value) for label,value in values))
+            readouts = [f"{self.t(label)}: {value}" for label, value in values]
+            self.overview_configuration.setText("\n".join(
+                "  |  ".join(readouts[index:index + 2]) for index in range(0, len(readouts), 2)
+            ))
         self.refresh_session_cockpit()
 
     def refresh_session_cockpit(self) -> None:
@@ -10837,6 +10862,11 @@ class ControlCenter(QMainWindow):
         snapshot = read_profile_snapshot(writable_native_path(Path(path)))
         return self.prepare_profile_bytes(snapshot.data)
 
+    def prepare_default_profile(self) -> Settings:
+        from default_profile import DEFAULT_PROFILE_JSON
+
+        return self.prepare_profile_bytes(DEFAULT_PROFILE_JSON)
+
     def prepare_profile_bytes(self, data: bytes) -> Settings:
         try:
             if type(data) is not bytes or len(data) > 1048576:
@@ -10973,7 +11003,7 @@ class ControlCenter(QMainWindow):
             return
         if self.engine.active:
             self.stop_capture()
-        self.settings = Settings()
+        self.settings = self.prepare_default_profile()
         self.clear_tuning_undo()
         self._active_profile_path = None
         self.dirty = True
@@ -11356,6 +11386,24 @@ class ControlCenter(QMainWindow):
         if not hasattr(self, "log_view"):
             return
         self.log_view.appendPlainText(f"{level:<6} {message}")
+        self._refresh_monitoring_activity()
+
+    def _refresh_monitoring_activity(self):
+        activity = getattr(self, "_monitoring_activity", None)
+        if activity is None:
+            return
+        lines = []
+        if hasattr(self, "log_view"):
+            block = self.log_view.document().lastBlock()
+            for _ in range(3):
+                if not block.isValid():
+                    break
+                if block.text():
+                    lines.append(block.text())
+                block = block.previous()
+        recent = "\n".join(reversed(lines)) if lines else self.t("No session activity yet.")
+        if activity.text() != recent:
+            activity.setText(recent)
 
     @disposable_deny('clipboard')
     def copy_diagnostics(self) -> None:
@@ -11510,7 +11558,7 @@ def main() -> None:
     window = ControlCenter(live_resources=live_resources)
     app._vaporlock_main_window = window
     if interface_unavailable:
-        window.log("WARN", window.t("The live interface is unavailable. Use native controls or reload it."))
+        window.log("INFO", window.t("The native dashboard is available. Optional interface resources were not loaded."))
     window.showMaximized()
     sys.exit(app.exec())
 

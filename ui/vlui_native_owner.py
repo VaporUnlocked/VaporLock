@@ -466,7 +466,7 @@ class NativeLiveOwner(QObject):
         if path.exists():
             self._load(path, transaction, lane)
         else:
-            self._replace(self._native.Settings(), None, lambda: lane.may_effect(transaction),
+            self._replace(self._center.prepare_default_profile(), None, lambda: lane.may_effect(transaction),
                 lambda code, committed: lane.finish(transaction, status='completed' if committed else
                     'failed' if code == 'IO_ERROR' else 'cancelled' if code == 'CANCELLED' else 'rejected',
                     code=code, effect_committed=committed), lane)
@@ -573,7 +573,7 @@ class NativeLiveOwner(QObject):
         path = self._native.PROFILE_DIRECTORY / 'default.json'
         if path.exists(): return self.load_native_profile(path)
         stamp = self.stamp()
-        return self._replace(self._native.Settings(), None, lambda: self.stamp() == stamp,
+        return self._replace(self._center.prepare_default_profile(), None, lambda: self.stamp() == stamp,
             lambda code, _committed: self._center.log('INFO' if code == 'OK' else 'WARN', 'Profile transition: ' + code))
 
     def open_native_profile(self):

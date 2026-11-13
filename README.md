@@ -32,8 +32,11 @@ A noncommercial label cannot remove AGPL obligations.
 - Local annotation/training and explicit optional Ultralytics integration.
 
 Hardware/backend dependencies determine what can run. No model weights, private
-profiles, datasets or external account credentials are included. The client
-creates new user settings; existing private settings are not build seeds.
+profiles, datasets or external account credentials are included. On first launch,
+the bundled default uses DirectML and looks for `models\nanoparticle-003-c.onnx`.
+Download it from [VaporLock Models](https://github.com/VaporUnlocked/VaporLock/releases/tag/Vaporlock-Models)
+and place it in the `models` folder beside `RunGui.bat`. The default annotation
+configuration also references `models\nanoparticle-003.onnx` from the same release.
 
 ## Build from source
 
