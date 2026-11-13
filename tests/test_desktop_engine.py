@@ -27,7 +27,7 @@ class DesktopEngineTests(unittest.TestCase):
         self.assertEqual(candidate_providers(Settings()), ('cpu',))
         self.assertEqual(candidate_providers(Settings(model_path='model.onnx')), ('dml', 'cpu'))
         self.assertEqual(candidate_providers(Settings(model_path='model.onnx', inference_dml_device=0)), ('dml',))
-        self.assertEqual(candidate_providers(Settings(model_path='model.cloud')), ('dml',))
+        self.assertEqual(candidate_providers(Settings(model_path='model.cloud')), ('dml', 'cpu'))
         self.assertEqual(candidate_providers(Settings(provider='cuda')), ('cuda',))
 
     def test_observe_drops_hardware_authority_before_the_native_boundary(self):
@@ -147,6 +147,33 @@ class DesktopEngineTests(unittest.TestCase):
         self.assertEqual(cloud.arguments, ['--cloud-pipe', cloud.pipe, '--cloud-worker-pid', '42'])
         cloud.attach(100)
         self.assertEqual(messages[-1], {'command': 'client', 'pid': 100})
+
+    def test_cloud_auto_uses_installed_cpu_runtime_when_directml_is_missing(self):
+        controller = EngineController(self.paths)
+        model = self.root / 'model.cloud'
+        model.touch()
+        cloud = SimpleNamespace(wait_ready=lambda _cancel: True, arguments=['--cloud-pipe', 'test'], close=lambda: None)
+        launch = (self.root / 'VaporLock.exe', {})
+        with patch('cloud_dependencies.ready_for', side_effect=lambda provider: provider == 'cpu'), \
+                patch('desktop.engine._CloudWorker', return_value=cloud) as worker, \
+                patch('desktop.engine._launch_for', return_value=launch) as find_native, \
+                patch.object(controller, '_run_native', return_value='') as run_native:
+            controller._run(Settings(model_path=str(model)), model, True, None)
+        worker.assert_called_once_with(self.root, model, 'cpu', -1)
+        find_native.assert_called_once_with(self.root, 'cpu')
+        self.assertEqual(run_native.call_args.args[-2][-2:], cloud.arguments)
+        self.assertIn('Using the installed .cloud CPU runtime', controller.snapshot().messages[0])
+
+    def test_cloud_explicit_directml_never_falls_back_to_cpu(self):
+        controller = EngineController(self.paths)
+        model = self.root / 'model.cloud'
+        model.touch()
+        with patch('cloud_dependencies.ready_for', side_effect=lambda provider: provider == 'cpu') as ready_for, \
+                patch('desktop.engine._CloudWorker') as worker:
+            controller._run(Settings(model_path=str(model), provider='dml'), model, True, None)
+        ready_for.assert_called_once_with('dml')
+        worker.assert_not_called()
+        self.assertIn('.cloud DirectML runtime is unavailable', controller.snapshot().error)
 
 
 if __name__ == '__main__':

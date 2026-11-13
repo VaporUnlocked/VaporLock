@@ -27,11 +27,14 @@ A noncommercial label cannot remove AGPL obligations.
 - **Workspace** reviews YOLO images, suggests boxes with a local ONNX model,
   and saves negative labels. It also creates `.cloud` projects, imports and
   reviews annotations, and runs fresh, initialized, or resumed training.
+  The YOLO training tab uses the optional local Ultralytics runtime.
 - **Settings** groups the full profile settings by task. Search covers all
   groups. Open legacy JSON profiles and use Save as to make a separate copy.
   Capture settings take effect at the next session start.
 - **Diagnostics** shows the selected backend, process messages and any global
-  shortcuts that are available only while the window has focus.
+  shortcuts that are available only while the window has focus. Enable the
+  local API in Settings, then use Apply API settings in Diagnostics to start
+  it and copy the token. LAN access uses HTTPS and requires a separate opt-in.
 
 DXGI/GDI capture, native CPU, DirectML, CUDA and TensorRT RTX backends depend
 on the installed SDKs and hardware. Model weights and datasets are user inputs.
@@ -89,11 +92,9 @@ and SHA-256, and never loads the downloaded checkpoint.
 
 The manifest records hashes for the local `.cloud` worker source.
 
-The desktop currently exposes local dataset and `.cloud` workflows. The
-optional Ultralytics worker is available from its command line with
-`.\.venv\Scripts\python.exe ui\training_worker.py --help`. The legacy
-local API, hosted dataset screens, and Xbox bridge launcher are not wired
-into the replacement desktop yet.
+The desktop currently supports local datasets and training. The API exposes
+its available commands at `/api/v1/schema`. Hosted dataset screens and the
+Xbox bridge launcher are pending.
 
 ## Optional components and known build gaps
 

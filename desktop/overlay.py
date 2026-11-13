@@ -77,7 +77,13 @@ class CaptureOverlay(QWidget):
                     painter.drawEllipse(area)
                 else:
                     painter.drawRect(area)
+        now = native_tick_ms()
         for track in payload['tracks']:
+            if track.get('observation_age_ms') is not None and native_observation_age_ms(
+                {'emitted_tick_ms': payload['emitted_tick_ms'], 'observation_age_ms': track['observation_age_ms']},
+                now,
+            ) >= settings.output_max_observation_age_ms:
+                continue
             color = settings.desktop_overlay_selected_color if track['selected'] else settings.desktop_overlay_track_color
             painter.setPen(QPen(QColor(color), 2.0 if track['selected'] else 1.0))
             if settings.overlay_boxes:

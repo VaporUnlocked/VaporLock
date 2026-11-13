@@ -88,6 +88,9 @@ class DesktopWindow(QMainWindow):
         self.overlay_identity = None
         self.last_messages = None
         self.last_error = ''
+        self.api = None
+        self.api_snapshot_at = 0.0
+        self.closing = False
         self.hotkeys = GlobalHotkeys() if global_shortcuts else None
         self.setWindowTitle('VaporLock')
         self.resize(1220, 790)
@@ -194,7 +197,7 @@ class DesktopWindow(QMainWindow):
         self.session_mode.addItem('Use configured output', False)
         controls.addWidget(self.session_mode)
         self.start_button = button('Start capture', self.start_capture, True)
-        self.stop_button = button('Stop', self.engine.stop)
+        self.stop_button = button('Stop', self.stop_capture)
         actions = QHBoxLayout()
         actions.addWidget(self.start_button, 1)
         actions.addWidget(self.stop_button)
@@ -229,6 +232,14 @@ class DesktopWindow(QMainWindow):
         self.hotkey_status = label('', 'muted')
         self.hotkey_status.setWordWrap(True)
         layout.addWidget(self.hotkey_status)
+        api_bar = QHBoxLayout()
+        self.api_status = label('Local API is stopped.', 'muted')
+        api_bar.addWidget(self.api_status, 1)
+        self.copy_api_token = button('Copy API token', self.copy_local_api_token)
+        self.copy_api_token.setEnabled(False)
+        api_bar.addWidget(self.copy_api_token)
+        api_bar.addWidget(button('Apply API settings', self.apply_api_settings))
+        layout.addLayout(api_bar)
         self.log = QPlainTextEdit()
         self.log.setAccessibleName('Engine log')
         self.log.setReadOnly(True)
@@ -278,20 +289,27 @@ class DesktopWindow(QMainWindow):
         if path:
             self.open_profile(Path(path))
 
-    def open_profile(self, path):
+    def open_profile(self, path, *, report_dialog=True):
         try:
             settings = read_profile(path, self.paths)
         except (OSError, ValueError) as error:
+            if not report_dialog:
+                raise
             self.show_error('Could not open profile', error)
             return
-        self.settings, self.profile_path, self.saved = settings, path, asdict(settings)
+        self.profile_path, self.saved = path, asdict(settings)
+        self.apply_settings(settings)
+        self.profile_name.setText(path.stem)
+        if hasattr(self, 'shortcuts'):
+            self.install_shortcuts()
+        return True
+
+    def apply_settings(self, settings):
+        self.settings = settings
         self.settings_panel.set_settings(settings)
         self.settings_changed()
         if self.workspace is not None:
             self.workspace.apply_settings(settings)
-        self.profile_name.setText(path.stem)
-        if hasattr(self, 'shortcuts'):
-            self.install_shortcuts()
 
     def save_current_profile(self, *, save_as=False):
         try:
@@ -312,6 +330,8 @@ class DesktopWindow(QMainWindow):
             self.profile_path, self.saved = path, asdict(settings)
             self.profile_name.setText(path.stem)
             self.install_shortcuts()
+            if self.api is not None and self.api.server.running:
+                self.api.refresh_catalog()
         except (OSError, ValueError) as error:
             self.show_error('Could not save profile', error)
             return
@@ -332,7 +352,7 @@ class DesktopWindow(QMainWindow):
         self.shortcuts = []
         used = set()
         global_bindings = (
-            (self.settings.hotkey_emergency_stop, self.engine.stop),
+            (self.settings.hotkey_emergency_stop, self.stop_capture),
             (self.settings.hotkey_start_stop, self.toggle_capture),
             (self.settings.hotkey_toggle_target_lock, self.engine.trigger_manual_lock),
             (self.settings.hotkey_save_screenshot, self.save_screenshot),
@@ -346,7 +366,7 @@ class DesktopWindow(QMainWindow):
         unavailable = ', '.join(dict.fromkeys(keys for keys, _ in global_bindings if keys and keys not in registered))
         self.hotkey_status.setText(f'Window-only shortcuts: {unavailable}' if unavailable else '')
         bindings = (
-            ('Escape', self.engine.stop),
+            ('Escape', self.stop_capture),
             ('Ctrl+F', lambda: (self.navigate(2), self.settings_panel.search.setFocus())),
             *((keys, callback) for keys, callback in global_bindings if keys not in registered),
         )
@@ -390,12 +410,15 @@ class DesktopWindow(QMainWindow):
 
     def toggle_capture(self):
         if self.engine.snapshot().state in ('starting', 'running', 'stopping'):
-            self.engine.stop()
+            self.stop_capture()
         else:
             self.start_capture()
 
-    def start_capture(self):
-        if QApplication.activeModalWidget() is not None:
+    def stop_capture(self):
+        self.engine.stop()
+
+    def start_capture(self, *, report_dialog=True):
+        if self.closing or QApplication.activeModalWidget() is not None:
             return
         try:
             settings = Settings(**asdict(self.edited_settings()))
@@ -422,6 +445,8 @@ class DesktopWindow(QMainWindow):
             self.show_overlay = settings.desktop_overlay_enabled and settings.desktop_overlay_visible
         except (OSError, RuntimeError, ValueError) as error:
             self.affinity_required = False
+            if not report_dialog:
+                raise
             self.show_error('Could not start capture', error)
         self.refresh_capture()
 
@@ -442,6 +467,11 @@ class DesktopWindow(QMainWindow):
 
     def refresh_capture(self):
         snapshot = self.engine.snapshot(include_overlay=self.show_overlay)
+        if self.api is not None and self.api.server.running:
+            now = time.monotonic()
+            if now >= self.api_snapshot_at:
+                self.api.publish(snapshot)
+                self.api_snapshot_at = now + .25
         active = snapshot.state in ('starting', 'running', 'stopping')
         if not active:
             self.affinity_required = False
@@ -472,7 +502,9 @@ class DesktopWindow(QMainWindow):
                 if value.text() != shown:
                     value.setText(shown)
         if self.show_overlay and snapshot.overlay and self.session_settings is not None and sys.platform == 'win32':
-            identity = tuple(snapshot.overlay.get(key) for key in ('session', 'source_generation', 'frame_id', 'config_revision'))
+            identity = tuple(snapshot.overlay.get(key) for key in (
+                'session', 'source_generation', 'frame_id', 'config_revision', 'source_boundary',
+            ))
             if self.overlay is None:
                 from desktop.overlay import CaptureOverlay
 
@@ -511,6 +543,37 @@ class DesktopWindow(QMainWindow):
     def show_error(self, title, error):
         QMessageBox.warning(self, title, str(error))
 
+    def apply_api_settings(self):
+        if self.closing:
+            return
+        try:
+            settings = self.edited_settings()
+            if not settings.local_api_enabled:
+                if self.api is not None:
+                    self.api.server.request_stop_async()
+                self.api_status.setText('Local API is stopped.')
+                self.copy_api_token.setEnabled(False)
+                return
+            if settings.local_api_lan_enabled:
+                answer = QMessageBox.question(self, 'Enable LAN API',
+                    'Allow authenticated local network clients to control VaporLock over HTTPS?')
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+            if self.api is None:
+                from desktop.local_api import DesktopApi
+
+                self.api = DesktopApi(self)
+            started, detail = self.api.start(settings)
+            self.api_status.setText(detail)
+            self.copy_api_token.setEnabled(started)
+        except (OSError, RuntimeError, ValueError) as error:
+            self.show_error('Could not apply API settings', error)
+
+    def copy_local_api_token(self):
+        if self.api is not None and self.api.server.running:
+            QApplication.clipboard().setText(self.api.server.token)
+            self.statusBar().showMessage('Local API token copied.', 4000)
+
     def calibrate_crosshair(self):
         if QApplication.activeModalWidget() is not None:
             return
@@ -535,12 +598,24 @@ class DesktopWindow(QMainWindow):
             self.refresh_capture()
 
     def closeEvent(self, event):
-        if (self.workspace is not None and not self.workspace.can_close()) or not self.allow_discard():
+        if not self.closing:
+            if (self.workspace is not None and not self.workspace.can_close()) or not self.allow_discard():
+                event.ignore()
+                return
+            self.closing = True
+            self.centralWidget().setEnabled(False)
+        if self.api is not None:
+            self.api.server.request_stop_async()
+            if not self.api.server.cleanup_complete():
+                self.engine.stop()
+                self.statusBar().showMessage('Waiting for the local API to stop…')
+                event.ignore()
+                QTimer.singleShot(100, self.close)
+                return
+        if not self.engine.close(timeout=0):
+            self.statusBar().showMessage('Waiting for capture to stop…')
             event.ignore()
-            return
-        if not self.engine.close():
-            self.statusBar().showMessage('Waiting for capture to stop. Close again when it has stopped.')
-            event.ignore()
+            QTimer.singleShot(100, self.close)
             return
         if self.workspace is not None:
             self.workspace.close_project()

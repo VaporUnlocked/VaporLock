@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from dataset_paths import display_path, reject_reparse
 from dataset_transaction import AnnotationCommitUncertain
 from review_document import ReviewDocument, serialize, to_annotations
+from desktop.yolo_training import YoloTraining
 
 
 IMAGE_TYPES = {'.png', '.jpg', '.jpeg', '.bmp', '.webp'}
@@ -1528,10 +1529,12 @@ class WorkspacePanel(QWidget):
         self.review = DatasetReview(paths, self)
         self.projects = CloudProjects(paths, self)
         self.training = CloudTraining(paths, self)
+        self.yolo = YoloTraining(paths, self)
         self.tabs = QTabWidget()
         self.tabs.addTab(self.review, 'Dataset review')
         self.tabs.addTab(self.projects, '.cloud projects')
         self.tabs.addTab(self.training, '.cloud training')
+        self.tabs.addTab(self.yolo, 'YOLO training')
         self.projects.train_requested.connect(self.open_training_project)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1541,6 +1544,7 @@ class WorkspacePanel(QWidget):
         self.review.apply_settings(settings)
         self.projects.apply_settings(settings)
         self.training.apply_settings(settings)
+        self.yolo.apply_settings(settings)
 
     def open_dataset(self, directory):
         self.tabs.setCurrentWidget(self.review)
@@ -1554,6 +1558,10 @@ class WorkspacePanel(QWidget):
         return True
 
     def can_close(self):
+        if self.yolo.worker is not None:
+            self.tabs.setCurrentWidget(self.yolo)
+            QMessageBox.information(self, 'YOLO worker running', 'Stop the YOLO worker and wait for it to finish before closing.')
+            return False
         if self.training.job is not None:
             self.tabs.setCurrentWidget(self.training)
             QMessageBox.information(self, 'Cloud job running', 'Stop the Cloud job and wait for it to finish before closing.')

@@ -62,7 +62,7 @@ def candidate_providers(settings: Settings) -> tuple[str, ...]:
         return (settings.provider,)
     if not settings.model_path:
         return ('cpu',)
-    if Path(settings.model_path).suffix.lower() == '.cloud' or settings.inference_dml_device >= 0:
+    if settings.inference_dml_device >= 0:
         return ('dml',)
     return ('dml', 'cpu')
 
@@ -239,7 +239,7 @@ class EngineController:
         if settings.crosshair_enabled and capture_excluded is not True:
             raise ValueError('Crosshair detection requires VaporLock windows to be excluded from capture.')
         if not observe_only and settings.output_transport == 'virtual-xbox' and controller_host_session is None:
-            raise ValueError('Prepare the Xbox-compatible controller bridge before starting Control.')
+            raise ValueError('Virtual Xbox output requires the signed VaporLock controller bridge, which is unavailable in this build.')
         if not observe_only and settings.output_transport == 'virtual-mouse' and not settings.virtual_mouse_opt_in:
             raise ValueError('Enable the virtual mouse driver in settings before starting Control.')
 
@@ -304,7 +304,15 @@ class EngineController:
                     self._message(f'Manual lock could not start: {failure}')
 
             if model is not None and model.suffix.lower() == '.cloud' and not self._cancel.is_set():
-                provider = providers[0]
+                from cloud_dependencies import ready_for
+
+                provider = next((candidate for candidate in providers if ready_for(candidate)), None)
+                if provider is None:
+                    labels = ' or '.join(PROVIDER_LABELS[candidate] for candidate in providers)
+                    raise RuntimeError(f'The .cloud {labels} runtime is unavailable. Install the matching Cloud dependencies.')
+                if provider != providers[0]:
+                    self._message('The .cloud DirectML runtime is unavailable. Using the installed .cloud CPU runtime.')
+                providers = (provider,)
                 with self._lock:
                     self._provider = provider
                 self._message('Loading the Cloud model.')
@@ -321,7 +329,8 @@ class EngineController:
                     self._reset_stream()
                 launch = _launch_for(self.paths.root, 'cpu' if cloud else provider)
                 if launch is None:
-                    error = f'The {PROVIDER_LABELS[provider]} engine is unavailable.'
+                    error = ('The native capture engine required by .cloud is unavailable.' if cloud
+                             else f'The {PROVIDER_LABELS[provider]} engine is unavailable.')
                     self._message(error)
                     continue
                 args = native_arguments(settings, self.paths, provider, observe_only=observe_only,
