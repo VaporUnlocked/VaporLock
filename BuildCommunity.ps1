@@ -29,7 +29,6 @@ foreach ($kind in @('cpu','dml','cuda')) {
         Checked $workerPython @('-I','-m','pip','install','onnxruntime')
     } else { Checked $workerPython @('-I','-m','pip','install','torch','torchvision','--index-url',$TorchCUDAIndex) }
 }
-Checked $python @('-I','-B',(Join-Path $root 'tools\refresh_public_manifests.py'))
 if (-not $SkipNativeBuild) {
     $nativeArguments = @('-I','-B',(Join-Path $root 'tools\build_public_client.py'))
     if ($NativeDirectML) { $nativeArguments += '--native-directml' }

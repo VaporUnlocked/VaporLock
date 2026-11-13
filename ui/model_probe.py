@@ -2,11 +2,47 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, QProcess, QTimer
 from engine_stream import EngineLineReader
-from tuning_tools import InferenceMeasurement
+
+
+class InferenceMeasurement:
+    """Measure fresh native work after warm-up, not repeated capture statistics."""
+
+    def __init__(self):
+        self.baseline = None
+        self.latest = None
+
+    def observe(self, payload):
+        try:
+            if any(type(payload[name]) not in (int,float) for name in (
+                    "inference_total", "uptime_seconds", "inference_work_ms", "model_work_ms")):
+                return
+            values = tuple(float(payload[name]) for name in (
+                "inference_total", "uptime_seconds", "inference_work_ms", "model_work_ms"))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return
+        if not all(math.isfinite(value) and value >= 0 for value in values) or not values[0].is_integer():
+            return
+        if self.latest is not None and (values[0] <= self.latest[0] or values[1] <= self.latest[1]
+                                       or values[2] < self.latest[2] or values[3] < self.latest[3]):
+            return
+        self.latest = values
+        if self.baseline is None and values[0] >= 8:
+            self.baseline = values
+
+    def result(self):
+        if self.baseline is None or self.latest is None:
+            return None
+        count, seconds, inference, model = (last - first for first, last in zip(self.baseline, self.latest))
+        if count < 8 or seconds < 2 or inference <= 0:
+            return None
+        return {"frames": int(count), "inference_ms": inference / count, "model_ms": model / count,
+                "fps": count / seconds, "seconds": seconds}
+
 
 
 @dataclass(frozen=True)

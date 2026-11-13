@@ -52,41 +52,33 @@ class PublicManifests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             for relative in ('cloud_source/4.0.0/runtime_sdk/cloud_sdk/__init__.py',
-                             'cloud_source/4.0.0/training_source/cloudstudio/__init__.py',
-                             'ui_system/runtime/view.js'):
+                             'cloud_source/4.0.0/training_source/cloudstudio/__init__.py'):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('value = 1\n')
-            resources = root / 'ui_system/runtime/resources.json'
-            resources.write_text(json.dumps({'resourceVersion': 1, 'resources': [
-                {'file': 'ui_system/runtime/view.js', 'bytes': 0, 'sha256': 'old'}]}))
             result = module.refresh(root)
-            self.assertEqual(result, {'cloud_files': 2, 'ui_resources': 1})
-            manifest = json.loads((root / 'cloud_source/4.0.0/IMPORT_MANIFEST.json').read_bytes())
+            self.assertEqual(result, {'cloud_files': 2})
+            manifest_path = root / 'cloud_source/4.0.0/IMPORT_MANIFEST.json'
+            manifest = json.loads(manifest_path.read_bytes())
             self.assertEqual(set(manifest), {'files', 'version'})
-            first = json.loads(resources.read_bytes())['resources'][0]['sha256']
-            (root / 'ui_system/runtime/view.js').write_text('value = 2\n')
+            (root / 'cloud_source/4.0.0/runtime_sdk/cloud_sdk/__init__.py').write_text('value = 2\n')
             module.refresh(root)
-            self.assertNotEqual(first, json.loads(resources.read_bytes())['resources'][0]['sha256'])
+            updated = json.loads(manifest_path.read_bytes())
+            self.assertNotEqual(manifest['files'][0]['sha256'], updated['files'][0]['sha256'])
+            self.assertEqual(manifest['files'][1], updated['files'][1])
 
-    def test_refresh_rejects_resource_escape(self):
+    def test_refresh_rejects_hardlinked_cloud_source(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            for branch in ('runtime_sdk', 'training_source'):
-                path = root / 'cloud_source/4.0.0' / branch / 'source.py'
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text('pass\n')
-            resources = root / 'ui_system/runtime/resources.json'
-            resources.parent.mkdir(parents=True)
-            resources.write_text(json.dumps({'resources': [{'file': '../private.txt'}]}))
-            with self.assertRaises(ValueError):
+            source = root / 'cloud_source/4.0.0/runtime_sdk/source.py'
+            source.parent.mkdir(parents=True)
+            (root / 'cloud_source/4.0.0/training_source').mkdir()
+            private = root / 'private.py'
+            private.write_text('pass\n')
+            os.link(private, source)
+            with self.assertRaises((ValueError, OSError, RuntimeError)):
                 module.refresh(root)
-
-    def test_relative_members_reject_windows_aliases(self):
-        for value in ('C:private.txt', 'C:/private.txt', '\\private.txt', '/private.txt',
-                      '../private.txt', 'ui/../private.txt', 'ui\\file.js', 'ui//file.js'):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                module.relative_member(value)
+            self.assertFalse((root / 'cloud_source/4.0.0/IMPORT_MANIFEST.json').exists())
 
     def test_manifest_hardlink_rejected_before_any_write(self):
         with tempfile.TemporaryDirectory() as folder:

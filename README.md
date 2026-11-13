@@ -1,11 +1,9 @@
 # VaporLock
 
 VaporLock is a Windows vision, tracking and annotation application with a C++20
-native engine and a Qt/Python interface. This is an unfinished community source
-snapshot of the 0.2.1 work, provided as-is. It is not a newly validated binary
-release. Publisher licensing, accounts, paid-feature gates, telemetry, forced
-updates, hosted model catalogs and installer distribution are retired.
-All former client capabilities are available without a VaporLock account or key.
+engine and a native Qt desktop interface. Community builds run without a
+VaporLock account or license key. Older releases remain available on the
+[releases page](https://github.com/VaporUnlocked/VaporLock/releases).
 
 Use only in lawful, authorized environments. Movement output changes input;
 follow the rules of your environment. No ban avoidance, invisibility, model
@@ -22,18 +20,21 @@ Third-party code and assets retain their own licenses; see
 integrations need a license compatibility review before combined redistribution.
 A noncommercial label cannot remove AGPL obligations.
 
-## Included capabilities
+## Desktop workflow
 
-- DXGI/GDI capture; ONNX CPU, DirectML and CUDA backend source; TensorRT RTX source.
-- Local `.cloud` inference, project/annotation/training/results workspace and
-  optional SAM mask assistance.
-- Tracking, target selection, exclusion zones, movement/output configuration,
-  overlays, diagnostics, themes, games and personal profile workflows.
-- Local annotation/training and explicit optional Ultralytics integration.
+- **Capture** puts the model, inference backend, display and frame rate next to
+  the preview. Start in Observe only to run capture with output disabled.
+- **Workspace** reviews YOLO images, suggests boxes with a local ONNX model,
+  and saves negative labels. It also creates `.cloud` projects, imports and
+  reviews annotations, and runs fresh, initialized, or resumed training.
+- **Settings** groups the full profile settings by task. Search covers all
+  groups. Open legacy JSON profiles and use Save as to make a separate copy.
+  Capture settings take effect at the next session start.
+- **Diagnostics** shows the selected backend, process messages and any global
+  shortcuts that are available only while the window has focus.
 
-Hardware/backend dependencies determine what can run. No model weights, private
-profiles, datasets or external account credentials are included. The client
-creates new user settings; existing private settings are not build seeds.
+DXGI/GDI capture, native CPU, DirectML, CUDA and TensorRT RTX backends depend
+on the installed SDKs and hardware. Model weights and datasets are user inputs.
 
 ## Build from source
 
@@ -74,7 +75,7 @@ official PyTorch CUDA build and driver. Do not mix CPU and CUDA/DML runtime DLLs
 in one folder. Ultralytics and other optional training integrations have their
 own setup and license requirements.
 
-After editing `.cloud` implementation files or UI browser resources, run:
+After editing `.cloud` implementation files, refresh the worker source manifest:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\refresh_public_manifests.py
@@ -86,27 +87,23 @@ publisher (not included in this source archive), run
 `assets/cloud-annotation/LICENSE.txt`. The helper verifies the expected size
 and SHA-256, and never loads the downloaded checkpoint.
 
-The refresh command regenerates local safety inventories. No original publisher key or
-historical official-build authorization is required for your changes.
+The manifest records hashes for the local `.cloud` worker source.
+
+The desktop currently exposes local dataset and `.cloud` workflows. The
+optional Ultralytics worker is available from its command line with
+`.\.venv\Scripts\python.exe ui\training_worker.py --help`. The legacy
+local API, hosted dataset screens, and Xbox bridge launcher are not wired
+into the replacement desktop yet.
 
 ## Optional components and known build gaps
 
-The Xbox-compatible controller integration retains normal Windows signing,
-consent, trust verification and owned removal safeguards. Its source references
-external HIDMaestro and Windows tooling resources. Those binaries are excluded
-from this source export; the existing dependency fetch script does not reproduce
-every embedded resource. The controller component is not a turnkey clean-source
-build until those inputs are supplied under their upstream licenses. Do not
-disable Windows protections or claim an install succeeded when resources are absent.
+The optional Xbox-compatible controller component references upstream
+HIDMaestro and Windows tooling resources. Building it requires those inputs
+under their upstream licenses. The desktop's other capture and output paths
+can be built independently.
 
 The aim-testing-suite source is included separately. The community suite uses
 the retained CC0 SWAT built-in character and original procedural view geometry;
 the former game-derived character/weapon asset is excluded. Custom user GLBs
 remain supported. A missing optional controller component does not prevent the
 main client opening; affected controller operations report missing dependencies.
-
-This snapshot is not an installer or hosted service. Administrator, key bot,
-licensing server, web/API, release catalog and publishing tools are not part of
-it. Never upload the original workspace, its Git history, private backups,
-operational records or credentials. Use the separately verified public export.
-No public hosting or support service is promised.

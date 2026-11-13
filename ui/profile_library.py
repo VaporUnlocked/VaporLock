@@ -6,7 +6,6 @@ from pathlib import Path
 import re
 import stat
 import tempfile
-from vlui_native_injection import writable_native_path
 
 MAX_IMAGE_BYTES=8*1024*1024
 MAX_META_BYTES=8192
@@ -17,7 +16,6 @@ def checked_path(root,*parts):
     if any(not isinstance(s,str) or s in ('','.', '..') or '/' in s or '\\' in s or ':' in s for s in parts):
         raise ValueError('Unsafe library path')
     path=root.joinpath(*parts)
-    writable_native_path(path)
     for node in (*reversed(path.parents),path):
         try:info=node.lstat()
         except FileNotFoundError:continue

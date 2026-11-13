@@ -3,9 +3,8 @@
 The noncommercial license applies only to original material that VaporLock's
 copyright holders have authority to license. Keep all existing vendor LICENSE,
 COPYING, NOTICE and attribution files. They take precedence for that material.
-The included Qt qwebchannel.js is used under its upstream LGPL-3.0 option.
-Full LGPL-3.0 and its incorporated GPL-3.0 text accompany it under
-third_party/qt/. The VaporLock noncommercial terms do not restrict the rights
+The Qt LGPL-3.0 and incorporated GPL-3.0 texts are under third_party/qt/.
+The VaporLock noncommercial terms do not restrict the rights
 these licenses grant in Qt or other separately licensed material. Distributions
 of Qt libraries must also satisfy their applicable source/relinking and notice
 obligations; no official-build signature is required to rebuild this client.

@@ -3683,14 +3683,21 @@ bool applyLiveSetting(AppConfig& config, const std::wstring& field, const std::w
 
 class LiveConfigReader {
 public:
+    bool stopRequested() const noexcept { return m_stopRequested; }
     std::uint64_t takeRejectedEpoch() { return std::exchange(m_rejectedEpoch, 0); }
     bool applyAvailable(AppConfig& config) {
+        if (m_stopRequested) return false;
         bool changed = false;
         const HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
         if (!input || input == INVALID_HANDLE_VALUE) return false;
         for (;;) {
             DWORD available = 0;
-            if (!PeekNamedPipe(input, nullptr, 0, nullptr, &available, nullptr) || available == 0) break;
+            if (!PeekNamedPipe(input, nullptr, 0, nullptr, &available, nullptr)) {
+                if (GetLastError() == ERROR_BROKEN_PIPE) m_stopRequested = true;
+                if (m_stopRequested) return false;
+                break;
+            }
+            if (available == 0) break;
             std::array<char, 1024> chunk{};
             DWORD read = 0;
             if (!ReadFile(input, chunk.data(), static_cast<DWORD>(std::min<std::size_t>(chunk.size(), available)), &read, nullptr) || read == 0) break;
@@ -3705,6 +3712,10 @@ public:
             std::string line = m_buffer.substr(0, newline);
             m_buffer.erase(0, newline + 1);
             if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line == "stop") {
+                m_stopRequested = true;
+                return false;
+            }
             const std::size_t tab = line.find('\t');
             if (tab == std::string::npos || tab == 0) continue;
             const auto epochTab = line.find('\t', tab + 1);
@@ -3743,6 +3754,7 @@ private:
     std::string m_buffer;
     std::uint64_t m_rejectedEpoch = 0;
     bool m_rejectionLatched = false;
+    bool m_stopRequested = false;
 };
 
 #ifdef VAPORLOCK_HAS_VIRTUAL_CONTROLLER
@@ -4563,7 +4575,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
             });
         });
 
-    output.start();
+    liveConfig.startOutput();
     const auto fail = [&](std::string line, int code) {
         output.stop();
         if (!datasetWriter.stop()) {
@@ -4582,7 +4594,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
 
     vaporlock::crosshair::Matcher crosshairMatcher;
     vaporlock::crosshair::Reference previousReference;
-    while (running) {
+    const auto sessionInterrupted = [&] { return telemetry.failed() || liveConfig.sessionStopRequested(); };
+    while (running && !liveConfig.sessionStopRequested()) {
         const auto frameStarted = std::chrono::steady_clock::now();
         const auto now = frameStarted;
         const bool timingReady = now - started >= std::chrono::seconds(2);
@@ -4595,7 +4608,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         auto frameDeadline = cloudCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
         if(cloudCapturePaced && cloudCaptureSchedule.hasFresh()) {
             if(!frameWait.until(cloudCaptureSchedule.next(config.captureFps),liveConfig.changedEvent(),
-                               [&]{return telemetry.failed();}))continue;
+                               sessionInterrupted))continue;
             if(!liveConfig.current(outputGeneration))continue;
         }
         previewWorker.configure(config.previewEnabled);
@@ -4604,7 +4617,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         if (telemetry.failed()) return fail("{\"type\":\"error\",\"message\":\"The control center connection was closed.\"}", 1);
         const auto captureStarted = std::chrono::steady_clock::now();
         const auto captureCancelled=[&] {
-            return telemetry.failed() || !liveConfig.current(outputGeneration);
+            return sessionInterrupted() || !liveConfig.current(outputGeneration);
         };
         const bool captureOk=cloudCapturePaced ? capture.capture(config,4,captureCancelled) : capture.capture(config);
         if(!captureOk)return fail("{\"type\":\"error\",\"message\":\"Desktop capture failed\"}",1);
@@ -4900,12 +4913,12 @@ int runHeadless(int argc, wchar_t* argv[]) {
             // rate slot nor cause a spin. A normal 4ms source wait needs no
             // extra delay; a very short unsuccessful call gets a bounded retry.
             if(!capture.freshFrame() && afterCapture-captureStarted<std::chrono::milliseconds(1))
-                frameWait.until(AimClock::now()+std::chrono::milliseconds(1),liveConfig.changedEvent(),[&]{return telemetry.failed();});
+                frameWait.until(AimClock::now()+std::chrono::milliseconds(1),liveConfig.changedEvent(),sessionInterrupted);
             continue;
         }
         int pacingFps = config.captureFps;
-        while (!frameWait.until(frameDeadline, liveConfig.changedEvent(), [&] { return telemetry.failed(); })) {
-            if (telemetry.failed()) break;
+        while (!frameWait.until(frameDeadline, liveConfig.changedEvent(), sessionInterrupted)) {
+            if (sessionInterrupted()) break;
             const int updatedFps = liveConfig.captureFps();
             if (updatedFps != pacingFps) {
                 // Recompute from this acquisition's start, not the wake time.

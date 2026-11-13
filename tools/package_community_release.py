@@ -127,15 +127,6 @@ def main():
             copied(root/name,package/'information'/name)
         for name in ('LICENSE-GPL-3.0.txt','LICENSE-LGPL-3.0.txt'):
             copied(root/'third_party/qt'/name,package/'information/third-party/qt'/name)
-        copied(root/'docs/EULA.md',package/'information/EULA.md')
-        for directory, dirs, files in os.walk(root/'guides',followlinks=False):
-            plain(Path(directory))
-            for name in dirs:plain(Path(directory)/name)
-            for name in files:
-                path=plain(Path(directory)/name)
-                if path.suffix.casefold() in ('.html','.css','.png','.svg'):
-                    copied(path,package/'guides'/path.relative_to(root/'guides'))
-        copied(root/'VaporLock-Settings-Guide.html',package/'VaporLock-Settings-Guide.html')
         (package/'README.txt').write_text('VaporLock '+version+' Community\n\nExtract the core ZIP, then open VaporLock.exe. No account or key is required.\nFor .cloud CUDA, extract the optional CUDA ZIP into the same parent so its VaporLock folder merges with this one.\nThe Windows controller-output component is not bundled because its embedded dependency redistribution permissions are unresolved.\nNo installer or automatic updates are included. See information/README.md, LICENSE and THIRD_PARTY_NOTICES.md.\n',encoding='utf-8')
     rows=inventory(package)
     metadata={'schema_version':1,'version':version,'edition':'community','unsigned':True,

@@ -1,11 +1,14 @@
 """Post-annotation pixel effects; no geometry, model, file or network effects."""
+from __future__ import annotations
+
 from dataclasses import dataclass
 import hashlib
 from io import BytesIO
 import random
+from typing import TYPE_CHECKING
 
-import numpy as np
-from PIL import Image, ImageEnhance, ImageFilter
+if TYPE_CHECKING:
+    from PIL import Image
 
 EFFECTS = ('blur', 'colour', 'exposure', 'noise', 'compression')
 STRENGTHS = ('mild', 'medium', 'strong')
@@ -36,6 +39,9 @@ def vary_image(original: Image.Image, options: VariationOptions, seed: int):
     Labels are deliberately not an input: no effect can translate, resize,
     crop, rotate or flip their coordinate system. Caller preserves label bytes.
     """
+    import numpy as np
+    from PIL import Image, ImageEnhance, ImageFilter
+
     options.validate()
     if type(seed) is not int or not 0 <= seed < 2**64:
         raise ValueError('Invalid variation seed.')

@@ -198,15 +198,20 @@ public:
         });
     }
 
-    void stop() {
+    void requestStop() {
         {
             std::lock_guard lock(m_mutex);
-            if (!m_stopped) cancelLocked();
+            if (m_stopped) return;
+            cancelLocked();
             m_stopped = true;
             observeCollectionLocked();
         }
         m_wake.notify_all();
         if (m_stopEvent) SetEvent(m_stopEvent);
+    }
+
+    void stop() {
+        requestStop();
         if (m_thread.joinable()) m_thread.join();
     }
 
@@ -551,7 +556,14 @@ public:
                 std::uint64_t rejectedEpoch = 0;
                 {
                     std::lock_guard lock(m_mutex);
-                    if (reader.applyAvailable(m_config)) {
+                    const bool changed = reader.applyAvailable(m_config);
+                    if (reader.stopRequested()) {
+                        m_sessionStop = true;
+                        m_output.requestStop();
+                        if (m_changed) SetEvent(m_changed);
+                        return;
+                    }
+                    if (changed) {
                         m_generation = m_output.configure(m_config);
                         if (m_changed) SetEvent(m_changed);
                     }
@@ -564,21 +576,26 @@ public:
         });
     }
     ~LiveConfigPump() { m_stop = true; if (m_thread.joinable()) m_thread.join(); if (m_changed) CloseHandle(m_changed); }
+    void startOutput() {
+        std::lock_guard lock(m_mutex);
+        if (!m_sessionStop) m_output.start();
+    }
     std::uint64_t read(AppConfig& config) {
         std::lock_guard lock(m_mutex);
         if (m_changed) ResetEvent(m_changed);
         config = m_config; return m_generation;
     }
-    bool current(std::uint64_t generation) { std::lock_guard lock(m_mutex); return generation == m_generation; }
+    bool current(std::uint64_t generation) { std::lock_guard lock(m_mutex); return !m_sessionStop && generation == m_generation; }
     template<class Action>
     bool withCurrent(std::uint64_t generation, Action action) {
         std::lock_guard lock(m_mutex);
-        if (generation != m_generation) return false;
+        if (m_sessionStop || generation != m_generation) return false;
         action();
         return true;
     }
     int captureFps() { std::lock_guard lock(m_mutex); return m_config.captureFps; }
     HANDLE changedEvent() const noexcept { return m_changed; }
+    bool sessionStopRequested() const noexcept { return m_sessionStop.load(); }
 private:
     HANDLE m_changed = nullptr;
     std::mutex m_mutex;
@@ -587,5 +604,6 @@ private:
     std::function<void(std::uint64_t)> m_rejected;
     std::uint64_t m_generation = 0;
     std::atomic<bool> m_stop{false};
+    std::atomic<bool> m_sessionStop{false};
     std::thread m_thread;
 };

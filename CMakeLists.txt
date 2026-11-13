@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(VaporLock
-    VERSION 0.2.1
+    VERSION 0.2.2
     DESCRIPTION "ONNX-based user-controlled aim assistance"
     LANGUAGES CXX)
 

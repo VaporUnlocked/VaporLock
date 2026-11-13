@@ -6,21 +6,11 @@ the product, installing components, contacting a service or publishing anywhere.
 Main is owner-authorized to publish only the verified source and latest
 unrestricted community release. This exporter itself never publishes.
 
-The public archive uses Development-relative paths as its repository root.
-Main supplies the community license, README, build instructions, fresh build
-helper and requirements. Active client C++/Python/UI/cloud/controller source,
-static UI assets, public guides, focused tests and exact necessary UI contract
-files are allowlisted. Normal user-safety protections remain client source.
-
-The UI allowlist consists of the 25 payloads named by runtime/resources.json,
-that resource manifest, the seven contract-v1-r5 schema/default documents and
-their index, the eight component-contract-v1-r1 documents and their index, and
-the foundation components-v1.json registry loaded by the schema consumer.
-Index payload paths, sizes and SHA-256 identities are checked against the exact
-selected closure. A modified index cannot expand the allowlist. Historical UI
-renderer, handoff, proposal, proof and review directories are not swept in.
-The bundled context-index JSON is an active resource, but its descriptive
-historical references are not followed or exported as extra dependencies.
+The public archive uses repository-relative paths. The community license,
+README, build instructions, build helper and requirements are included with
+the native engine, desktop application, Cloud and controller sources. Public
+assets and focused tests are allowlisted. The retired browser renderer and its
+handoff, proposal, proof and review files are excluded.
 
 Excluded wholesale: website, API, admin suite, Discord bot, licensing service,
 installer, hosted distribution, deployment scripts, internal handovers, review

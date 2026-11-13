@@ -1,4 +1,4 @@
-"""Refresh editable-source inventories; no publisher keys or official-build gate."""
+"""Refresh the local Cloud source inventory after editing its implementation."""
 from __future__ import annotations
 import argparse
 from contextlib import ExitStack
@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from pathlib import PurePosixPath
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -18,15 +17,6 @@ def plain(path: Path) -> Path:
         if node.exists() and (node.is_symlink() or getattr(node.lstat(), 'st_file_attributes', 0) & 0x400):
             raise ValueError('Linked manifest source rejected')
     return path
-
-
-def relative_member(value):
-    if type(value) is not str or not value or '\\' in value or ':' in value or '\x00' in value:
-        raise ValueError('Invalid source-relative manifest member')
-    path = PurePosixPath(value)
-    if path.is_absolute() or any(part in ('', '.', '..') for part in value.split('/')):
-        raise ValueError('Invalid source-relative manifest member')
-    return Path(*path.parts)
 
 
 def source_files(folder, stack):
@@ -47,7 +37,7 @@ def source_files(folder, stack):
 
 
 def write_outputs(outputs):
-    """Admit all regular/single-link outputs before modifying either manifest."""
+    """Admit all regular, single-link outputs before modifying them."""
     with ExitStack() as stack:
         opened = []
         for path, payload in outputs:
@@ -96,18 +86,6 @@ def refresh(root: Path) -> dict:
         for ancestor in reversed((root, *root.parents)):
             if os.name == 'nt':
                 stack.enter_context(_windows_handle(ancestor, directory=True))
-        resource_path = plain(root / 'ui_system/runtime/resources.json')
-        # This descriptor is an editable build input, validated before either
-        # output is written. read_plain's lease must end before rewriting it.
-        with read_plain(resource_path) as raw:
-            resources = json.loads(raw)
-        selected = []
-        for entry in resources['resources']:
-            member = relative_member(entry['file'])
-            source = plain(root / member)
-            if not source.is_relative_to(root):
-                raise ValueError('Resource outside source tree')
-            selected.append((entry, source))
         entries = []
         for branch in ('runtime_sdk', 'training_source'):
             for path in source_files(plain(cloud / branch), stack):
@@ -116,13 +94,9 @@ def refresh(root: Path) -> dict:
                                 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
         if not entries:
             raise ValueError('Cloud source is absent')
-        for entry, source in selected:
-            raw = stack.enter_context(read_plain(source))
-            entry.update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
         target = plain(cloud / 'IMPORT_MANIFEST.json')
-        write_outputs([(target, json.dumps({'version': '4.0.0', 'files': entries}, indent=2) + '\n'),
-                       (resource_path, json.dumps(resources, indent=2) + '\n')])
-    return {'cloud_files': len(entries), 'ui_resources': len(resources['resources'])}
+        write_outputs([(target, json.dumps({'version': '4.0.0', 'files': entries}, indent=2) + '\n')])
+    return {'cloud_files': len(entries)}
 
 
 if __name__ == '__main__':

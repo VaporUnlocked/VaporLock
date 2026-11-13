@@ -3,7 +3,6 @@ from pathlib import Path
 from contextlib import contextmanager
 import ast
 import hashlib
-import json
 import os
 import sys
 import tempfile
@@ -22,43 +21,15 @@ def fixture():
     with tempfile.TemporaryDirectory(dir=parent) as name:yield Path(name)
 
 class PublicClientTests(unittest.TestCase):
-    def test_community_heading_translations_include_uppercase_sections(self):
-        from localization import translate_text
-        headings=('Class priorities and anchors','Manual track lock','Motion compensation',
-            'Preview snapshot','Global controls','Profile hotkeys','Local control API','Session details')
-        for language in ('zh-CN','de','ru','fr'):
-            for heading in headings:
-                with self.subTest(language=language,heading=heading):
-                    translated=translate_text(heading,language)
-                    self.assertNotEqual(translated,heading)
-                    self.assertNotIn('premium',translated.casefold())
-                    self.assertEqual(translate_text(heading.upper(),language),translated.upper())
-            description=translate_text('Configure the display language, theme and setup preferences.',language)
-            self.assertNotEqual(description,'Configure the display language, theme and setup preferences.')
-
-    def test_interface_help_has_full_width_and_release_labels_have_no_empty_edition(self):
-        source=(ROOT/'ui/vapor_lock_gui.py').read_text(encoding='utf-8')
-        self.assertIn("interface_outer.addWidget(help_card)",source)
-        self.assertNotIn('lower.left_layout.addWidget(help_card)',source)
-        self.assertNotIn('Configure the existing display language, theme, updates and setup preferences.',source)
-        self.assertNotIn('Vapor Lock {PRODUCT_VERSION} / {edition}',source)
-        self.assertNotIn('Vapor Lock {PRODUCT_VERSION} · {edition}',source)
-        self.assertNotIn("Vapor Lock {PRODUCT_VERSION} · {''}",source)
-
-    def test_active_browser_copy_has_no_premium_controls_or_stale_release_values(self):
-        copy=json.loads((ROOT/'ui_system/runtime/annotation-native-copy.json').read_text(encoding='utf-8'))
-        control='Configure the shared calibration shortcut and Windows-wide controls stored with the current profile.'
-        for language in ('en','zh-CN','de','ru','fr'):
-            self.assertEqual(copy[language]['Vapor Lock 0.1.3 edition'],'Vapor Lock')
-            self.assertNotIn('premium',copy[language][control].casefold())
-
     def test_all_active_python_compiles(self):
-        for path in (ROOT/'ui').glob('*.py'):
-            with self.subTest(path=path.name):compile(path.read_bytes(),str(path),'exec')
+        for folder in ('desktop', 'ui'):
+            for path in (ROOT / folder).glob('*.py'):
+                with self.subTest(path=path.name):
+                    compile(path.read_bytes(), str(path), 'exec')
 
     def test_enforcement_removed_not_only_disabled(self):
         for name in RETIRED:self.assertFalse((ROOT/'ui'/(name+'.py')).exists(),name)
-        for path in (ROOT/'ui').glob('*.py'):
+        for path in (*((ROOT / 'desktop').glob('*.py')), *((ROOT / 'ui').glob('*.py'))):
             tree=ast.parse(path.read_text(encoding='utf-8-sig'))
             for node in ast.walk(tree):
                 if isinstance(node,ast.ImportFrom):self.assertNotIn(node.module,RETIRED,path.name)
@@ -67,33 +38,13 @@ class PublicClientTests(unittest.TestCase):
                 if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute):
                     self.assertNotEqual(node.func.attr,'premium_operation_allowed',path.name)
 
-    def test_main_has_no_activation_or_publisher_services(self):
-        import vapor_lock_gui as gui
-        self.assertFalse(gui.IS_FREE_EDITION)
-        self.assertFalse(hasattr(gui,'ActivationDialog'))
-        for method in ('start_license_monitor','check_license_monitor','show_license_recovery','show_update_notice'):
-            self.assertFalse(hasattr(gui.ControlCenter,method))
-        object_marker=object()
-        self.assertIs(gui.ControlCenter.feature_control(object_marker),object_marker)
-
-    def test_local_resources_resolve_in_source_tree(self):
-        from vlui_fixed_resources import load_fixed_resources
-        from vlui_resource_root import browser_resource_root,native_manifest_identity,browser_resource_manifest
-        from vlui_context import _types
-        from vlui_schema import load_bundled_contract
-        from vlui_component_contract import load_component_contract
-        _types.cache_clear()
-        self.assertEqual(len(_types()),72)
-        self.assertEqual(len(load_bundled_contract().components),49)
-        self.assertEqual(len(load_component_contract().schema.components),49)
-        self.assertEqual(browser_resource_root(),ROOT)
-        data=json.loads(browser_resource_manifest().read_text())
-        self.assertEqual(len(data['resources']),25)
-        for row in data['resources']:
-            self.assertTrue(row['file'].startswith('ui_system/runtime/'))
-            raw=(ROOT/row['file']).read_bytes()
-            self.assertEqual(len(raw),row['bytes']);self.assertEqual(hashlib.sha256(raw).hexdigest(),row['sha256'])
-        self.assertEqual(len(load_fixed_resources(reviewed_manifest_sha256=native_manifest_identity())),25)
+    def test_desktop_entrypoint_does_not_import_legacy_renderers(self):
+        modules = ('vapor_lock_gui', 'vlui_qt_host', 'vlui_native_shell', 'QtWebEngineWidgets')
+        for name in ('__main__.py', 'window.py', 'controls.py', 'workspaces.py'):
+            source = (ROOT / 'desktop' / name).read_text(encoding='utf-8')
+            with self.subTest(name=name):
+                for module in modules:
+                    self.assertNotIn(module, source)
 
     def test_cloud_keeps_private_protocol_and_rejects_wrong_pipe(self):
         from cloud_access import edition,pipe_name

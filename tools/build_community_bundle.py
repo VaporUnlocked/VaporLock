@@ -97,30 +97,21 @@ def validate_inventory(root,expected,kind,edition=None):
     with BundleLease(root,expected,kind,edition=edition) as lease:return dict(lease.hashes)
 
 def stage_resources(output):
-    sys.path.insert(0,str(ROOT/'ui'))
-    from vlui_context import _types
-    from vlui_schema import load_bundled_contract
-    from vlui_component_contract import load_component_contract
-    _types.cache_clear()
-    if len(_types())!=72 or len(load_bundled_contract().components)!=49 or len(load_component_contract().schema.components)!=49:
-        raise ValueError('Native UI contract resources are incomplete.')
-    source=ROOT/'ui_system/runtime/resources.json';data=json.loads(source.read_bytes());pending=[]
-    if data.get('resourceVersion')!=1 or len(data.get('resources',[]))!=25:raise ValueError('Invalid UI resource map.')
-    for i,row in enumerate(data['resources']):
-        name=relative(row['file'])
-        if not name.startswith('ui_system/runtime/'):raise ValueError('UI resource outside sanitized runtime.')
-        origin=ROOT/name;target='vlui/payload/'+f'r{i:02d}'+origin.suffix
-        copy_verified(origin,output/target,row);row['file']=target
-    checksum=write(output/'vlui/runtime/resources.json',data)
-    # Native validator resources are exact app-owned documents, not old history.
-    fixed=['ui_system/runtime/bundled/context-contract.json','ui_system/handoffs/foundation-v1-r1/components-v1.json']
-    for prefix in ('ui_system/proposals/contract-v1-r5','ui_system/contracts/component-contract-v1-r1'):
-        index=json.loads((ROOT/prefix/'index.json').read_bytes());fixed.append(prefix+'/index.json')
-        fixed.extend(prefix+'/'+relative(x['path']) for x in index['files'])
-    for name in dict.fromkeys(fixed):copy_verified(ROOT/name,output/name,record(ROOT/name))
-    return checksum
+    name='assets/VaporLock.ico'
+    entry=record(ROOT/name)
+    copy_verified(ROOT/name,output/name,entry)
+    return write(output/'resources.json',{'files':[{'path':name,**entry}]})
 
-def source_snapshot(output):
+
+def verify_resources(output, expected):
+    manifest=output/'resources.json'
+    if sha(manifest)!=expected:
+        raise RuntimeError('Prepared desktop resources changed.')
+    for row in json.loads(manifest.read_bytes())['files']:
+        if record(output/relative(row['path']))!={key:row[key] for key in ('bytes','sha256')}:
+            raise RuntimeError('A prepared desktop resource changed.')
+
+def source_snapshot(output, *, desktop=False):
     output.mkdir(parents=True)
     sources={}
     for origin in sorted((ROOT/'ui').glob('*.py')):
@@ -129,6 +120,12 @@ def source_snapshot(output):
         for node in ast.walk(tree):
             if isinstance(node,ast.ImportFrom) and node.module in RETIRED:raise ValueError('Retired enforcement import in '+origin.name)
         entry=record(origin);copy_verified(origin,output/origin.name,entry);sources[origin.relative_to(ROOT).as_posix()]=entry
+    if desktop:
+        for origin in sorted((ROOT/'desktop').glob('*.py')):
+            name=origin.relative_to(ROOT).as_posix()
+            entry=record(origin)
+            copy_verified(origin,output/name,entry)
+            sources[name]=entry
     return sources
 
 def stage(output,dependency_source,manifest_sha):
@@ -295,25 +292,20 @@ def freeze_gui(output):
     if (output/'gui-plan.json').is_file():
         gui=json.loads((output/'gui-plan.json').read_bytes())
         for name,entry in gui['sources'].items():
-            if record(ROOT/name)!=entry or record(source/Path(name).name)!=entry:raise RuntimeError('GUI snapshot changed; prepare a fresh output.')
+            member=name if name.startswith('desktop/') else Path(name).name
+            if record(ROOT/name)!=entry or record(source/member)!=entry:raise RuntimeError('GUI snapshot changed; prepare a fresh output.')
         resources_sha=gui['resourcesSHA256'];sources=gui['sources']
-        if sha(output/'gui-resources/vlui/runtime/resources.json')!=resources_sha:raise RuntimeError('Prepared GUI resources changed.')
+        verify_resources(output/'gui-resources',resources_sha)
     else:
-        sources=source_snapshot(source);resources_sha=stage_resources(output/'gui-resources')
+        sources=source_snapshot(source,desktop=True);resources_sha=stage_resources(output/'gui-resources')
         write(output/'gui-plan.json',{'sources':sources,'resourcesSHA256':resources_sha,'cloudStartupSHA256':cloud['startup']['sha256'],'version':plan['version']})
     plan={**plan,'sources':sources,'resourcesSHA256':resources_sha}
-    (source/'product_build.py').write_text("EDITION='premium'\nPRODUCT_VERSION="+repr(plan['version'])+"\nCLOUD_ROLE='gui'\nCLOUD_STARTUP_SHA256="+repr(cloud['startup']['sha256'])+'\nVLUI_RESOURCE_MANIFEST_SHA256='+repr(plan['resourcesSHA256'])+'\n',encoding='utf8')
-    data=[(output/'gui-resources/vlui','vlui'),(output/'gui-resources/ui_system','ui_system')]
-    for name in ('VaporLock.ico','VaporLock.png','Background.png','check-dark.svg','check-light.svg','arrow-up-dark.svg','arrow-down-dark.svg','arrow-up-light.svg','arrow-down-light.svg'):
-        origin=ROOT/'assets'/name
-        if origin.is_file():data.append((origin,'assets'))
-    data.append((ROOT/'Background.png','assets'))
-    for folder in ('themes','icons'):
-        if (ROOT/'assets'/folder).is_dir():data.append((ROOT/'assets'/folder,'assets/'+folder))
-    for language in ('de','fr','ru','zh_CN'):data.append((environment/'Lib/site-packages/PySide6/translations'/('qtbase_'+language+'.qm'),'translations'))
-    bundle=freeze(output,'VaporLockControlCenter','vapor_lock_gui.py',environment=environment,windowed=True,
-        hidden=('tuning_tools','motion_compensation','local_control_api','PySide6.QtWebEngineCore','PySide6.QtWebEngineWidgets','PySide6.QtWebChannel','cryptography.hazmat.backends.openssl'),collect=('xxhash',),data=data,source=source,phase_name='g-'+uuid.uuid4().hex[:6],
-        exclude=('PySide6.QtQml','PySide6.QtQuick','PySide6.QtQuickWidgets','PySide6.QtQuickControls2','PySide6.QtQuick3D'))
+    (source/'product_build.py').write_text("EDITION='premium'\nPRODUCT_VERSION="+repr(plan['version'])+"\nCLOUD_ROLE='gui'\nCLOUD_STARTUP_SHA256="+repr(cloud['startup']['sha256'])+'\n',encoding='utf8')
+    data=[(output/'gui-resources/assets/VaporLock.ico','assets')]
+    bundle=freeze(output,'VaporLockControlCenter','desktop/__main__.py',environment=environment,windowed=True,
+        hidden=('product_build',),data=data,source=source,phase_name='VaporLockControlCenter-'+uuid.uuid4().hex[:6],
+        exclude=('PySide6.QtWebEngineCore','PySide6.QtWebEngineWidgets','PySide6.QtWebChannel',
+                 'PySide6.QtQml','PySide6.QtQuick','PySide6.QtQuickWidgets'))
     qt_fix(bundle,environment)
     target=output/'package/app';target.mkdir(exist_ok=True)
     for member in bundle.iterdir():
@@ -347,7 +339,7 @@ def component_sources(output):
         raw=analysis.read_bytes()
         if len(raw)>16*1024**2:raise ValueError('Compiler analysis exceeds bound.')
         values=ast.literal_eval(raw.decode('utf8'));names=set()
-        is_gui='VaporLockControlCenter' in analysis.parts
+        is_gui=any(part.startswith('VaporLockControlCenter') for part in analysis.parts)
         selected_sources=gui_plan['sources'] if is_gui else sources
         selected_root=output/('gui-source' if is_gui else 'source')
         for value in strings(values):
@@ -356,7 +348,9 @@ def component_sources(output):
                 if not path.is_absolute():continue
                 relative_name=path.relative_to(selected_root).as_posix()
             except (ValueError,OSError):continue
-            if '/' not in relative_name and relative_name.endswith('.py') and relative_name!='product_build.py':names.add('ui/'+relative_name)
+            if relative_name.endswith('.py') and relative_name!='product_build.py':
+                if '/' not in relative_name:names.add('ui/'+relative_name)
+                elif relative_name.startswith('desktop/'):names.add(relative_name)
         if not names:raise RuntimeError('Compiler analysis has no authored source closure.')
         for name in names:
             if name not in selected_sources or record(ROOT/name)!=selected_sources[name]:raise RuntimeError('An imported component source changed: '+name)
@@ -380,7 +374,7 @@ def verify_inputs(output):
         for name,entry in plan['sources'].items():
             if record(ROOT/name)!=entry:raise RuntimeError('Authored source changed during packaging: '+name)
     resources='gui-resources' if plan_path.name=='gui-plan.json' else 'resources'
-    if sha(output/resources/'vlui/runtime/resources.json')!=plan['resourcesSHA256']:raise RuntimeError('Prepared UI changed.')
+    verify_resources(output/resources,plan['resourcesSHA256'])
 
 
 def probe_environment(output):
@@ -402,13 +396,8 @@ def probe(output):
     environment=probe_environment(output)
     owned_run([str(package/'app/VaporLockControlCenter.exe'),'--verify-qt-startup',str(directory/'qt-startup.json')],directory/'qt-startup.log',environment=environment,timeout=90)
     report=json.loads((directory/'qt-startup.json').read_bytes())
-    if (report.get('edition'),report.get('version'),report.get('cloud_role'),report.get('cloud_startup_sha256'),report.get('resource_manifest_sha256'),report.get('browser_resources'))!=('premium',gui['version'],'gui',cloud['startup']['sha256'],gui['resourcesSHA256'],25):raise RuntimeError('Frozen GUI metadata mismatch.')
-    if report.get('platform')!='windows' or report.get('rendered') is not True or report.get('product_controls_created') is not False:raise RuntimeError('Frozen GUI dependency probe failed.')
-    for name,value in report['modules'].items():
-        loaded=Path(value).resolve()
-        if name=='icuuc.dll':
-            if loaded!=(Path(os.environ.get('SystemRoot',r'C:\Windows'))/'System32/icuuc.dll').resolve():raise RuntimeError('GUI imported non-system ICU.')
-        elif not loaded.is_relative_to((package/'app/_internal').resolve()):raise RuntimeError('GUI relied on an external native runtime.')
+    if (report.get('version'),report.get('platform'),report.get('rendered'),report.get('pages'))!=(gui['version'],'win32',True,4):
+        raise RuntimeError('Frozen desktop startup probe failed.')
     class ProbeChild(AnnotationChild):
         def _stderr(self):
             captured=bytearray()
@@ -451,6 +440,8 @@ def probe(output):
     for executable in ('VaporLockControlCenter.exe','VaporLockDatasetTools.exe','VaporLockDatasetCuda.exe','VaporLockTrainingTools.exe','VaporLockAccelerationSetup.exe','cloud/VaporLockCloudTools.exe'):
         reader=CArchiveReader(str(package/'app'/executable));pyz=next(k for k in reader.toc if k.endswith('.pyz'));names=reader.open_embedded_archive(pyz).toc
         if RETIRED.intersection(names):raise RuntimeError('Retired enforcement appeared in frozen component.')
+        if executable=='VaporLockControlCenter.exe' and any('QtWebEngine' in name for name in names):
+            raise RuntimeError('Frozen desktop unexpectedly includes the browser renderer.')
         modules[executable]={'sha256':sha(package/'app'/executable),'retiredModulesAbsent':True}
     write(output/'frozen-probes.json',{'schema':1,'guiDependencyPass':True,'cloudReadyClosePass':True,'cloudEvents':events,'frozenModules':modules,'gpuWorkloadExecuted':False,'captureExecuted':False,'controllerInstalled':False})
     return report

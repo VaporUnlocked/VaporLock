@@ -39,12 +39,13 @@ class PublicExportTests(unittest.TestCase):
                 "tools/announce_0200.py", "docs/INTERNAL_HANDOVER.txt", "app/__pycache__/cached.py",
                 "controller_host/hidmaestro_integration/resources/resource-0000.bin"):
             self.put(relative, "MUST NEVER EXPORT")
-        self.put("ui_system/runtime/live.html", "<html></html>")
+        self.put("ui_system/runtime/live.html", "MUST NEVER EXPORT")
+        self.put("desktop/window.py", "pass\n")
         self.put("cloud_source/4.0.0/training_source/cloudstudio/models/network.py", "pass\n")
         self.put("third_party/monocypher/LICENSE.md", "Third party license\n")
         names = {name for name, _ in exporter.select_files(self.source)}
         self.assertIn("app/main.cpp", names)
-        self.assertIn("ui_system/runtime/live.html", names)
+        self.assertIn("desktop/window.py", names)
         self.assertIn("cloud_source/4.0.0/training_source/cloudstudio/models/network.py", names)
         self.assertIn("third_party/monocypher/LICENSE.md", names)
         self.assertFalse(any("MUST" in file.read_text() for name, file in exporter.select_files(self.source)))
@@ -151,18 +152,11 @@ class PublicExportTests(unittest.TestCase):
         self.assertEqual([True], denied)
         self.assertIn("ui/client.py", selected)
 
-    def test_active_ui_files_do_not_export_historical_notes_or_proofs(self):
-        active = ("ui_system/runtime/live.html",
-            "ui_system/proposals/contract-v1-r5/style.schema.json",
-            "ui_system/contracts/component-contract-v1-r1/components-v1.json",
-            "ui_system/handoffs/foundation-v1-r1/components-v1.json")
-        omitted = ("ui_system/runtime/internal-review.txt",
-            "ui_system/runtime/bundled/private-proof.json",
-            "ui_system/renderer/unused-example.js",
-            "ui_system/proposals/contract-v1-r5/review-notes.txt",
-            "ui_system/proposals/trusted-display-context-v1-r3/proposal.txt",
-            "ui_system/handoffs/foundation-v1-r1/private-report.json",
-            "ui_system/handoffs/native-components-v1-r2/acceptance-proof.json")
+    def test_desktop_sources_export_without_legacy_browser_resources(self):
+        active = ("desktop/__main__.py", "desktop/window.py", "desktop/workspaces.py")
+        omitted = ("ui_system/runtime/live.html", "ui_system/runtime/resources.json",
+            "ui_system/contracts/component-contract-v1-r1/components-v1.json", "requirements-vlui.txt",
+            "Background.png", "SOURCE_MANIFEST.json", "desktop/profiles/saved.json")
         for name in active:
             self.put(name, "active source resource")
         for name in omitted:
@@ -170,37 +164,6 @@ class PublicExportTests(unittest.TestCase):
         selected = {name for name, _ in exporter.select_files(self.source)}
         self.assertTrue(set(active) <= selected)
         self.assertTrue(set(omitted).isdisjoint(selected))
-
-    def runtime_manifest(self):
-        entries = []
-        for name in sorted(exporter.UI_RUNTIME_FILES - {"ui_system/runtime/resources.json"}):
-            payload = "public resource: " + name
-            self.put(name, payload)
-            encoded = payload.encode("utf-8")
-            entries.append({"file": name, "bytes": len(encoded), "sha256": exporter.sha256(encoded)})
-        self.put("ui_system/runtime/resources.json", json.dumps({"resources": entries}))
-        return entries
-
-    def test_runtime_manifest_requires_exact_exported_payload_closure(self):
-        entries = self.runtime_manifest()
-        selected = {name for name, _ in exporter.select_files(self.source)}
-        self.assertTrue(exporter.UI_RUNTIME_FILES <= selected)
-        # An old provenance index must not become a new read/export authority.
-        entries[0]["file"] = "ui_system/handoffs/foundation-v1-r1/private-proof.json"
-        self.put(entries[0]["file"], "private proof")
-        self.put("ui_system/runtime/resources.json", json.dumps({"resources": entries}))
-        with self.assertRaises(exporter.ExportError):
-            exporter.select_files(self.source)
-
-    def test_runtime_manifest_detects_missing_or_changed_payload(self):
-        entries = self.runtime_manifest()
-        selected = entries[0]["file"]
-        self.put(selected, "changed source")
-        with self.assertRaises(exporter.ExportError):
-            exporter.select_files(self.source)
-        (self.source / selected).unlink()
-        with self.assertRaises(exporter.ExportError):
-            exporter.select_files(self.source)
 
     def test_controller_authored_template_is_distinct_from_saved_profiles(self):
         template = "controller_host/profiles/vapor-lock-xbox-one-windows.json"

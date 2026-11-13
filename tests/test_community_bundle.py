@@ -34,18 +34,18 @@ class BundleTests(unittest.TestCase):
         with fixture() as temporary:
             identity=builder.stage_resources(temporary)
             self.assertEqual(len(identity),64)
-            data=json.loads((temporary/'vlui/runtime/resources.json').read_bytes())
-            for row in data['resources']:
-                self.assertTrue(row['file'].startswith('vlui/payload/'))
-                self.assertEqual(builder.record(temporary/row['file']),{k:row[k] for k in ('bytes','sha256')})
+            data=json.loads((temporary/'resources.json').read_bytes())
+            self.assertEqual([row['path'] for row in data['files']],['assets/VaporLock.ico'])
+            builder.verify_resources(temporary,identity)
     def test_actual_import_audit_uses_separate_gui_snapshot(self):
         with fixture() as temporary:
-            worker='ui/cloud_access.py';gui='ui/localization.py'
+            worker='ui/cloud_access.py';gui='desktop/window.py'
             builder.write(temporary/'stage.json',{'sources':{worker:builder.record(ROOT/worker)}})
             builder.write(temporary/'gui-plan.json',{'sources':{gui:builder.record(ROOT/gui)}})
             for phase,source,name in (('CloudTools','source',worker),('VaporLockControlCenter','gui-source',gui)):
                 folder=temporary/phase/'work';folder.mkdir(parents=True)
-                (folder/'Analysis-00.toc').write_text(repr([(str(temporary/source/Path(name).name),'PYMODULE')]))
+                member=name if name.startswith('desktop/') else Path(name).name
+                (folder/'Analysis-00.toc').write_text(repr([(str(temporary/source/member),'PYMODULE')]))
             result=builder.component_sources(temporary)
             self.assertEqual(len(result),2)
             self.assertIn(gui,result['VaporLockControlCenter/work/Analysis-00.toc'])
@@ -65,6 +65,6 @@ class BundleTests(unittest.TestCase):
     def test_frozen_source_snapshot_has_no_retired_enforcement(self):
         with fixture() as temporary:
             sources=builder.source_snapshot(temporary/'source')
-            self.assertGreater(len(sources),100)
+            self.assertIn('ui/cloud_worker.py',sources)
             for name in builder.RETIRED:self.assertFalse((temporary/'source'/(name+'.py')).exists())
 if __name__=='__main__':unittest.main()

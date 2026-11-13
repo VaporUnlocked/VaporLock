@@ -103,6 +103,34 @@ int main() {
                     "restart command fixture failed");
             require(restarted.applyAvailable(config) && config.visualEpoch == 5 && config.confidence == .8,
                     "new reader retained another session's rejection");
+            require(!send("stop\r\nconfidence\t0.1\n") && live.stopRequested() && config.confidence == .8,
+                    "stop was rejected or allowed queued settings to follow it");
+            require(!live.applyAvailable(config) && config.confidence == .8,
+                    "settings escaped an accepted stop");
+
+            AimOutputScheduler scheduler([](const AimReport&, const AimInputs&, const AppConfig&, AimOutputStatus&) {
+                return true;
+            });
+            LiveConfigPump pump(config, scheduler);
+            pump.startOutput();
+            const auto generation = scheduler.generation();
+            require(WriteFile(writer, "stop\n", 5, &written, nullptr) && written == 5,
+                    "session stop fixture write failed");
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            while ((!pump.sessionStopRequested() || scheduler.generation() == generation)
+                    && std::chrono::steady_clock::now() < deadline) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+            require(pump.sessionStopRequested() && scheduler.generation() != generation,
+                    "session stop did not revoke the active output generation");
+            require(!pump.current(generation), "session stop retained old capture work");
+            scheduler.stop();
+
+            require(CloseHandle(writer), "test command pipe close failed");
+            restore.writer = nullptr;
+            LiveConfigReader disconnected;
+            require(!disconnected.applyAvailable(config) && disconnected.stopRequested(),
+                    "owner pipe closure did not stop the session");
         }
         {
             AppConfig config;

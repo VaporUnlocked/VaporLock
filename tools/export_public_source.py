@@ -21,41 +21,20 @@ import zipfile
 ROOT_FILES = frozenset({
     ".gitignore",
     "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "PRIVACY.md",
-    "requirements-community.txt", "requirements-vlui.txt", "BuildCommunity.ps1",
+    "requirements-community.txt", "BuildCommunity.ps1",
     "CMakeLists.txt", "CMakePresets.json", "product_version.txt", "RunGui.bat",
-    "Start.bat", "Background.png", "VaporLock-Settings-Guide.html",
+    "Start.bat",
 })
 REQUIRED_ROOT_FILES = frozenset({"README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
     "requirements-community.txt", "BuildCommunity.ps1", "CMakeLists.txt"})
 CLIENT_DIRS = frozenset({"app", "capture", "config", "controller_host", "controller_proxy",
-    "core", "detection", "gui", "hardware", "output", "overlay", "plugins",
+    "core", "desktop", "detection", "hardware", "output", "overlay", "plugins",
     "selection", "tracking", "ui", "acceleration"})
-ASSET_DIRS = frozenset({"assets", "guides"})
+ASSET_DIRS = frozenset({"assets"})
 TOOLS = frozenset({"export_public_source.py", "build_public_client.py",
     "build_community_bundle.py", "package_community_release.py",
-    "refresh_public_manifests.py", "build_settings_guides.py", "build_controller_host.ps1",
+    "refresh_public_manifests.py", "build_controller_host.ps1",
     "fetch_sam_weights.py"})
-# These are the active client resources, not whole historical handoff branches.
-# Index entries are checked against this set; an edited index cannot broaden it.
-UI_RUNTIME_FILES = frozenset("ui_system/runtime/" + name for name in (
-    "resources.json", "component-map-014.json", "native-presentation-014.json",
-    "annotation-translations.json", "live-adapter.js", "live.html", "qwebchannel.js",
-    "native-component-renderer-014.js", "native-components-014.js",
-    "annotation-native-copy.json", "native-renderer-014.css",
-    "bundled/components.json", "bundled/context-contract.json", "bundled/context-index.json",
-    "bundled/context-relations.json", "bundled/SmokeyGlass.png",
-    "bundled/arrow-down-light.svg", "bundled/arrow-up-light.svg", "bundled/check-dark.svg",
-    "bundled/native-canvases.js", "bundled/native-component-copy.json",
-    "bundled/native-component-renderer.css", "bundled/native-component-views.js",
-    "bundled/native-demo.css", "bundled/native-policy.js", "bundled/trusted-context.mjs"))
-UI_SCHEMA_NAMES = frozenset({"index.json", "manifest.schema.json", "style.schema.json",
-    "layout.schema.json", "semantics.json", "css-policy.json", "tokens.json",
-    "presentation-defaults.json"})
-UI_FILES = (UI_RUNTIME_FILES
-    | frozenset("ui_system/proposals/contract-v1-r5/" + name for name in UI_SCHEMA_NAMES)
-    | frozenset("ui_system/contracts/component-contract-v1-r1/" + name
-        for name in UI_SCHEMA_NAMES | {"components-v1.json"})
-    | {"ui_system/handoffs/foundation-v1-r1/components-v1.json"})
 CONTROLLER_TEMPLATES = frozenset({
     "controller_host/profiles/vapor-lock-xbox-one-windows.json"})
 SOURCE_DATA_FILES = frozenset({
@@ -87,11 +66,12 @@ PUBLIC_TEST_FILES = frozenset("tests/" + name for name in (
     "tensorrt_rtx_smoke.cpp", "aim_output_tests.h", "compensation_output_tests.h",
     "controller_pipe_tests.h", "feature_batch3_tests.h", "feature_batch5_tests.h",
     "crosshair_reference_tests.h", "capture_recovery_tests.h",
-    "test_public_source_export.py", "test_public_client_access.py", "test_public_build_tools.py", "test_community_bundle.py", "test_community_package.py"))
+    "test_public_source_export.py", "test_public_client_access.py", "test_public_build_tools.py",
+    "test_community_bundle.py", "test_community_package.py", "test_desktop_settings.py",
+    "test_desktop_engine.py", "test_desktop_workspaces.py"))
 CLOUD_BRANCHES = ("runtime_sdk", "training_source", "config")
 CLOUD_FILES = frozenset({"IMPORT_MANIFEST.json", "requirements-runtime.txt",
     "requirements-training.txt", "RUN_CLOUD.md", "TRAIN_CLOUD.md", "run_cloud.py", "train_cloud.py"})
-DOC_BRANCHES = ("settings-guide",)
 DOC_FILES = frozenset({"PUBLIC_SOURCE_EXPORT_SCOPE.txt"})
 SUITE_ROOT_FILES = frozenset({"CMakeLists.txt", "build.ps1", "package.ps1", "README.md",
     "LICENSE",
@@ -198,7 +178,7 @@ def allowed(relative: str, *, directory: bool = False) -> bool:
         return False
     root = parts[0]
     if len(parts) == 1:
-        return (directory and root in CLIENT_DIRS | ASSET_DIRS | {"ui_system", "cloud_source", "docs", "tests", "tools", "third_party"}) or relative in ROOT_FILES
+        return (directory and root in CLIENT_DIRS | ASSET_DIRS | {"cloud_source", "docs", "tests", "tools", "third_party"}) or relative in ROOT_FILES
     if root in CLIENT_DIRS:
         if parts[:2] == ("controller_host", "profiles"):
             return _exact_member(relative, CONTROLLER_TEMPLATES, directory=directory)
@@ -207,8 +187,6 @@ def allowed(relative: str, *, directory: bool = False) -> bool:
         return directory or suffix in SOURCE_EXT | ASSET_EXT or relative in SOURCE_DATA_FILES
     if root in ASSET_DIRS:
         return directory or suffix in ASSET_EXT | {".html"} or relative in SOURCE_DATA_FILES
-    if root == "ui_system":
-        return _exact_member(relative, UI_FILES, directory=directory)
     if root == "cloud_source":
         if parts[1] != "4.0.0":
             return False
@@ -221,10 +199,7 @@ def allowed(relative: str, *, directory: bool = False) -> bool:
     if root == "tools":
         return not directory and len(parts) == 2 and parts[1] in TOOLS
     if root == "docs":
-        if len(parts) == 2 and parts[1] in DOC_FILES:
-            return not directory
-        branch = "/".join(parts[1:] if directory else parts[1:-1])
-        return _branch_allowed(branch, DOC_BRANCHES) and (directory or suffix in SOURCE_EXT)
+        return not directory and len(parts) == 2 and parts[1] in DOC_FILES
     if root == "tests":
         return _exact_member(relative, PUBLIC_TEST_FILES, directory=directory)
     if root == "third_party":
@@ -296,7 +271,6 @@ def suite_allowed(relative: str, *, directory: bool = False) -> bool:
 
 def select_files(source: Path, suite: Path | None = None) -> list[tuple[str, Path]]:
     selected = _walk_selected(source, allowed)
-    _check_ui_resource_closure(selected)
     _check_cloud_source_closure(selected)
     # Do not recurse SDK installations. Include only these explicitly named notices.
     for sdk in SDK_NOTICE_ROOTS:
@@ -331,52 +305,6 @@ def _check_cloud_source_closure(selected):
         with read_plain(path) as data:
             if len(data)!=entry['bytes'] or sha256(data)!=entry['sha256']:
                 raise ExportError('Cloud source export member identity differs: '+name)
-
-
-def _check_ui_resource_closure(selected: list[tuple[str, Path]]) -> None:
-    """Validate only the three active indexes and their exact selected payloads.
-
-    Internal context-index provenance references are descriptive JSON; they do
-    not cause any historical proposal, proof, handoff or review file to be read.
-    """
-    selected_paths = dict(selected)
-    indexes = (
-        ("ui_system/runtime/resources.json", "resources", "file", "",
-            UI_RUNTIME_FILES - {"ui_system/runtime/resources.json"}),
-        ("ui_system/proposals/contract-v1-r5/index.json", "files", "path",
-            "ui_system/proposals/contract-v1-r5/",
-            {"ui_system/proposals/contract-v1-r5/" + name for name in UI_SCHEMA_NAMES - {"index.json"}}),
-        ("ui_system/contracts/component-contract-v1-r1/index.json", "files", "path",
-            "ui_system/contracts/component-contract-v1-r1/",
-            {"ui_system/contracts/component-contract-v1-r1/" + name
-                for name in (UI_SCHEMA_NAMES | {"components-v1.json"}) - {"index.json"}}),
-    )
-    for index_name, field, path_field, prefix, expected in indexes:
-        if index_name not in selected_paths:
-            continue
-        with read_plain(selected_paths[index_name]) as raw:
-            if len(raw) > 128 * 1024:
-                raise ExportError("Active UI index exceeds its source bound")
-            try:
-                document = json.loads(raw)
-                entries = document[field]
-            except (ValueError, KeyError, TypeError):
-                raise ExportError("Malformed active UI resource index: " + index_name) from None
-        if not isinstance(entries, list) or len(entries) != len(expected):
-            raise ExportError("Active UI resource closure changed: " + index_name)
-        seen = set()
-        for entry in entries:
-            if not isinstance(entry, dict) or not isinstance(entry.get(path_field), str):
-                raise ExportError("Malformed active UI resource entry: " + index_name)
-            relative = prefix + entry[path_field]
-            safe_relative(relative)
-            if relative not in expected or relative in seen or relative not in selected_paths:
-                raise ExportError("Active UI resource closure changed: " + index_name)
-            seen.add(relative)
-            with read_plain(selected_paths[relative]) as payload:
-                if (type(entry.get("bytes")) is not int or len(payload) != entry["bytes"]
-                        or sha256(payload) != entry.get("sha256")):
-                    raise ExportError("Active UI resource identity mismatch: " + relative)
 
 
 PATTERNS = (
