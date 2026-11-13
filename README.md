@@ -44,21 +44,25 @@ Use a short checkout path such as `C:\src\VaporLock`: Qt's dependency files can
 exceed Windows path-length limits in deeply nested checkout/virtualenv folders.
 
 ```powershell
-.\BuildCommunity.ps1 -InstallDependencies -CloudCPU -CloudDML
+.\BuildCommunity.ps1 -InstallDependencies -CloudDML -NativeDirectML
 .\RunGui.bat
 ```
 
-That command prepares source dependencies and compiles available native targets.
-To prepare Python without compiling C++, add `-SkipNativeBuild`. A native engine
-without an ONNX SDK can exercise its synthetic testing path but cannot perform
-real ONNX inference. Supply the ONNX Runtime/DirectML SDKs explicitly to build
-those providers; there are no SDK binaries in this source export:
+`-CloudDML` installs the `.cloud` Python worker. `-NativeDirectML` restores
+the pinned Microsoft.ML.OnnxRuntime.DirectML and
+Microsoft.AI.DirectML NuGet packages into `build/dependencies` and produces
+`build/windows-release/Release/dml/VaporLockDml.exe` with its matching DLLs.
+To prepare Python without compiling C++, use `-SkipNativeBuild` in place of
+`-NativeDirectML`. A native engine built without an ONNX SDK can exercise its
+synthetic testing path. For real ONNX inference, choose a configured backend.
+For an offline build, supply both extracted NuGet packages:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\build_public_client.py --onnx-root C:\SDKs\onnxruntime --dml-root C:\SDKs\directml
+.\.venv\Scripts\python.exe tools\build_public_client.py --dml-root C:\SDKs\onnxruntime-directml --directml-root C:\SDKs\directml
 ```
 
-The CMake cache variables `ONNXRUNTIME_ROOT`, `ONNXRUNTIME_DML_ROOT`,
+Use `--onnx-root` for the separate native CPU/CUDA ONNX Runtime SDK.
+The CMake cache variables `ONNXRUNTIME_ROOT`, `ONNXRUNTIME_DML_ROOT`, `VAPORLOCK_DIRECTML_ROOT`,
 `VAPORLOCK_TENSORRT_RTX_ROOT`, `CUDAToolkit_ROOT` and
 `VAPORLOCK_CUDA_RUNTIME_ROOT` configure external SDKs. TensorRT RTX needs its
 compatible CUDA toolkit, compiler and supported NVIDIA GPU. Provider support

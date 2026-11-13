@@ -113,9 +113,11 @@ def main():
             ('trt',('VaporLockTensorRt.exe','onnxruntime.dll','onnxruntime_providers_shared.dll','tensorrt_rtx_1_6.dll','tensorrt_onnxparser_rtx_1_6.dll'))):
             for name in names:
                 copied(args.native/directory/name,package/'engine'/directory/name)
-        # DirectML is an independently licensed vendor runtime already present
-        # in the verified Cloud DML cohort. Do not copy an old product engine.
-        copied(package/'runtime/cloud/dml/onnxruntime/capi/DirectML.dll',package/'engine/dml/DirectML.dll')
+        native_directml = args.native/'dml/DirectML.dll'
+        if not native_directml.is_file():
+            # Older native builds staged the redistributable in the Cloud cohort.
+            native_directml = package/'runtime/cloud/dml/onnxruntime/capi/DirectML.dll'
+        copied(native_directml,package/'engine/dml/DirectML.dll')
         qt=package/'app/_internal'
         for directory in ('','dml','trt'):
             for name in ('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','msvcp140_1.dll','msvcp140_2.dll','msvcp140_codecvt_ids.dll','concrt140.dll'):

@@ -1,10 +1,12 @@
 [CmdletBinding()]
-param([switch]$InstallDependencies, [switch]$CloudCPU, [switch]$CloudDML, [switch]$CloudCUDA, [switch]$SkipNativeBuild,
+param([switch]$InstallDependencies, [switch]$CloudCPU, [switch]$CloudDML, [switch]$CloudCUDA,
+      [switch]$SkipNativeBuild, [switch]$NativeDirectML,
       [ValidatePattern('^https://download\.pytorch\.org/whl/cu[0-9]+$')][string]$TorchCUDAIndex = 'https://download.pytorch.org/whl/cu130')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = $PSScriptRoot
 $python = Join-Path $root '.venv\Scripts\python.exe'
+if ($SkipNativeBuild -and $NativeDirectML) { throw 'Choose either -SkipNativeBuild or -NativeDirectML.' }
 function Checked([string]$exe, [string[]]$arguments) {
     & $exe @arguments
     if ($LASTEXITCODE -ne 0) { throw "Build command failed: $exe" }
@@ -28,5 +30,9 @@ foreach ($kind in @('cpu','dml','cuda')) {
     } else { Checked $workerPython @('-I','-m','pip','install','torch','torchvision','--index-url',$TorchCUDAIndex) }
 }
 Checked $python @('-I','-B',(Join-Path $root 'tools\refresh_public_manifests.py'))
-if (-not $SkipNativeBuild) { Checked $python @('-I','-B',(Join-Path $root 'tools\build_public_client.py')) }
+if (-not $SkipNativeBuild) {
+    $nativeArguments = @('-I','-B',(Join-Path $root 'tools\build_public_client.py'))
+    if ($NativeDirectML) { $nativeArguments += '--native-directml' }
+    Checked $python $nativeArguments
+}
 Write-Host 'Source preparation finished. Run RunGui.bat. Optional driver/test-suite dependencies are documented in README.md.'

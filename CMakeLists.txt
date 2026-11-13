@@ -139,6 +139,8 @@ endif()
 
 set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime-gpu" CACHE PATH "Path to an extracted ONNX Runtime Windows SDK")
 set(ONNXRUNTIME_DML_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime-directml-1.24.4" CACHE PATH "Path to an extracted ONNX Runtime DirectML package")
+set(VAPORLOCK_DIRECTML_ROOT "" CACHE PATH "Path to an extracted Microsoft.AI.DirectML package")
+option(VAPORLOCK_REQUIRE_DIRECTML "Require a complete native DirectML build" OFF)
 set(VAPORLOCK_CUDA_RUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cuda-runtime" CACHE PATH "Directory containing CUDA/cuDNN runtime DLLs")
 set(VAPORLOCK_TENSORRT_RTX_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorrt-rtx-1.6.1.120/TensorRT-RTX-1.6.1.120" CACHE PATH "Path to an extracted TensorRT RTX Windows SDK")
 option(VAPORLOCK_BUILD_CUDA_PREPROCESS "Build the optional custom CUDA preprocessing module" OFF)
@@ -289,17 +291,54 @@ endif()
 # separate executable. This prevents incompatible provider DLLs from being
 # loaded into one process.
 set(VAPORLOCK_DML_NATIVE "${ONNXRUNTIME_DML_ROOT}/runtimes/win-x64/native")
-if(EXISTS "${ONNXRUNTIME_DML_ROOT}/build/native/include/onnxruntime_cxx_api.h" AND EXISTS "${VAPORLOCK_DML_NATIVE}/onnxruntime.lib")
+set(VAPORLOCK_DML_INCLUDE "${ONNXRUNTIME_DML_ROOT}/build/native/include")
+set(VAPORLOCK_DML_RUNTIME_FILES
+    "${VAPORLOCK_DML_NATIVE}/onnxruntime.dll"
+    "${VAPORLOCK_DML_NATIVE}/onnxruntime_providers_shared.dll")
+set(VAPORLOCK_DML_MISSING)
+foreach(sdk_file IN ITEMS "${VAPORLOCK_DML_INCLUDE}/onnxruntime_cxx_api.h"
+                         "${VAPORLOCK_DML_INCLUDE}/dml_provider_factory.h"
+                         "${VAPORLOCK_DML_NATIVE}/onnxruntime.lib" ${VAPORLOCK_DML_RUNTIME_FILES})
+    if(NOT EXISTS "${sdk_file}" OR IS_DIRECTORY "${sdk_file}")
+        list(APPEND VAPORLOCK_DML_MISSING "${sdk_file}")
+    endif()
+endforeach()
+
+set(VAPORLOCK_DIRECTML_DLL "${VAPORLOCK_DML_NATIVE}/DirectML.dll")
+if(VAPORLOCK_DIRECTML_ROOT)
+    set(VAPORLOCK_DIRECTML_DLL "${VAPORLOCK_DIRECTML_ROOT}/bin/x64-win/DirectML.dll")
+    if(NOT EXISTS "${VAPORLOCK_DIRECTML_ROOT}/include/DirectML.h" OR IS_DIRECTORY "${VAPORLOCK_DIRECTML_ROOT}/include/DirectML.h")
+        list(APPEND VAPORLOCK_DML_MISSING "${VAPORLOCK_DIRECTML_ROOT}/include/DirectML.h")
+    endif()
+endif()
+if(EXISTS "${VAPORLOCK_DIRECTML_DLL}" AND NOT IS_DIRECTORY "${VAPORLOCK_DIRECTML_DLL}")
+    list(APPEND VAPORLOCK_DML_RUNTIME_FILES "${VAPORLOCK_DIRECTML_DLL}")
+elseif(VAPORLOCK_REQUIRE_DIRECTML OR VAPORLOCK_DIRECTML_ROOT)
+    list(APPEND VAPORLOCK_DML_MISSING "${VAPORLOCK_DIRECTML_DLL}")
+endif()
+
+if(VAPORLOCK_DML_MISSING)
+    if(VAPORLOCK_REQUIRE_DIRECTML)
+        list(JOIN VAPORLOCK_DML_MISSING "\n  " missing_files)
+        message(FATAL_ERROR "Native DirectML was requested but these SDK files are missing:\n  ${missing_files}\n"
+            "Set ONNXRUNTIME_DML_ROOT and VAPORLOCK_DIRECTML_ROOT, or use BuildCommunity.ps1 -NativeDirectML.")
+    endif()
+    message(STATUS "Native DirectML engine disabled because the SDK is incomplete. Use BuildCommunity.ps1 -NativeDirectML to enable it.")
+else()
     vaporlock_common_target(VaporLockDml)
     set_target_properties(VaporLockDml PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/dml")
     target_compile_definitions(VaporLockDml PRIVATE VAPORLOCK_HAS_ONNXRUNTIME=1 VAPORLOCK_HAS_DML=1 VAPORLOCK_FORCE_DML=1)
-    target_include_directories(VaporLockDml PRIVATE "${ONNXRUNTIME_DML_ROOT}/build/native/include")
+    target_include_directories(VaporLockDml PRIVATE "${VAPORLOCK_DML_INCLUDE}")
+    if(VAPORLOCK_DIRECTML_ROOT)
+        target_include_directories(VaporLockDml PRIVATE "${VAPORLOCK_DIRECTML_ROOT}/include")
+    endif()
     target_link_libraries(VaporLockDml PRIVATE d3d12)
-    foreach(runtime_dll IN ITEMS onnxruntime.dll onnxruntime_providers_shared.dll)
-        add_custom_command(TARGET VaporLockDml POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VAPORLOCK_DML_NATIVE}/${runtime_dll}" "$<TARGET_FILE_DIR:VaporLockDml>/${runtime_dll}"
-        )
-    endforeach()
+    add_custom_target(VaporLockDmlRuntime
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:VaporLockDml>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VAPORLOCK_DML_RUNTIME_FILES} "$<TARGET_FILE_DIR:VaporLockDml>"
+        DEPENDS ${VAPORLOCK_DML_RUNTIME_FILES}
+        VERBATIM)
+    add_dependencies(VaporLockDml VaporLockDmlRuntime)
 endif()
 
 # TensorRT RTX is a dedicated NVIDIA consumer-GPU engine. It shares the
