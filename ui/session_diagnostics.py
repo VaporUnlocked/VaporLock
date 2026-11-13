@@ -22,7 +22,7 @@ METRICS = frozenset({
 })
 STAGES = ('capture','preprocess','model','postprocess','tracking','loop_interval',
           'observation_interval','completion_interval','observation_age')
-OPTIONAL_STAGES = ('capture_wall','capture_acquire','capture_rate_wait',
+OPTIONAL_STAGES = ('capture_wall','capture_acquire','capture_dxgi_readback','capture_dxgi_cpu_copy','capture_rate_wait',
                    'capture_rate_overshoot','post_tracking_work')
 VALUES = ('mean_ms','p50_ms','p95_ms','p99_ms','max_ms')
 

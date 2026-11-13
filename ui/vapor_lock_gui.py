@@ -30,6 +30,7 @@ from guide_links import add_guide_button, guide_topic
 from vlui_live_context import validated_native_settings
 from vlui_c014_settings import CAPTURE_FIELDS, validated_capture_field, validated_capture_settings
 from frame_rate import FRAME_RATE_FIELDS, MAX_FRAME_RATE, valid_frame_rate
+from default_profile import DEFAULT_CAPTURE_REGION
 from annotation_provider import BACKENDS as ANNOTATION_BACKENDS
 _NATIVE_INJECTION = native_injection()
 from dataset_storage import atomic_text, dataset_lock, recover_annotations
@@ -596,10 +597,10 @@ class Settings:
     max_detections: int = 300
     resize_mode: str = "letterbox"
     monitor: int = 1
-    region_x: int = 0
-    region_y: int = 0
-    region_width: int = 640
-    region_height: int = 640
+    region_x: int = DEFAULT_CAPTURE_REGION[0]
+    region_y: int = DEFAULT_CAPTURE_REGION[1]
+    region_width: int = DEFAULT_CAPTURE_REGION[2]
+    region_height: int = DEFAULT_CAPTURE_REGION[3]
     capture_fps: int = 30
     inference_fps: int = 30
     frame_skip: int = 0
@@ -5184,7 +5185,7 @@ class ControlCenter(QMainWindow):
         benchmark = QWidget()
         benchmark_row = QHBoxLayout(benchmark)
         benchmark_row.setContentsMargins(0, 0, 0, 0)
-        self.model_benchmark = QLabel("Run a short live comparison of the bundled CUDA, DirectML, and CPU engines for this model.")
+        self.model_benchmark = QLabel("Compare available providers using a centered 640 × 640 capture.")
         self.model_benchmark.setObjectName("detail")
         self.model_benchmark.setWordWrap(True)
         self.model_benchmark_button = QPushButton("Benchmark providers")
@@ -5192,7 +5193,7 @@ class ControlCenter(QMainWindow):
         self.model_benchmark_button.clicked.connect(self.benchmark_providers)
         benchmark_row.addWidget(self.model_benchmark, 1)
         benchmark_row.addWidget(self.model_benchmark_button)
-        self.model_benchmark_button.setToolTip('Measures the model on the configured capture region with output, preview and dataset writing disabled. Capture must be stopped first.')
+        self.model_benchmark_button.setToolTip('Capture must be stopped first. The benchmark runs with output, preview and dataset writing disabled.')
         check_details.body.addWidget(self.model_benchmark)
         actions_flow.addWidget(self._tuning_lock.wrap(self.model_benchmark_button))
         benchmark.deleteLater()
@@ -9444,6 +9445,8 @@ class ControlCenter(QMainWindow):
             ('capture_rate_wait', 'Capture pacing wait'),
             ('capture_rate_overshoot', 'Capture timer overshoot'),
             ('capture_acquire', 'Capture wait'),
+            ('capture_dxgi_readback', 'DXGI readback wait'),
+            ('capture_dxgi_cpu_copy', 'DXGI CPU pixel copy'),
             ('model', 'Model execution'),
             ('post_tracking_work', 'Post-tracking work'),
             ('completion_interval', 'Inference completion interval'),
@@ -9551,6 +9554,8 @@ class ControlCenter(QMainWindow):
 
     @disposable_deny('model-process')
     def benchmark_providers(self) -> None:
+        from model_probe import performance_probe_settings
+
         if self.engine.active:
             self.model_benchmark.setText("Stop the active capture session before benchmarking providers.")
             return
@@ -9567,9 +9572,8 @@ class ControlCenter(QMainWindow):
         if not candidates:
             self.model_benchmark.setText("No bundled native engine is available for benchmarking.")
             return
-        settings = Settings(**asdict(self.settings))
+        settings = performance_probe_settings(self.settings)
         settings.model_path = str(model)
-        settings.frame_skip = 0
         settings.preview_enabled = False
         settings.dataset_enabled = False
         settings.movement_enabled = False
@@ -9581,7 +9585,6 @@ class ControlCenter(QMainWindow):
         self._benchmark_active = True
         self.model_benchmark_button.setEnabled(False)
         self.set_start_enabled(False)
-        self.model_benchmark.setText("Benchmarking providers on the current capture region...")
         self._run_next_provider_benchmark()
 
     def _run_next_provider_benchmark(self) -> None:
@@ -9602,7 +9605,8 @@ class ControlCenter(QMainWindow):
             self._benchmark_results.append({'provider': provider, **result.measurement} if result.ok
                                            else {'provider': provider, 'error': result.reason})
             self._run_next_provider_benchmark()
-        self.model_benchmark.setText(f"Benchmarking {self.engine.provider_label(provider)}...")
+        self.model_benchmark.setText(self.tf("Benchmarking {provider} at 640 × 640…",
+                                            provider=self.engine.provider_label(provider)))
         self._probe_model(self._benchmark_settings, provider, completed)
 
     def _finish_provider_benchmark(self) -> None:
@@ -11116,7 +11120,7 @@ class ControlCenter(QMainWindow):
                 overlay = raw.get("overlay", {})
                 visuals = raw.get("visuals", {})
                 dataset = raw.get("dataset", {})
-                region = capture.get("region", [0, 0, 640, 640])
+                region = capture.get("region", list(DEFAULT_CAPTURE_REGION))
                 if isinstance(region, str):
                     try:
                         region = [int(value.strip()) for value in region.split(",")]

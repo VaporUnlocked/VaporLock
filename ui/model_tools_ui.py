@@ -8,8 +8,9 @@ import time
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
-    QLabel, QLineEdit, QComboBox, QPushButton, QListWidget, QListWidgetItem, QFileDialog, QScrollArea)
+    QCheckBox, QLabel, QLineEdit, QComboBox, QPushButton, QListWidget, QListWidgetItem, QFileDialog, QScrollArea)
 
+from model_probe import performance_probe_settings
 from pipeline_tools import model_identity, engine_identity, recommended_rates, profile_summary
 
 
@@ -65,12 +66,13 @@ class ModelTools(QDialog):
         c=self.center
         if self._measured_display is None:
             self.performance.setText(c.t(self._performance_copy)); return
-        results,proposal,original,input_details=self._measured_display
+        results,proposal,original,measured,input_details=self._measured_display
         lines=[c.tf('{provider}: {rate} inferences/s, {ms} ms per inference',
             provider=c.engine.provider_label(r['provider']),rate=f"{r['fps']:.1f}",ms=f"{r['inference_ms']:.1f}") for r in results]
         lines.append(c.tf('Verified model input: {details}',details=input_details))
-        lines.append(c.tf('Capture region: {width} × {height}; monitor: {monitor}',
-            width=getattr(original,'region_width',0),height=getattr(original,'region_height',0),monitor=getattr(original,'monitor',0)))
+        lines.append(c.tf('Benchmark region ({x}, {y}, {width}, {height}) on monitor {monitor}',
+            x=measured.region_x, y=measured.region_y, width=measured.region_width,
+            height=measured.region_height, monitor=measured.monitor))
         names={'provider':'Inference provider','capture_fps':'Capture rate','inference_fps':'Inference rate','frame_skip':'Frame skipping'}
         for provider,reason in self._failures:
             lines.append(c.engine.provider_label(provider)+': '+c.t(reason))
@@ -107,12 +109,17 @@ class ModelTools(QDialog):
     def _performance_page(self):
         layout = self.page('Performance setup')
         layout.addWidget(self.label('Measure and Apply stop the current session. Output stays stopped until you use Start.'))
-        layout.addWidget(self.label('Measures the current capture region with output, previews and dataset writing disabled. Measurement uses at least 120 capture/inference requests per second and no frame skipping.'))
+        layout.addWidget(self.label('Measures a centered 640 × 640 region by default. Output, previews, dataset writing and frame skipping are disabled during measurement.'))
+        region_label = 'Measure the current profile region'
+        self.use_profile_region = QCheckBox(self.center.t(region_label))
+        self._static.append((self.use_profile_region, region_label))
+        self.use_profile_region.toggled.connect(self.invalidate)
+        layout.addWidget(self.use_profile_region)
         self.measure_button = self.button(layout, 'Measure performance', self.measure)
         self.performance = self.label('Run measurements to see current → proposed settings. Apply is unavailable until measurements are complete.')
         layout.addWidget(self.performance)
         self.apply_button = self.button(layout, 'Apply measured recommendation', self.apply_recommendation)
-        layout.addWidget(self.label('A conservative starting point with 10% rate headroom, capped at 120. Lower rates reduce load but can increase response delay. Results describe this machine and capture scene; detection accuracy is not measured.'))
+        layout.addWidget(self.label('Recommendations leave 10% headroom and respect the configured FPS limits. Results describe this machine and capture scene.'))
         layout.addWidget(self.label('Model input size is defined by the ONNX model. Capture-region size is separate. Keep the current input size unless a different export has been validated; no quality-preserving resize is assumed.'))
         layout.addStretch()
 
@@ -268,6 +275,7 @@ class ModelTools(QDialog):
         cleanup=self._identity_thread is not None and self._identity_thread.is_alive()
         enabled=not self.busy and not cleanup and not bool(getattr(self.center,'_model_probes',[]))
         self.measure_button.setEnabled(enabled)
+        self.use_profile_region.setEnabled(enabled)
         self.switch_button.setEnabled(enabled and bool(self.candidate.text().strip()))
         self.test_signal_button.setEnabled(enabled)
         self.apply_button.setEnabled(enabled and self._recommendation is not None)
@@ -367,8 +375,9 @@ class ModelTools(QDialog):
         self._begin('measure',lambda:self._identity(self._settings,self._measure_ready))
 
     def _measure_ready(self, identity):
-        c=self.center; settings=deepcopy(self._settings)
-        settings.frame_skip=0; results=[]; failures=[]; input_details=''
+        c=self.center
+        settings=performance_probe_settings(self._settings, use_current_region=self.use_profile_region.isChecked())
+        results=[]; failures=[]; input_details=''
         def recommend():
             return recommended_rates(results, capture_limit=settings.capture_fps,
                                      inference_limit=settings.inference_fps)
@@ -402,7 +411,7 @@ class ModelTools(QDialog):
             proposal=recommend()
             if proposal is None: self._fail('No provider produced usable live timing data.'); return
             self._recommendation=(identity,self._stamp,proposal,self._session_generation,time.monotonic())
-            self._measured_display=(results,proposal,self._settings,input_details)
+            self._measured_display=(results,proposal,self._settings,settings,input_details)
             self.render_performance()
             self._complete('Measurements ready. Review the proposed changes before Apply.')
         next_provider()

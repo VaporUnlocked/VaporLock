@@ -1,5 +1,7 @@
 """Bundled default for installations without a saved default profile."""
 
+DEFAULT_CAPTURE_REGION = (0, 0, 640, 640)
+
 DEFAULT_PROFILE_JSON = br"""{
   "profile_name": "default",
   "model_path": "models\\nanoparticle-003-c.onnx",

@@ -1326,6 +1326,8 @@ _ROWS.update({
     "Capture pacing wait": ("采集限速等待", "Wartezeit durch Erfassungslimit", "Ожидание по лимиту захвата", "Attente de cadence de capture"),
     "Capture timer overshoot": ("采集计时器超时量", "Verzögerung des Erfassungstimers", "Задержка таймера захвата", "Retard du minuteur de capture"),
     "Post-tracking work": ("跟踪后的处理", "Verarbeitung nach der Verfolgung", "Обработка после отслеживания", "Traitement après le suivi"),
+    "DXGI readback wait": ("DXGI 读回等待", "DXGI-Wartezeit beim Rücklesen", "Ожидание чтения DXGI", "Attente de lecture DXGI"),
+    "DXGI CPU pixel copy": ("DXGI CPU 像素复制", "DXGI-Pixelkopie durch CPU", "Копирование пикселей DXGI процессором", "Copie des pixels DXGI par le processeur"),
     "Capture: {capture} · Model input: {input}": (
         "采集：{capture} · 模型输入：{input}", "Erfassung: {capture} · Modelleingabe: {input}",
         "Захват: {capture} · Вход модели: {input}", "Capture : {capture} · Entrée du modèle : {input}",

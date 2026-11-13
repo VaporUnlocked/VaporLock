@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, QProcess, QTimer
+from default_profile import DEFAULT_CAPTURE_REGION
 from engine_stream import EngineLineReader
 from tuning_tools import InferenceMeasurement
 
@@ -160,13 +162,22 @@ class ModelProbe(QObject):
 
 def inert_settings(settings):
     """A new settings object: no output, driver, preview, event, or dataset job."""
-    from copy import deepcopy
     result = deepcopy(settings)
     for name in ("movement_enabled", "motion_compensation_enabled", "event_action_enabled",
                  "dataset_enabled", "preview_enabled", "preview_lossless", "desktop_overlay_enabled"):
         if hasattr(result, name):
             setattr(result, name, False)
     result.output_transport = "mouse"
+    return result
+
+
+def performance_probe_settings(settings, *, use_current_region=False):
+    """Use a common capture region unless this measurement targets the profile."""
+    result = deepcopy(settings)
+    result.frame_skip = 0
+    if not use_current_region:
+        (result.region_x, result.region_y, result.region_width,
+         result.region_height) = DEFAULT_CAPTURE_REGION
     return result
 
 

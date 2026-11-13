@@ -97,6 +97,29 @@ class PublicClientTests(unittest.TestCase):
         proposal = recommended_rates(results, capture_limit=120, inference_limit=144)
         self.assertEqual((proposal["capture_fps"], proposal["inference_fps"]), (120, 144))
 
+    def test_provider_measurements_default_to_centered_640_crop(self):
+        from default_profile import DEFAULT_PROFILE_JSON
+        from model_probe import performance_probe_settings
+        from vapor_lock_gui import ControlCenter, EngineBridge
+
+        def native_region(settings):
+            arguments = EngineBridge.arguments_for(settings, "dml", observe_only=True)
+            return arguments[arguments.index("--region") + 1]
+
+        default = ControlCenter.prepare_profile_bytes(None, DEFAULT_PROFILE_JSON)
+        self.assertEqual(native_region(default), "0,0,640,640")
+        custom = ControlCenter.prepare_profile_bytes(None, json.dumps({
+            "region_x": -12, "region_y": 9, "region_width": 100, "region_height": 80,
+            "frame_skip": 3, "capture_fps": 88, "inference_fps": 103,
+        }).encode())
+        standard = performance_probe_settings(custom)
+        profiled = performance_probe_settings(custom, use_current_region=True)
+        self.assertEqual(native_region(standard), "0,0,640,640")
+        self.assertEqual(native_region(profiled), "-12,9,100,80")
+        self.assertEqual(native_region(custom), "-12,9,100,80")
+        self.assertEqual((standard.frame_skip, profiled.frame_skip, custom.frame_skip), (0, 0, 3))
+        self.assertEqual((standard.capture_fps, standard.inference_fps), (88, 103))
+
     def test_engine_capabilities_accepts_legacy_and_cuda_graph_responses(self):
         from engine_capabilities import EngineCapabilities
 

@@ -41,6 +41,109 @@ static void verifyLines() {
     std::cout << "Visible-pixel parity cases: " << cases << "; extreme endpoints passed\n";
 }
 
+struct CaptureLookaheadFixture {
+    std::mutex mutex;
+    std::condition_variable wake;
+    int attempts = 0, allowed = 0;
+    std::uint64_t source = 1;
+
+    bool reached(int count) {
+        std::unique_lock lock(mutex);
+        return wake.wait_for(lock, std::chrono::seconds(2), [&] { return attempts >= count; });
+    }
+    void release(int count, std::uint64_t generation) {
+        std::lock_guard lock(mutex);
+        allowed = count;
+        source = generation;
+        wake.notify_all();
+    }
+};
+
+struct CaptureLookaheadSource {
+    using Frame = DesktopCapture::Frame;
+    static inline CaptureLookaheadFixture* fixture = nullptr;
+
+    template<class Cancelled>
+    bool capture(const AppConfig& config, unsigned, Cancelled cancelled) {
+        frame.fresh = false;
+        std::unique_lock lock(fixture->mutex);
+        const int attempt = ++fixture->attempts;
+        fixture->wake.notify_all();
+        if (!fixture->wake.wait_for(lock, std::chrono::seconds(2), [&] { return fixture->allowed >= attempt; }))
+            return false;
+        if (cancelled()) return true;
+        frame.identity = {1, fixture->source, static_cast<std::uint64_t>(attempt), 0};
+        lock.unlock();
+        frame.observed = frame.acquired = AimClock::now();
+        frame.frameWidth = config.captureRegion.width;
+        frame.frameHeight = config.captureRegion.height;
+        frame.pixels.assign(static_cast<std::size_t>(frame.frameWidth) * frame.frameHeight * 4U,
+                            static_cast<unsigned char>(attempt));
+        frame.fresh = true;
+        return true;
+    }
+
+    bool freshFrame() const { return frame.fresh; }
+    AimTime acquiredAt() const { return frame.acquired; }
+    AimTime observedAt() const { return frame.observed; }
+    std::uint64_t dxgiTimeouts() const { return 0; }
+    void takeFrame(Frame& destination, std::uint64_t revision) {
+        frame.identity.configRevision = revision;
+        std::swap(destination, frame);
+    }
+    Frame frame;
+};
+
+static void verifyCaptureLookahead() {
+    using namespace std::chrono_literals;
+    using Worker = DesktopCaptureWorkerFor<CaptureLookaheadSource>;
+    CaptureLookaheadFixture fixture;
+    CaptureLookaheadSource::fixture = &fixture;
+    std::atomic<std::uint64_t> liveRevision{1}, observedSource{0};
+    Worker worker([&](std::uint64_t revision) { return liveRevision != revision; },
+                  [&](CaptureFrameIdentity identity) { observedSource = identity.sourceGeneration; });
+    const Worker::Request request{1, {0, 0, 640, 640}, 256, 1};
+    Worker::Progress progress;
+    DesktopCapture::Frame frame;
+    worker.submit(request);
+    fixture.release(1, 1);
+    require(worker.take(frame, 1, 2s, &progress) == Worker::Result::Frame && observedSource == 1,
+            "Initial capture or source notification did not arrive");
+    require(frame.width() == 640 && frame.height() == 640 && frame.pixels.front() == 1,
+            "Capture did not preserve the default crop and its pixels");
+    const auto original = frame.identity;
+
+    worker.submit(request); // Start lookahead while the first frame remains in inference.
+    worker.submit(request);
+    require(fixture.reached(2), "Next capture did not start during inference");
+    require(worker.take(frame, 1, 0ms) == Worker::Result::Pending
+                && frame.identity == original && frame.pixels.front() == 1,
+            "Pending capture changed the consumer's committed frame");
+    require(worker.withCurrentSource(original, [] {}), "An in-progress read retired the current source");
+    fixture.release(2, 2);
+    require(worker.take(frame, 1, 2s) == Worker::Result::Frame
+                && frame.identity.frameId == 2 && frame.pixels.front() == 2 && observedSource == 2,
+            "The one-slot lookahead did not commit the next source");
+    require(!worker.withCurrentSource(original, [] {}), "A previous capture source could still publish");
+
+    worker.submit(request);
+    require(fixture.reached(3), "The next read was not scheduled");
+    liveRevision = 2;
+    auto revised = request;
+    revised.revision = 2;
+    worker.submit(revised);
+    fixture.release(4, 2);
+    require(worker.take(frame, 1, 0ms) == Worker::Result::Pending,
+            "A superseded capture escaped its configuration revision");
+    require(worker.take(frame, 2, 2s, &progress) == Worker::Result::Frame
+                && frame.identity.frameId == 4 && frame.identity.configRevision == 2 && frame.pixels.front() == 4,
+            "A new request did not replace obsolete in-flight capture");
+    require(progress.retiredAttempts == 1, "An obsolete capture attempt was not counted");
+    worker.stop();
+    CaptureLookaheadSource::fixture = nullptr;
+    std::cout << "640x640 capture lookahead, source transition and config cancellation passed\n";
+}
+
 static void verifyPreviewQueue(bool cancel) {
     std::promise<void> started, release;
     auto released = release.get_future();
@@ -276,6 +379,7 @@ int main(int argc, char** argv) {
         }
     }
     verifyLines();
+    verifyCaptureLookahead();
     verifyPreviewQueue(false);
     verifyPreviewQueue(true);
     verifyThreadedEncoding(false);
