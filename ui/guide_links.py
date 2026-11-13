@@ -17,7 +17,7 @@ GROUPS = {
     'duplicate-boxes': 'nms_enabled nms_iou nms_class_agnostic max_detections',
     'wrong-crop': 'monitor region_x region_y region_width region_height',
     'slow-processing': 'capture_fps inference_fps frame_skip ort_intra_op_threads ort_inter_op_threads provider',
-    'blank-preview': 'preview_enabled preview_fps preview_quality',
+    'blank-preview': 'preview_enabled preview_fps preview_quality preview_lossless',
     'missing-overlay': 'overlay_enabled overlay_boxes overlay_motion overlay_fov desktop_overlay_enabled desktop_overlay_visible desktop_overlay_opacity desktop_overlay_labels desktop_overlay_status desktop_overlay_motion desktop_overlay_layout desktop_overlay_scale',
     'controller-activation': 'activation_mode activation_key activation_source controller_slot controller_binding controller_trigger_press controller_trigger_release',
     'no-movement': 'movement_enabled output_transport aim_reference aim_reference_x aim_reference_y',

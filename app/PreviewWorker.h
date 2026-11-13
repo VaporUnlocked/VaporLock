@@ -56,11 +56,18 @@ public:
     }
 
     static std::string encode(Frame frame) {
-        std::vector<unsigned char> jpeg;
+        const bool lossless = frame.config.previewLossless;
+        if (lossless && (frame.width <= 0 || frame.height <= 0 || frame.width > 16384 || frame.height > 16384
+            || static_cast<std::size_t>(frame.width) * frame.height > 16777216U
+            || frame.pixels.size() != static_cast<std::size_t>(frame.width) * frame.height * 4U))
+            throw std::runtime_error("The capture size exceeds the lossless preview limits or its pixels are invalid.");
+        std::vector<unsigned char> image;
         const auto pixels = visualizedFrame(frame.width, frame.height, std::move(frame.pixels), frame.tracks, frame.selected, frame.config);
-        if (!encodeJpeg(frame.width, frame.height, pixels, frame.config.previewQuality, jpeg))
+        const bool encoded = lossless ? encodePreviewPng(frame.width, frame.height, pixels, image)
+                                      : encodeJpeg(frame.width, frame.height, pixels, frame.config.previewQuality, image);
+        if (!encoded)
             throw std::runtime_error("Live preview could not be encoded. Capture and inference are still running.");
-        return "{\"type\":\"preview\",\"width\":" + std::to_string(frame.width)
+        auto line = "{\"type\":\"preview\",\"width\":" + std::to_string(frame.width)
             + ",\"height\":" + std::to_string(frame.height)
             + ",\"schema\":2,\"session\":" + std::to_string(frame.identity.session)
             + ",\"source_generation\":" + std::to_string(frame.identity.sourceGeneration)
@@ -72,7 +79,14 @@ public:
             + ",\"reference_inside\":" + (frame.config.frameReference.inside ? "true" : "false")
             + ",\"crosshair_detected\":" + (frame.config.frameReference.detected ? "true" : "false")
             + ",\"crosshair_age_ms\":" + std::to_string(frame.config.frameReference.detected ? std::chrono::duration<double,std::milli>(AimClock::now()-frame.config.frameReference.matched).count() : 0.)
-            + ",\"jpeg\":\"" + base64Encode(jpeg) + "\"}";
+            + (lossless ? ",\"png\":\"" : ",\"jpeg\":\"");
+        const auto base64Bytes = (image.size() + 2U) / 3U * 4U;
+        if (line.size() + base64Bytes + 2U >= vaporlock::io::AsyncTelemetry::maxLineBytes)
+            throw std::runtime_error("The preview image exceeds the native message size limit.");
+        line.reserve(line.size() + base64Bytes + 2U);
+        line += base64Encode(image);
+        line += "\"}";
+        return line;
     }
 
 private:

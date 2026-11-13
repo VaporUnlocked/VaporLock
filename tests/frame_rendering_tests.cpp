@@ -77,24 +77,67 @@ static void verifyPreviewQueue(bool cancel) {
     std::cout << "Preview latest-only queue cancel=" << cancel << "; 1999 submissions ms=" << ms << '\n';
 }
 
-static void verifyThreadedEncoding() {
+static void verifyThreadedEncoding(bool lossless) {
     std::promise<std::pair<bool, std::string>> result;
     auto future = result.get_future();
     PreviewWorker worker([&](std::string data) { result.set_value({true, std::move(data)}); },
                          [&](std::string error) { result.set_value({false, std::move(error)}); });
     worker.configure(true);
     PreviewWorker::Frame frame;
-    frame.width = 32; frame.height = 16;
-    frame.pixels.resize(32 * 16 * 4, 255);
+    constexpr int width = 31, height = 16;
+    frame.width = width;
+    frame.height = height;
+    frame.pixels.resize(width * height * 4);
+    for (int pixel = 0; pixel < width * height; ++pixel) {
+        frame.pixels[pixel * 4] = static_cast<unsigned char>(pixel * 17);
+        frame.pixels[pixel * 4 + 1] = static_cast<unsigned char>(pixel * 23);
+        frame.pixels[pixel * 4 + 2] = static_cast<unsigned char>(pixel * 61);
+        frame.pixels[pixel * 4 + 3] = 0;
+    }
+    const auto original = frame.pixels;
     frame.config.overlayEnabled = false;
+    frame.config.previewLossless = lossless;
     worker.publish(std::move(frame));
     const bool completed = future.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
     worker.stop();
     require(completed, "Actual preview encoding stalled");
     const auto [success, text] = future.get();
-    require(success && text.starts_with("{\"type\":\"preview\",\"width\":32,\"height\":16,")
-            && text.find("\"jpeg\":\"/9j/") != std::string::npos && text.find("\"schema\":2") != std::string::npos,
+    require(success && text.starts_with("{\"type\":\"preview\",\"width\":31,\"height\":16,")
+            && text.find("\"schema\":2") != std::string::npos,
             "Preview worker did not initialize its own image-encoding context");
+    if (!lossless) {
+        require(text.find("\"jpeg\":\"/9j/") != std::string::npos && text.find("\"png\"") == std::string::npos,
+                "Default preview did not use the JPEG wire format");
+        return;
+    }
+
+    std::vector<unsigned char> png;
+    require(encodePreviewPng(width, height, original, png)
+            && text.ends_with("\"png\":\"" + base64Encode(png) + "\"}") && text.find("\"jpeg\"") == std::string::npos,
+            "Threaded preview did not send the lossless PNG bytes");
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    require(SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf()))),
+            "Cannot create PNG test decoder factory");
+    Microsoft::WRL::ComPtr<IWICStream> stream;
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> decodedFrame;
+    require(SUCCEEDED(factory->CreateStream(stream.GetAddressOf()))
+            && SUCCEEDED(stream->InitializeFromMemory(png.data(), static_cast<DWORD>(png.size())))
+            && SUCCEEDED(factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf()))
+            && SUCCEEDED(decoder->GetFrame(0, decodedFrame.GetAddressOf())), "Cannot decode lossless preview PNG");
+    UINT decodedWidth = 0, decodedHeight = 0;
+    require(SUCCEEDED(decodedFrame->GetSize(&decodedWidth, &decodedHeight)) && decodedWidth == width && decodedHeight == height,
+            "Lossless preview changed the captured dimensions");
+    Microsoft::WRL::ComPtr<IWICFormatConverter> bgra;
+    std::vector<unsigned char> decoded(original.size());
+    require(SUCCEEDED(factory->CreateFormatConverter(bgra.GetAddressOf()))
+            && SUCCEEDED(bgra->Initialize(decodedFrame.Get(), GUID_WICPixelFormat32bppBGRA, WICBitmapDitherTypeNone, nullptr, 0., WICBitmapPaletteTypeCustom))
+            && SUCCEEDED(bgra->CopyPixels(nullptr, width * 4, static_cast<UINT>(decoded.size()), decoded.data())),
+            "Cannot read the decoded lossless preview pixels");
+    for (std::size_t pixel = 0; pixel < decoded.size(); pixel += 4) {
+        require(std::equal(decoded.begin() + pixel, decoded.begin() + pixel + 3, original.begin() + pixel)
+                && decoded[pixel + 3] == 255, "Lossless preview changed RGB or reused undefined capture alpha");
+    }
 }
 
 static void verifyOutputDuringBackpressure() {
@@ -235,7 +278,8 @@ int main(int argc, char** argv) {
     verifyLines();
     verifyPreviewQueue(false);
     verifyPreviewQueue(true);
-    verifyThreadedEncoding();
+    verifyThreadedEncoding(false);
+    verifyThreadedEncoding(true);
     verifyPreviewRecovery();
     verifyOutputDuringBackpressure();
     for (const auto [width, height] : {std::pair{640, 640}, std::pair{1024, 1024}, std::pair{1920, 1080}}) {

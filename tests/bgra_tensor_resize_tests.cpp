@@ -87,14 +87,23 @@ static void compareIdentity(bool nhwc) {
 
 int main(){try{
  vaporlock::image::BgraTensorResize plan;int cases=0;
- for(auto size:std::array<std::array<int,4>,9>{{{1000,1000,640,640},{640,480,640,640},{1,7,11,3},{17,11,23,31},{1920,1080,640,640},{640,640,320,320},{320,640,641,479},{1,1,4,3},{641,479,640,640}}})
- for(bool nhwc:{false,true})for(bool letterbox:{false,true}){
- compare<float>(plan,size[0],size[1],size[2],size[3],nhwc,letterbox);
- compare<uint8_t>(plan,size[0],size[1],size[2],size[3],nhwc,letterbox);cases+=2;
+ const std::array<std::array<int,4>,13> sizes{{
+     {1000,1000,640,640}, {640,480,640,640}, {1,7,11,3}, {17,11,23,31},
+     {1920,1080,640,640}, {640,640,320,320}, {320,640,641,479}, {1,1,4,3},
+     {641,479,640,640}, {100,100,640,640}, {320,180,640,640}, {93,6,79,23}, {7,7,19,21},
+ }};
+ for (auto [width, height, targetWidth, targetHeight] : sizes) {
+     for (bool nhwc : {false, true}) for (bool letterbox : {false, true}) {
+         compare<float>(plan, width, height, targetWidth, targetHeight, nhwc, letterbox);
+         compare<uint8_t>(plan, width, height, targetWidth, targetHeight, nhwc, letterbox);
+         cases += 2;
+     }
  }
  for(bool nhwc:{false,true})for(auto shift:std::array<std::array<float,2>,5>{{{24,0},{-24,0},{0,24},{0,-24},{-2.25F,1.5F}}}){
  compare<float>(plan,9,6,13,11,nhwc,true,shift[0],shift[1]);
  compare<uint8_t>(plan,9,6,13,11,nhwc,true,shift[0],shift[1]);cases+=2;
+ compare<float>(plan,9,6,31,21,nhwc,true,shift[0],shift[1]);
+ compare<uint8_t>(plan,9,6,31,21,nhwc,true,shift[0],shift[1]);cases+=2;
  }
  for (bool nhwc : {false, true}) {
      compareIdentity<float>(nhwc);

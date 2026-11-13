@@ -163,7 +163,7 @@ def inert_settings(settings):
     from copy import deepcopy
     result = deepcopy(settings)
     for name in ("movement_enabled", "motion_compensation_enabled", "event_action_enabled",
-                 "dataset_enabled", "preview_enabled", "desktop_overlay_enabled"):
+                 "dataset_enabled", "preview_enabled", "preview_lossless", "desktop_overlay_enabled"):
         if hasattr(result, name):
             setattr(result, name, False)
     result.output_transport = "mouse"

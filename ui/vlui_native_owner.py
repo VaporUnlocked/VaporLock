@@ -43,6 +43,10 @@ def _canonical_native_palette(palette):
     return result
 
 
+def _native_only_setting(name):
+    return name.startswith('cloud_') or name == 'preview_lossless'
+
+
 class NativeLiveOwner(QObject):
     def __init__(self, center):
         super().__init__(center)
@@ -65,10 +69,9 @@ class NativeLiveOwner(QObject):
         self._notifier = None
         self._notification_pending = False
         self._scale = self._read_scale()
-        # The .cloud suite is native-only. Its local paths/recipes do not add
-        # renderer controls or expand the existing 251-field HTML contract.
+        # Native-only controls live outside the existing renderer contract.
         field_specs = tuple((name, str(field.type)) for name, field in native.Settings.__dataclass_fields__.items()
-                            if not name.startswith('cloud_'))
+                            if not _native_only_setting(name))
         self.producer = LiveContextProducer(read_native_source=self.read_native_source, field_specs=field_specs)
         self.handlers = {'setLocale': self.set_locale, 'setInterfaceMode': self.set_interface,
             'setPaletteColor': self.set_color, 'setPaletteOpacity': self.set_opacity,
@@ -181,7 +184,8 @@ class NativeLiveOwner(QObject):
 
     def read_native_source(self):
         center = self._center
-        settings = {key:value for key,value in asdict(center.settings).items() if not key.startswith('cloud_')}
+        all_settings = asdict(center.settings)
+        settings = {key: value for key, value in all_settings.items() if not _native_only_setting(key)}
         model_state, model_key, model_label = self._native_model(settings)
         selection_signature = (settings['model_path'], model_state, model_key)
         if selection_signature != self._model_selection_signature:
@@ -203,8 +207,8 @@ class NativeLiveOwner(QObject):
                          else 'unconnected' for group in _GROUPS}}
         semantic = canonical({key: value for key, value in settings.items() if key != 'profile_name'})
         fingerprint = (canonical(settings), canonical(prefs), model_state, model_key, model_label)
-        native_cloud = tuple((key,canonical(value)) for key,value in sorted(asdict(center.settings).items()) if key.startswith('cloud_'))
-        mutation_fingerprint = (canonical(settings), native_cloud, canonical(prefs['appearance']), canonical(profile),
+        native_only = tuple((key, canonical(value)) for key, value in sorted(all_settings.items()) if _native_only_setting(key))
+        mutation_fingerprint = (canonical(settings), native_only, canonical(prefs['appearance']), canonical(profile),
                                 canonical(catalog), prefs['locale'], prefs['textScale'], model_state, model_key)
         targets = self._profile_target, self._model_target
         authority = (native_injection() is not None, self._cancellation_epoch, center._native_closing,

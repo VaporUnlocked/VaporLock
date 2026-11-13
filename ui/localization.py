@@ -434,6 +434,19 @@ _ROWS: dict[str, tuple[str, str, str, str]] = {
     "Live preview": ("实时预览", "Live-Vorschau", "Предпросмотр в реальном времени", "Aperçu en direct"),
     "Preview rate": ("预览速率", "Vorschaurate", "Частота предпросмотра", "Fréquence d'aperçu"),
     "JPEG quality": ("JPEG 质量", "JPEG-Qualität", "Качество JPEG", "Qualité JPEG"),
+    "Lossless preview": ("无损预览", "Verlustfreie Vorschau", "Предпросмотр без потерь", "Aperçu sans perte"),
+    "Send PNG frames to preserve source colors. This can use more CPU and bandwidth. It only affects the preview.": (
+        "发送 PNG 帧以保留源图像色彩。这可能增加 CPU 和带宽用量，仅影响预览。",
+        "PNG-Bilder erhalten die Quellfarben. Das kann mehr CPU-Leistung und Bandbreite erfordern und betrifft nur die Vorschau.",
+        "Кадры PNG сохраняют исходные цвета. Это может увеличить нагрузку на процессор и канал связи и влияет только на предпросмотр.",
+        "Les images PNG préservent les couleurs d’origine. Cela peut augmenter la charge du processeur et le débit utilisé. Seul l’aperçu est concerné.",
+    ),
+    "Inspect the source capture with optional tracks, anchor, and projected motion.": (
+        "查看原始捕获画面，可选择显示轨迹、锚点和预测运动。",
+        "Das Aufnahmebild mit optionalen Spuren, Anker und vorhergesagter Bewegung prüfen.",
+        "Просмотр исходного кадра с возможностью отображения траекторий, опорной точки и прогнозируемого движения.",
+        "Examiner la capture source et afficher, au choix, les suivis, le point d’ancrage et le mouvement prévu.",
+    ),
     "Save annotated PNG": ("保存标注 PNG", "Annotiertes PNG speichern", "Сохранить аннотированный PNG", "Enregistrer le PNG annoté"),
     "Detection overlay": ("检测叠加层", "Erkennungs-Overlay", "Наложение обнаружения", "Superposition de détection"),
     "Show annotations": ("显示标注", "Anmerkungen anzeigen", "Показывать аннотации", "Afficher les annotations"),
@@ -1310,6 +1323,13 @@ _ROWS.update({
 _ROWS.update({
     "Fresh frame interval": ("新帧间隔", "Abstand neuer Bilder", "Интервал между новыми кадрами", "Intervalle entre nouvelles images"),
     "Capture wait": ("采集等待", "Wartezeit der Erfassung", "Ожидание захвата", "Attente de capture"),
+    "Capture pacing wait": ("采集限速等待", "Wartezeit durch Erfassungslimit", "Ожидание по лимиту захвата", "Attente de cadence de capture"),
+    "Capture timer overshoot": ("采集计时器超时量", "Verzögerung des Erfassungstimers", "Задержка таймера захвата", "Retard du minuteur de capture"),
+    "Post-tracking work": ("跟踪后的处理", "Verarbeitung nach der Verfolgung", "Обработка после отслеживания", "Traitement après le suivi"),
+    "Capture: {capture} · Model input: {input}": (
+        "采集：{capture} · 模型输入：{input}", "Erfassung: {capture} · Modelleingabe: {input}",
+        "Захват: {capture} · Вход модели: {input}", "Capture : {capture} · Entrée du modèle : {input}",
+    ),
     "Inference completion interval": ("推理完成间隔", "Abstand zwischen Inferenzabschlüssen", "Интервал между завершениями вывода", "Intervalle entre inférences terminées"),
     "Frame age after tracking": ("跟踪后的帧龄", "Bildalter nach der Verfolgung", "Возраст кадра после отслеживания", "Âge de l’image après le suivi"),
     "{stage}: {median} ms median · {p95} ms p95": (

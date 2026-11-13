@@ -415,6 +415,7 @@ struct AppConfig {
     bool previewEnabled = false;
     int previewFps = 5;
     int previewQuality = 80;
+    bool previewLossless = false;
     bool datasetEnabled = false;
     bool datasetCaptureConfidenceEnabled = false;
     std::wstring datasetDirectory;
@@ -792,6 +793,37 @@ bool encodeJpeg(int width, int height, const std::vector<unsigned char>& bgra, i
     encoded.assign(data, data + size);
     GlobalUnlock(global);
     return true;
+}
+
+bool encodePreviewPng(int width, int height, const std::vector<unsigned char>& bgra, std::vector<unsigned char>& encoded) {
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf())))) return false;
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    // Desktop alpha is undefined. Treat the fourth byte as padding to preserve opaque RGB.
+    if (FAILED(factory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGR, width * 4,
+                                               static_cast<UINT>(bgra.size()), const_cast<BYTE*>(bgra.data()), bitmap.GetAddressOf()))) return false;
+    Microsoft::WRL::ComPtr<IWICFormatConverter> rgb;
+    if (FAILED(factory->CreateFormatConverter(rgb.GetAddressOf()))
+        || FAILED(rgb->Initialize(bitmap.Get(), GUID_WICPixelFormat24bppBGR, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom))) return false;
+    Microsoft::WRL::ComPtr<IStream> stream;
+    if (FAILED(CreateStreamOnHGlobal(nullptr, TRUE, stream.GetAddressOf()))) return false;
+    Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
+    if (FAILED(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf()))
+        || FAILED(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache))) return false;
+    Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
+    WICPixelFormatGUID format = GUID_WICPixelFormat24bppBGR;
+    if (FAILED(encoder->CreateNewFrame(frame.GetAddressOf(), nullptr))
+        || FAILED(frame->Initialize(nullptr)) || FAILED(frame->SetSize(width, height))
+        || FAILED(frame->SetPixelFormat(&format)) || !IsEqualGUID(format, GUID_WICPixelFormat24bppBGR)
+        || FAILED(frame->WriteSource(rgb.Get(), nullptr)) || FAILED(frame->Commit()) || FAILED(encoder->Commit())) return false;
+    STATSTG stats{};
+    if (FAILED(stream->Stat(&stats, STATFLAG_NONAME)) || stats.cbSize.QuadPart == 0
+        || stats.cbSize.QuadPart > vaporlock::io::AsyncTelemetry::maxLineBytes) return false;
+    encoded.resize(static_cast<std::size_t>(stats.cbSize.QuadPart));
+    ULONG bytesRead = 0;
+    return SUCCEEDED(stream->Seek({}, STREAM_SEEK_SET, nullptr))
+        && SUCCEEDED(stream->Read(encoded.data(), static_cast<ULONG>(encoded.size()), &bytesRead))
+        && bytesRead == encoded.size();
 }
 
 void drawLine(std::vector<unsigned char>& bgra, int width, int height, int x0, int y0, int x1, int y1, const std::array<unsigned char, 3>& color) {
@@ -1907,6 +1939,12 @@ public:
     double postprocessMilliseconds() const { return m_postprocessMs; }
     const std::wstring& deviceName() const noexcept { return m_deviceName; }
     int deviceIndex() const noexcept { return m_inferenceDevice; }
+    std::pair<int, int> onnxInputSize() const noexcept {
+#if VAPORLOCK_HAS_ONNXRUNTIME
+        if (m_runtime) return {m_inputWidth, m_inputHeight};
+#endif
+        return {0, 0};
+    }
     bool cudaGraphActive() const noexcept {
 #if VAPORLOCK_HAS_ONNXRUNTIME && VAPORLOCK_HAS_CUDA
         return m_runtime && m_runtime->cudaGraphActive();
@@ -3720,6 +3758,7 @@ bool applyLiveSetting(AppConfig& config, const std::wstring& field, const std::w
     if (field == L"preview_enabled") return boolean(config.previewEnabled);
     if (field == L"preview_fps") return integer(config.previewFps, 1, 120);
     if (field == L"preview_quality") return integer(config.previewQuality, 30, 100);
+    if (field == L"preview_lossless") return boolean(config.previewLossless);
     if (field == L"overlay_enabled") return boolean(config.overlayEnabled);
     if (field == L"overlay_boxes") return boolean(config.overlayBoxes);
     if (field == L"overlay_motion") return boolean(config.overlayMotion);
@@ -4446,6 +4485,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         else if (argument == L"--no-preview") config.previewEnabled = false;
         else if (argument == L"--preview-fps") config.previewFps = std::clamp(_wtoi(next().c_str()), 1, 120);
         else if (argument == L"--preview-quality") config.previewQuality = std::clamp(_wtoi(next().c_str()), 30, 100);
+        else if (argument == L"--preview-lossless") config.previewLossless = true;
         else if (argument == L"--overlay") config.overlayEnabled = true;
         else if (argument == L"--no-overlay") config.overlayEnabled = false;
         else if (argument == L"--overlay-boxes") config.overlayBoxes = true;
@@ -4544,7 +4584,9 @@ int runHeadless(int argc, wchar_t* argv[]) {
     vaporlock::InferenceCadence inferenceCadence;
     vaporlock::pipeline::PipelineTiming pipelineTiming;
     vaporlock::pipeline::FrameSchedule frameSchedule;
-    vaporlock::pipeline::FreshFrameSchedule freshCaptureSchedule;
+    vaporlock::pipeline::CloudFreshFrameSchedule cloudCaptureSchedule;
+    using FreshFrameSchedule = vaporlock::pipeline::FreshFrameSchedule;
+    FreshFrameSchedule desktopCaptureSchedule(FreshFrameSchedule::Pacing::KeepPhase);
     vaporlock::pipeline::DeadlineWait frameWait;
     AimTime previousLoop{}, previousObservation{}, previousCompletion{};
     const auto started = std::chrono::steady_clock::now();
@@ -4666,6 +4708,19 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const auto frameStarted = std::chrono::steady_clock::now();
         const auto now = frameStarted;
         const bool timingReady = now - started >= std::chrono::seconds(2);
+        const auto waitForCaptureRate = [&](AimTime deadline) {
+            const auto waitStarted = AimClock::now();
+            const bool reached = frameWait.until(deadline, liveConfig.changedEvent(),
+                [&] { return telemetry.failed(); });
+            // Only count completed positive rate waits. Source polling and
+            // interrupted waits do not measure this rate deadline.
+            if (timingReady && reached && waitStarted < deadline) {
+                const auto woke = AimClock::now();
+                pipelineTiming.captureRateWait.record(std::chrono::duration<double, std::milli>(woke - waitStarted).count());
+                pipelineTiming.captureRateOvershoot.record(std::chrono::duration<double, std::milli>(woke - deadline).count());
+            }
+            return reached;
+        };
         if (timingReady && previousLoop >= started + std::chrono::seconds(2))
             pipelineTiming.loopInterval.record(std::chrono::duration<double,std::milli>(now-previousLoop).count());
         previousLoop = now;
@@ -4674,10 +4729,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const bool cloudCapturePaced=!config.cloudPipe.empty();
         const bool desktopModelCapture = !cloudCapturePaced && !config.modelPath.empty() && config.captureMonitor > 0;
         const bool freshCapturePaced = cloudCapturePaced || desktopModelCapture;
+        auto& freshCaptureSchedule = cloudCapturePaced ? cloudCaptureSchedule : desktopCaptureSchedule;
         auto frameDeadline = freshCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
         if(freshCapturePaced && freshCaptureSchedule.hasFresh()) {
-            if(!frameWait.until(freshCaptureSchedule.next(config.captureFps),liveConfig.changedEvent(),
-                               [&]{return telemetry.failed();}))continue;
+            if(!waitForCaptureRate(freshCaptureSchedule.next(config.captureFps)))continue;
             if(!liveConfig.current(outputGeneration))continue;
         }
         previewWorker.configure(config.previewEnabled);
@@ -4988,12 +5043,18 @@ int runHeadless(int argc, wchar_t* argv[]) {
             } else {
                 report << ",\"capture_dxgi_update_fps\":null,\"capture_dxgi_coalesced_fps\":null";
             }
+            if (const auto [inputWidth, inputHeight] = detector.onnxInputSize(); inputWidth > 0 && inputHeight > 0)
+                report << ",\"model_input_width\":" << inputWidth << ",\"model_input_height\":" << inputHeight;
             report << ",\"timing\":";
             pipelineTiming.json(report);
             report << ",\"model\":\"" << (config.modelPath.empty() ? "test signal" : "loaded") << "\"}";
             telemetry.publish(Telemetry::Kind::Stats, report.str());
             lastReport = reportNow;
         }
+
+        if (timingReady && decision == InferenceDecision::Run)
+            pipelineTiming.postTrackingWork.record(
+                std::chrono::duration<double, std::milli>(AimClock::now() - previousCompletion).count());
 
         if (desktopModelCapture) {
             if (!capture.freshFrame()) {
@@ -5011,7 +5072,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
             continue;
         }
         int pacingFps = config.captureFps;
-        while (!frameWait.until(frameDeadline, liveConfig.changedEvent(), [&] { return telemetry.failed(); })) {
+        while (!waitForCaptureRate(frameDeadline)) {
             if (telemetry.failed()) break;
             const int updatedFps = liveConfig.captureFps();
             if (updatedFps != pacingFps) {

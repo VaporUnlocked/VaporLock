@@ -11,6 +11,7 @@ _CAPABILITY_RESOURCE = 201
 _RT_RCDATA = 10
 _ONNX_SUPPORT = 1
 _CUDA_SUPPORT = 2
+_LOSSLESS_PREVIEW_SUPPORT = 4
 
 
 def source_engine(root, provider, *, require_model=False):
@@ -95,6 +96,15 @@ def has_model_support(path, provider):
         return False
     needed = _ONNX_SUPPORT | _CUDA_SUPPORT if provider == 'cuda' else _ONNX_SUPPORT
     return (flags & needed) == needed
+
+
+def supports_lossless_preview(path):
+    try:
+        identity = path.stat()
+        flags = _engine_flags(path, identity.st_size, identity.st_mtime_ns, identity.st_ctime_ns)
+    except OSError:
+        return False
+    return bool(flags & _LOSSLESS_PREVIEW_SUPPORT)
 
 
 def provider_ready(path, provider, *, require_model=False):

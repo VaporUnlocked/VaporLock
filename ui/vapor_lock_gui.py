@@ -720,6 +720,7 @@ class Settings:
     preview_enabled: bool = True
     preview_fps: int = 5
     preview_quality: int = 80
+    preview_lossless: bool = False
     overlay_enabled: bool = True
     overlay_boxes: bool = True
     overlay_motion: bool = True
@@ -1276,7 +1277,11 @@ class PreviewCanvas(QLabel):
                     bounds.y() + (bounds.height() - size.height()) // 2,
                     size.width(), size.height(),
                 )
-                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                # Preserve individual source pixels when magnifying a small crop.
+                pixel_ratio = painter.device().devicePixelRatioF()
+                downscaling = (size.width() * pixel_ratio < self._frame.width()
+                               or size.height() * pixel_ratio < self._frame.height())
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, downscaling)
                 painter.drawImage(target, self._frame)
         if self._frame.isNull():
             super().paintEvent(event)
@@ -2523,7 +2528,7 @@ class EngineBridge(QObject):
         "event_action_enabled", "event_action_requires_activation", "event_action_mode", "event_action_button", "event_action_cooldown_ms",
         "virtual_controller_manual_priority",
         "virtual_controller_stick", "virtual_controller_strength", "invert_x", "invert_y", "response_curve",
-        "preview_enabled", "preview_fps", "preview_quality", "overlay_enabled", "overlay_boxes", "overlay_motion", "overlay_fov", "overlay_segmentation_masks", "segmentation_mask_limit", "segmentation_mask_threshold",
+        "preview_enabled", "preview_fps", "preview_quality", "preview_lossless", "overlay_enabled", "overlay_boxes", "overlay_motion", "overlay_fov", "overlay_segmentation_masks", "segmentation_mask_limit", "segmentation_mask_threshold",
         "dataset_enabled", "dataset_capture_confidence_enabled", "dataset_directory", "dataset_min_confidence", "dataset_interval_ms",
         "dataset_capture_requires_activation", "dataset_jpeg_quality", "dataset_max_images", "dataset_max_mib",
         "desktop_overlay_enabled",
@@ -2575,6 +2580,7 @@ class EngineBridge(QObject):
         self._provider_index = 0
         self._active_provider = ""
         self._has_telemetry = False
+        self._preview_lossless_supported = False
         self._last_error = ""
         self._fatal_error = False
         self._start_failure_scheduled = False
@@ -2742,6 +2748,10 @@ class EngineBridge(QObject):
         if self._settings is not None and field in Settings.__dataclass_fields__:
             setattr(self._settings, field, value)
         if not self.active:
+            return False
+        if field == "preview_lossless" and not self._preview_lossless_supported:
+            if value:
+                self.message.emit("Lossless preview requires an updated native engine. This engine uses JPEG.")
             return False
         if field in self.LIVE_LOCAL_SETTINGS:
             return True
@@ -2980,6 +2990,8 @@ class EngineBridge(QObject):
         args.append("--cuda-graph-replay" if settings.cuda_graph_replay else "--no-cuda-graph-replay")
         args.append("--cuda-preprocess" if settings.cuda_preprocess else "--no-cuda-preprocess")
         args.append("--preview" if settings.preview_enabled else "--no-preview")
+        if settings.preview_lossless:
+            args.append("--preview-lossless")
         args.append("--overlay" if settings.overlay_enabled else "--no-overlay")
         args.append("--overlay-boxes" if settings.overlay_boxes else "--no-overlay-boxes")
         args.append("--overlay-motion" if settings.overlay_motion else "--no-overlay-motion")
@@ -3048,6 +3060,8 @@ class EngineBridge(QObject):
             self._reset_output_stream()
             self._active_provider = provider
             self._has_telemetry = False
+            from native_engine_layout import supports_lossless_preview
+            self._preview_lossless_supported = supports_lossless_preview(executable)
             self._last_error = ""
             self.state_changed.emit(f"Starting {self.provider_label(provider)} engine")
             self.process.setProcessEnvironment(environment)
@@ -3069,6 +3083,10 @@ class EngineBridge(QObject):
                 return
             if self._cloud_session and self._cloud_session.ready:
                 arguments += ['--cloud-pipe', self._cloud_session.pipe, '--cloud-worker-pid', str(self._cloud_session.ready['pid'])]
+            if not self._preview_lossless_supported and "--preview-lossless" in arguments:
+                arguments.remove("--preview-lossless")
+                if self._settings.preview_enabled:
+                    self.message.emit("Lossless preview requires an updated native engine. This engine uses JPEG.")
             self.process.start(str(executable),arguments)
             return
         self.message.emit("No compatible bundled inference engine could be started.")
@@ -3170,7 +3188,7 @@ class EngineBridge(QObject):
         pending, self._pending_visuals = self._pending_visuals, {}
         if self.intentional_stop or self._output_failed or not self.active:
             return
-        # Overlay is independent of JPEG decode and has no preview-rate cap.
+        # Overlay is independent of preview image decoding and its rate cap.
         for kind in ('overlay', 'preview'):
             if kind not in pending:
                 continue
@@ -3188,17 +3206,17 @@ class EngineBridge(QObject):
                 width, height = int(payload["width"]), int(payload["height"])
                 if width <= 0 or height <= 0:
                     raise ValueError("Invalid dimensions")
-                jpeg = base64.b64decode(payload["jpeg"], validate=True)
+                encoded = base64.b64decode(payload["png"] if "png" in payload else payload["jpeg"], validate=True)
                 self._preview_observed_at = time.monotonic() - native_observation_age_ms(payload, native_tick_ms()) / 1000.0
                 from crosshair_reference import remaining_ms
                 self._preview_reference_deadline = time.monotonic()+remaining_ms(payload,native_tick_ms())/1000.
-                self.preview.emit(jpeg, width, height)
+                self.preview.emit(encoded, width, height)
             except (KeyError, ValueError, TypeError):
                 self.message.emit("Received an invalid preview frame from the native engine.")
 
     def _read_output(self) -> None:
         self.process.setReadChannel(QProcess.ProcessChannel.StandardOutput)
-        # Bound work per event-loop turn. JPEG decoding and painting happen only
+        # Bound work per event-loop turn. Image decoding and painting happen only
         # for the newest visual record; lifecycle and dataset events stay ordered.
         chunk = bytes(self.process.read(4 * 1024 * 1024))
         if self.intentional_stop:
@@ -5733,6 +5751,18 @@ class ControlCenter(QMainWindow):
         ):
             self.setting(layout, title, detail, self.feature_control(self.range(field, 0.0, maximum, 2, suffix)))
 
+    def _build_preview_encoding_controls(self, stream: QVBoxLayout) -> None:
+        lossless = QCheckBox("Enabled")
+        lossless.setObjectName("losslessPreview")
+        lossless.setProperty("guideField", "preview_lossless")
+        lossless.setChecked(self.settings.preview_lossless)
+        quality = self.range("preview_quality", 30, 100, 0)
+        quality.setEnabled(not lossless.isChecked())
+        lossless.toggled.connect(lambda enabled: quality.setEnabled(not enabled))
+        lossless.toggled.connect(lambda enabled: self.change("preview_lossless", enabled))
+        self.setting(stream, "Lossless preview", "Send PNG frames to preserve source colors. This can use more CPU and bandwidth. It only affects the preview.", lossless)
+        self.setting(stream, "JPEG quality", "Compression quality for debug frames. Higher values retain finer detail and use more interprocess bandwidth.", quality)
+
     def _build_preview_controls(self, stream: QVBoxLayout, annotations: QVBoxLayout, desktop: QVBoxLayout) -> None:
         self.section(stream, "Preview stream")
         enabled = QCheckBox("Enabled")
@@ -5741,7 +5771,7 @@ class ControlCenter(QMainWindow):
         self._discrete_registry.register('discrete.preview_enabled.1', 'preview_enabled', enabled)
         self.setting(stream, "Live preview", "Emit compressed annotated frames from the native engine only while a session is running. Disabling this removes preview encoding work from the capture pipeline.", enabled)
         self.setting(stream, "Preview rate", "Maximum annotated frames sent to this control center each second.", self.range("preview_fps", 1, 30, 0, " fps"))
-        self.setting(stream, "JPEG quality", "Compression quality for debug frames. Higher values retain finer detail and use more interprocess bandwidth.", self.range("preview_quality", 30, 100, 0))
+        self._build_preview_encoding_controls(stream)
         snapshot = QPushButton("Save annotated PNG")
         snapshot.clicked.connect(self.save_annotated_snapshot)
         self.setting(stream, "Preview snapshot", "Save the most recent native annotated debug frame as a PNG in this Windows account's Vapor Lock screenshots folder.", self.feature_control(snapshot))
@@ -6612,7 +6642,7 @@ class ControlCenter(QMainWindow):
         self.reload_motion_compensation_library()
 
     def visuals_page(self) -> QWidget:
-        page, layout = self.new_page("Visuals", "Inspect the exact selected-monitor crop that the native detector is evaluating, including its active tracks, anchor, and projected motion.")
+        page, layout = self.new_page("Visuals", "Inspect the source capture with optional tracks, anchor, and projected motion.")
         self.section(layout, "Live annotated preview")
         self.preview_view = PreviewCanvas()
         layout.addWidget(self.preview_view)
@@ -6626,7 +6656,7 @@ class ControlCenter(QMainWindow):
         enabled.toggled.connect(lambda state: self.change("preview_enabled", state))
         self.setting(stream, "Live preview", "Emit compressed annotated frames from the native engine only while a session is running. Disabling this removes preview encoding work from the capture pipeline.", enabled)
         self.setting(stream, "Preview rate", "Maximum annotated frames sent to this control center each second.", self.range("preview_fps", 1, 30, 0, " fps"))
-        self.setting(stream, "JPEG quality", "Compression quality for debug frames. Higher values retain finer detail and use more interprocess bandwidth.", self.range("preview_quality", 30, 100, 0))
+        self._build_preview_encoding_controls(stream)
         snapshot = QPushButton("Save annotated PNG")
         snapshot.clicked.connect(self.save_annotated_snapshot)
         self.setting(stream, "Preview snapshot", "Save the most recent native annotated debug frame as a PNG in this Windows account's Vapor Lock screenshots folder.", self.feature_control(snapshot))
@@ -9391,6 +9421,11 @@ class ControlCenter(QMainWindow):
         if all(type(rate) is int and rate > 0 for rate in (capture_cap, inference_cap)):
             lines.append(self.tf('Configured limits: {capture} capture fps · {inference} inference fps',
                 capture=capture_cap, inference=inference_cap))
+        capture_size = data.get('capture_width'), data.get('capture_height')
+        input_size = data.get('model_input_width'), data.get('model_input_height')
+        if all(type(dimension) is int and dimension > 0 for dimension in (*capture_size, *input_size)):
+            lines.append(self.tf('Capture: {capture} · Model input: {input}',
+                capture=f'{capture_size[0]} × {capture_size[1]}', input=f'{input_size[0]} × {input_size[1]}'))
         source_rate = data.get('capture_dxgi_update_fps')
         if finite(source_rate):
             lines.append(self.tf('DXGI desktop updates: {rate}/s', rate=f'{source_rate:.1f}'))
@@ -9406,8 +9441,11 @@ class ControlCenter(QMainWindow):
             timing = {}
         for key, caption in (
             ('observation_interval', 'Fresh frame interval'),
+            ('capture_rate_wait', 'Capture pacing wait'),
+            ('capture_rate_overshoot', 'Capture timer overshoot'),
             ('capture_acquire', 'Capture wait'),
             ('model', 'Model execution'),
+            ('post_tracking_work', 'Post-tracking work'),
             ('completion_interval', 'Inference completion interval'),
             ('observation_age', 'Frame age after tracking'),
         ):
@@ -11488,9 +11526,9 @@ class ControlCenter(QMainWindow):
                 getattr(self, attribute).setText('--')
         self.refresh_preview_status()
 
-    def apply_preview(self, jpeg: bytes, width: int, height: int) -> None:
-        image = QImage.fromData(jpeg, "JPG")
-        if image.isNull():
+    def apply_preview(self, encoded: bytes, width: int, height: int) -> None:
+        image = QImage.fromData(encoded)
+        if image.isNull() or image.size() != QSize(width, height):
             self.log("WARN", "The native engine sent a preview image that Qt could not decode.")
             return
         self._last_preview_frame = image
