@@ -284,6 +284,33 @@ def worker_event(value, operation):
         if set(value)!={'type','model'}:raise CloudInputError('Invalid model-check result.')
         _runtime_model_summary(value['model'])
         return True
+    if operation == 'evaluate' and kind == 'evaluated':
+        from cloud_results import EVALUATION_METRICS
+        if (set(value) != {'type', 'split', 'confidence', 'images', 'metrics'} or value['split'] not in ('val', 'test')
+                or type(value['metrics']) is not dict or set(value['metrics']) != EVALUATION_METRICS.keys()):
+            raise CloudInputError('Invalid .cloud evaluation result.')
+        integer(value['images'], 1, MAX_IMAGES, 'Evaluation images')
+        finite(value['confidence'], 0, 1, 'Evaluation confidence')
+        for name, metric in value['metrics'].items():
+            if metric is not None:
+                finite(metric, 0, 256 if name == 'false_positives_per_frame' else 1, 'Evaluation metric')
+        return True
+    if operation == 'inspect' and kind == 'image_inspected':
+        if set(value) != {'type', 'width', 'height', 'device', 'primary_count', 'invalid_contours',
+                          'empty_masks', 'detections', 'timing_ms'}:
+            raise CloudInputError('Invalid .cloud image inspection result.')
+        if type(value['device']) is not str or not re.fullmatch(r'cpu|cuda(?::[0-9]{1,2})?', value['device']):
+            raise CloudInputError('Invalid inspection device.')
+        for key in ('primary_count', 'invalid_contours', 'empty_masks'):
+            integer(value[key], 0, MAX_DETECTIONS, 'Inspection count')
+        detection_result(value, max_side=32768, max_pixels=MAX_IMAGE_PIXELS)
+        if len(value['detections']) + value['invalid_contours'] + value['empty_masks'] != value['primary_count']:
+            raise CloudInputError('Inspection result counts do not agree.')
+        return True
+    if operation == 'export' and kind == 'exported':
+        if set(value) != {'type', 'output'} or type(value['output']) is not str or not 1 <= len(value['output']) <= 32000:
+            raise CloudInputError('Invalid .cloud ONNX export result.')
+        return True
     if operation == 'check_project' and kind == 'project_checked':
         if set(value) != {'type', 'counts'}:
             raise CloudInputError('Invalid .cloud project-check result.')
@@ -340,37 +367,43 @@ def worker_event(value, operation):
             raise CloudInputError('Invalid .cloud detection result.')
         integer(value['sequence'], 1, 2**64 - 1, 'Result sequence')
         integer(value['captured_ns'], 1, 2**64 - 1, 'Result capture time')
-        width = integer(value['width'], 1, 4096, 'Result width'); height = integer(value['height'], 1, 4096, 'Result height')
-        if width * height > MAX_FRAME_PIXELS or type(value['detections']) is not list or len(value['detections']) > MAX_DETECTIONS:
-            raise CloudInputError('Invalid .cloud detection result size.')
-        aggregate_mask_pixels = 0
-        for detection in value['detections']:
-            if (type(detection) is not dict or set(detection) - {'class_id', 'confidence', 'primary_box', 'mask', 'wrapper'}
-                    or type(detection.get('class_id')) is not int or detection['class_id'] != 0):
-                raise CloudInputError('Invalid .cloud detection class or fields.')
-            finite(detection.get('confidence'), 0, 1, 'Detection confidence')
-            box = detection.get('primary_box')
-            if type(box) is not list or len(box) != 4:
-                raise CloudInputError('Invalid .cloud detection box.')
-            for i, coordinate in enumerate(box):
-                finite(coordinate, 0, width if i % 2 == 0 else height, 'Detection coordinate')
-            if box[2] <= box[0] or box[3] <= box[1]:
-                raise CloudInputError('Invalid .cloud detection box area.')
-            if 'mask' in detection:
-                aggregate_mask_pixels += check_mask(detection['mask'], width, height)
-            wrapper = detection.get('wrapper', [])
-            if type(wrapper) is not list or len(wrapper) > 2048:
-                raise CloudInputError('Invalid .cloud wrapper preview.')
-            for point in wrapper:
-                if type(point) is not list or len(point) != 2:
-                    raise CloudInputError('Invalid .cloud wrapper point.')
-                finite(point[0], 0, width, 'Wrapper X'); finite(point[1], 0, height, 'Wrapper Y')
-        if aggregate_mask_pixels > MAX_FRAME_PIXELS * 4:
-            raise CloudInputError('Detection masks exceed the per-frame allocation budget.')
-        timing = value['timing_ms']
-        if type(timing) is not dict or set(timing) != {'preprocess', 'inference', 'postprocess', 'total'}:
-            raise CloudInputError('Invalid .cloud timing result.')
-        for elapsed in timing.values():
-            finite(elapsed, 0, 60000, 'Runtime timing')
+        detection_result(value, max_side=4096, max_pixels=MAX_FRAME_PIXELS)
         return False
     raise CloudInputError('Unexpected .cloud worker event.')
+
+
+def detection_result(value, *, max_side, max_pixels):
+    width = integer(value['width'], 1, max_side, 'Result width')
+    height = integer(value['height'], 1, max_side, 'Result height')
+    if width * height > max_pixels or type(value['detections']) is not list or len(value['detections']) > MAX_DETECTIONS:
+        raise CloudInputError('Invalid .cloud detection result size.')
+    aggregate_mask_pixels = 0
+    for detection in value['detections']:
+        if (type(detection) is not dict or set(detection) - {'class_id', 'confidence', 'primary_box', 'mask', 'wrapper'}
+                or type(detection.get('class_id')) is not int or detection['class_id'] != 0):
+            raise CloudInputError('Invalid .cloud detection class or fields.')
+        finite(detection.get('confidence'), 0, 1, 'Detection confidence')
+        box = detection.get('primary_box')
+        if type(box) is not list or len(box) != 4:
+            raise CloudInputError('Invalid .cloud detection box.')
+        for i, coordinate in enumerate(box):
+            finite(coordinate, 0, width if i % 2 == 0 else height, 'Detection coordinate')
+        if box[2] <= box[0] or box[3] <= box[1]:
+            raise CloudInputError('Invalid .cloud detection box area.')
+        if 'mask' in detection:
+            aggregate_mask_pixels += check_mask(detection['mask'], width, height)
+        wrapper = detection.get('wrapper', [])
+        if type(wrapper) is not list or len(wrapper) > 2048:
+            raise CloudInputError('Invalid .cloud wrapper preview.')
+        for point in wrapper:
+            if type(point) is not list or len(point) != 2:
+                raise CloudInputError('Invalid .cloud wrapper point.')
+            finite(point[0], 0, width, 'Wrapper X')
+            finite(point[1], 0, height, 'Wrapper Y')
+    if aggregate_mask_pixels > max_pixels * 4:
+        raise CloudInputError('Detection masks exceed the per-frame allocation budget.')
+    timing = value['timing_ms']
+    if type(timing) is not dict or set(timing) != {'preprocess', 'inference', 'postprocess', 'total'}:
+        raise CloudInputError('Invalid .cloud timing result.')
+    for elapsed in timing.values():
+        finite(elapsed, 0, 60000, 'Runtime timing')

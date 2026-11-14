@@ -4,6 +4,7 @@
 #include "training.hpp"
 #include "branding.hpp"
 #include "bundled_assets.hpp"
+#include "yard_view.hpp"
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -19,10 +20,65 @@ std::string glb(const std::string& input) {
     uint32_t header[]={0x46546c67,2,uint32_t(20+json.size()),uint32_t(json.size()),0x4e4f534a};
     std::memcpy(out.data(),header,20);return out+json;
 }
+void checkYard() {
+    const Vector3 player{0,1.62f,-8};
+    YardRound round;
+    for (int i=0;i<int(YardWeapons.size());++i) {
+        round.reset(YardMode::Practice,i,407);
+        check(round.ammo==YardWeapons[i].magazine&&!round.trigger(true,true),"All loadouts start full and respect countdown");
+        for(int t=0;t<160;++t)round.tick(float(TickSeconds),player);
+        check(round.trigger(true,true)&&round.ammo==YardWeapons[i].magazine-1,"Each weapon fires and consumes a round");
+        check(!round.trigger(true,true),"Every weapon respects its cycle time");
+        for(int t=0;t<155;++t)round.tick(float(TickSeconds),player);
+        if(round.gun().automatic)check(round.trigger(false,true),"Automatic weapons fire while held");
+        else if(round.gun().burst>1){
+            check(round.trigger(false,false),"Burst continues after releasing trigger");
+            for(int t=0;t<20;++t)round.tick(float(TickSeconds),player);
+            check(round.trigger(false,false)&&round.burstLeft==0,"Burst stops after three rounds");
+        }else check(!round.trigger(false,true),"Semi-auto weapons require a new trigger press");
+        round.reload();
+        for(int t=0;t<450;++t)round.tick(float(TickSeconds),player);
+        check(round.ammo==round.gun().magazine&&round.reserve==round.gun().reserve,"Practice reload restores reserve");
+    }
+    round.reset(YardMode::Clear,0,407);
+    round.ready=0;round.tick(float(TickSeconds),player);round.time=5;
+    for(int i=0;i<round.population();++i)round.damage(i,120,false);
+    round.tick(float(TickSeconds),player);
+    check(round.phase==YardPhase::Won&&round.kills==10,"Clearing all targets wins the timed sweep");
+    round.reset(YardMode::Clear,0,407);round.ready=0;round.time=90;
+    round.tick(float(TickSeconds),player);
+    check(round.phase==YardPhase::Lost,"Clearing the yard has a 90-second limit");
+    round.reset(YardMode::Hold,0,407);round.ready=0;round.tick(float(TickSeconds),player);
+    for(int wave=1;wave<=3;++wave) {
+        round.time+=4;
+        for(int i=0;i<round.population();++i)round.damage(i,120,false);
+        round.tick(float(TickSeconds),player);
+        if(wave<3){
+            check(round.phase==YardPhase::Intermission&&round.wave==wave+1,"Hold advances to the next wave");
+            round.ready=0;round.tick(float(TickSeconds),player);
+        }
+    }
+    check(round.phase==YardPhase::Won&&round.kills==15,"Three waves complete Hold the Line");
+    round.reset(YardMode::Practice,0,407);round.ready=0;round.tick(float(TickSeconds),player);
+    round.damage(0,120,false);
+    check(!round.bots[0].active,"Practice bot drops after a lethal hit");
+    for(int t=0;t<130;++t)round.tick(float(TickSeconds),player);
+    check(round.bots[0].active&&round.health==100,"Practice respawns bots and disables damage");
+    YardRound repeat;
+    round.reset(YardMode::Clear,0,234);repeat.reset(YardMode::Clear,0,234);
+    for(int i=0;i<300;++i){round.advance(1.f/60,player);repeat.advance(1.f/60,player);}
+    check(round.bots[3].position.x==repeat.bots[3].position.x&&round.health==repeat.health,"Identical seeds and inputs reproduce patrols");
+    auto feet=moveYardPlayer({18,0,20},{0,0,7});
+    check(near(feet.y,2.6),"Catwalk stairs are traversable");
+    feet=moveYardPlayer({-12,0,4},{0,0,10});
+    check(feet.z<7,"Container walls block movement");
+    check(yardWallDistance({{-12,1,4},{0,0,1}},50)<4,"Containers block fire");
+}
 int main(int argc,char** argv) {
     try {
         if(argc!=2)throw std::runtime_error("Provide the suite root.");
         establishRoot(pathFromUtf8(argv[1]));installFileCallbacks();
+        checkYard();
         Settings s;
         check(near(verticalFov(90,16.0f/9),58.7155,0.001),"Horizontal to vertical FOV conversion");
         check(near(angularError({0,0,0},{0,0,1},{0,0,10}),0),"Centered aim error");

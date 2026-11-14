@@ -15,6 +15,7 @@ class EngineCapabilities(QObject):
         super().__init__(parent)
         self._identity = None
         self._status = "unverified"
+        self.cuda_graph_replay = None
         self._process = None
         self._retired_processes = []
 
@@ -28,7 +29,10 @@ class EngineCapabilities(QObject):
                 or type(data.get("protocol_version")) is not int or data["protocol_version"] != 1
                 or type(data.get("cuda_preprocess")) is not bool):
             return None
-        return data["cuda_preprocess"]
+        graph = data.get("cuda_graph_replay", False)
+        if type(graph) is not bool:
+            return None
+        return data["cuda_preprocess"], graph
 
     def request(self, executable: Path | None, environment: QProcessEnvironment) -> str:
         try:
@@ -61,7 +65,12 @@ class EngineCapabilities(QObject):
                 if process not in self._retired_processes:
                     self._retired_processes.append(process)
                 process.kill()
-            self._status = "available" if result is True else "unavailable" if result is False else "unverified"
+            if result is None:
+                self.cuda_graph_replay = None
+                self._status = "unverified"
+            else:
+                cuda_preprocess, self.cuda_graph_replay = result
+                self._status = "available" if cuda_preprocess else "unavailable"
             self.changed.emit()
 
         def read(channel):
@@ -104,6 +113,7 @@ class EngineCapabilities(QObject):
     def stop(self):
         process, self._process = self._process, None
         self._identity, self._status = None, "unverified"
+        self.cuda_graph_replay = None
         if process is not None:
             if process.state() != QProcess.ProcessState.NotRunning and process not in self._retired_processes:
                 self._retired_processes.append(process)

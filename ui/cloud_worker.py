@@ -39,13 +39,17 @@ def read_request():
 
 def recipe(request, training=None, checkpoint=None):
     from cloud_contract import CloudInputError, integer
-    from cloudstudio.training_settings import resolve_settings
+    from cloud_recipe import MODEL_FIELDS
+    from cloudstudio.training_settings import resolve_settings, SETTING_BY_NAME, PRESETS
     mode = request.get('mode', 'fresh')
     if mode not in ('fresh', 'initialize', 'resume'):
         raise CloudInputError('Choose a fresh, initialized or resumed .cloud run.')
     overrides = request.get('overrides', {})
-    if type(overrides) is not dict or set(overrides) - {'epochs', 'batch_size', 'device', 'patience'}:
-        raise CloudInputError('Only run scheduling, batch and device overrides are permitted.')
+    preset = request.get('preset', 'player')
+    if type(preset) is not str or preset not in PRESETS:
+        raise CloudInputError('Choose a supported .cloud training preset.')
+    if type(overrides) is not dict or set(overrides) - SETTING_BY_NAME.keys():
+        raise CloudInputError('Unsupported .cloud recipe setting.')
     if mode == 'resume':
         if checkpoint is None:
             raise CloudInputError('Resume requires a validated .cloudtrain checkpoint.')
@@ -57,16 +61,23 @@ def recipe(request, training=None, checkpoint=None):
         values.update(overrides)
         values.update(resume_path=request['checkpoint'], init_model_path=None)
         return values
-    values = resolve_settings('player', overrides=overrides)
+    try:
+        values = resolve_settings(preset, overrides=overrides)
+    except ValueError as error:
+        raise CloudInputError('Invalid .cloud recipe. ' + str(error)) from error
+    if values['allow_no_validation']:
+        raise CloudInputError('Cloud Studio requires a reviewed validation split.')
     values.update(resume_path=None, init_model_path=request.get('initial_model') if mode == 'initialize' else None)
     if mode == 'initialize':
         from cloud_contract import inspect_model_stream
         path = Path(request.get('initial_model', ''))
         with path.open('rb') as stream:
             information = inspect_model_stream(stream, os.fstat(stream.fileno()).st_size)
-        if information['architecture'] != 'cloudvision_s2_v1':
-            raise CloudInputError('Initialize S2 training with a compatible S2 .cloud model.')
-        values.update(information['config'])
+        from cloudstudio.config import ModelConfig
+        capacities = vars(ModelConfig.from_dict(information['config']))
+        if any(name in overrides and overrides[name] != capacities[name] for name in MODEL_FIELDS):
+            raise CloudInputError('The recipe architecture or model dimensions differ from the initial .cloud model.')
+        values.update(capacities)
     integer(values['epochs'], 1, 10000, 'Epochs')
     return values
 
@@ -125,13 +136,129 @@ def check_model(request):
     finally:lease.stack.close()
 
 
+def evaluate_model(request):
+    from cloud_contract import CloudInputError, MAX_DESCRIPTOR, MAX_WEIGHTS, finite, inspect_model_stream
+    from cloud_project import ProjectLease
+    from cloud_results import EVALUATION_METRICS
+    from cloud_source_adapter import enable_source
+
+    if set(request) != {'operation', 'project', 'model', 'split', 'confidence', 'device'}:
+        raise CloudInputError('Invalid .cloud evaluation request.')
+    split = request['split']
+    if split not in ('val', 'test'):
+        raise CloudInputError('Choose validation or test images for evaluation.')
+    confidence = finite(request['confidence'], 0, 1, 'Evaluation confidence')
+    with ProjectLease(request['project']) as project:
+        project.check_image_headers()
+        selected = project.hold_file(request['model'], MAX_DESCRIPTOR + MAX_WEIGHTS + 56)
+        with selected.open('rb') as stream:
+            inspect_model_stream(stream, os.fstat(stream.fileno()).st_size)
+        enable_source('training')
+        from cloudstudio.data import Project
+        from cloudstudio.evaluation import evaluate_with_predictor
+        from cloudstudio import training
+        from cloud_training_input import training_preparation
+
+        bounded = Project(project.root, project.manifest)
+        records = bounded.training_records(split)
+        if not records:
+            raise CloudInputError('The selected split has no reviewed images.')
+        runtime = inspection_runtime(selected, request['device'])
+        with training_preparation(training):
+            metrics = evaluate_with_predictor(bounded, records,
+                lambda image: runtime.predict(image, confidence=confidence, debug=True),
+                split=split, confidence=confidence)
+        emit({'type': 'evaluated', 'split': split, 'confidence': confidence,
+              'images': len(records), 'metrics': {key: metrics.get(key) for key in EVALUATION_METRICS}})
+
+
+def inspection_runtime(path, device):
+    import torch
+    from cloud_contract import CloudInputError
+    from cloudstudio.runtime import CloudRuntime
+    if device.startswith('cuda') and not torch.cuda.is_available():
+        raise CloudInputError('NVIDIA CUDA is unavailable. Choose CPU or check the CUDA runtime.')
+    torch.set_num_threads(min(4, torch.get_num_threads()))
+    return CloudRuntime(path, backend='torch', device=device)
+
+
+def inspect_image(request):
+    from cloud_annotation_decode import decode
+    from cloud_contract import CloudInputError, MAX_DESCRIPTOR, MAX_WEIGHTS, finite, integer, inspect_model_stream
+    from cloud_project import ProjectLease
+    from cloud_source_adapter import enable_source
+
+    if set(request) != {'operation', 'model', 'image', 'confidence', 'nms_iou', 'max_detections', 'min_height', 'device'}:
+        raise CloudInputError('Invalid .cloud image inspection request.')
+    confidence = finite(request['confidence'], 0, 1, 'Inspection confidence')
+    nms_iou = finite(request['nms_iou'], 0, 1, 'Box NMS overlap')
+    maximum = integer(request['max_detections'], 1, 256, 'Maximum detections')
+    min_height = integer(request['min_height'], 0, 32768, 'Minimum detection height')
+    lease = ProjectLease('.')
+    try:
+        selected = lease.hold_file(request['model'], MAX_DESCRIPTOR + MAX_WEIGHTS + 56)
+        with selected.open('rb') as stream:
+            inspect_model_stream(stream, os.fstat(stream.fileno()).st_size)
+        image, _, _ = decode(request['image'])
+        enable_source('training')
+        from cloudstudio import training
+        from cloud_training_input import training_preparation
+
+        runtime = inspection_runtime(selected, request['device'])
+        with training_preparation(training):
+            prediction = runtime.predict(image, confidence=confidence, nms_iou=nms_iou,
+                                         max_detections=maximum, min_height=min_height, debug=True)
+        emit({'type': 'image_inspected', 'width': image.width, 'height': image.height,
+              'device': str(runtime.device), 'invalid_contours': prediction['invalid_contours'],
+              'empty_masks': prediction.get('empty_masks', 0), 'timing_ms': prediction['timing_ms'],
+              'primary_count': prediction['diagnostics']['primary_count'],
+              'detections': [{key: item[key] for key in ('class_id', 'confidence', 'primary_box', 'mask', 'wrapper')
+                              if key in item} for item in prediction['detections']]})
+    finally:
+        lease.stack.close()
+
+
+def export_model(request):
+    from tempfile import TemporaryDirectory
+    from cloud_contract import CloudInputError, MAX_DESCRIPTOR, MAX_WEIGHTS, inspect_model_stream
+    from cloud_project import ProjectLease, NewRunLease
+    from cloud_source_adapter import enable_source
+
+    if set(request) != {'operation', 'model', 'output_parent', 'run_name'}:
+        raise CloudInputError('Invalid .cloud ONNX export request.')
+    source = ProjectLease('.')
+    try:
+        selected = source.hold_file(request['model'], MAX_DESCRIPTOR + MAX_WEIGHTS + 56)
+        with selected.open('rb') as stream:
+            inspect_model_stream(stream, os.fstat(stream.fileno()).st_size)
+        enable_source('training')
+        from cloudstudio.export import export_onnx, read_onnx_export
+        import torch
+        import shutil
+
+        torch.set_num_threads(min(4, torch.get_num_threads()))
+        with TemporaryDirectory(prefix='vaporlock-cloud-export-') as staging:
+            export_onnx(selected, staging)
+            read_onnx_export(staging)
+            # Publish the manifest after both checked graphs are in place.
+            with NewRunLease(request['output_parent'], request['run_name'], staging) as output:
+                for name in ('detector.onnx', 'wrapper.onnx', 'model.json'):
+                    with (Path(staging) / name).open('rb') as origin, (output / name).open('xb') as target:
+                        shutil.copyfileobj(origin, target)
+                        target.flush()
+                        os.fsync(target.fileno())
+                emit({'type':'exported', 'output':str(output)})
+    finally:
+        source.stack.close()
+
+
 def train_model(request):
     from cloud_contract import CloudInputError, MAX_CHECKPOINT, MAX_DESCRIPTOR, MAX_WEIGHTS, inspect_checkpoint_archive
     from cloud_project import ProjectLease, NewRunLease
     # Packaged Free explicitly permits this dedicated .cloud job. Premium
     # retains its original independent license monitor and operation checks.
 
-    if set(request) - {'operation', 'project', 'output_parent', 'run_name', 'mode', 'initial_model', 'checkpoint', 'overrides'}:
+    if set(request) - {'operation', 'project', 'output_parent', 'run_name', 'mode', 'initial_model', 'checkpoint', 'overrides', 'preset'}:
         raise CloudInputError('Unsupported .cloud training fields.')
     # main() has already admitted the selected provider/common inventories.
     # Initialize NumPy before any thread blocks on piped stdin: on Windows,
@@ -156,12 +283,6 @@ def train_model(request):
         from cloudstudio import training
         from cloudstudio.data import Project
         from cloudstudio.geometry import validate_annotation
-        for record in project.manifest['images']:
-            if record['reviewed']:
-                for annotation in record['annotations']:
-                    errors = validate_annotation(annotation, record['width'], record['height'], require_complete=True)
-                    if errors:
-                        raise CloudInputError('A reviewed instance has invalid box or encasing geometry.')
         checkpoint = None
         original_loader = training._load_checkpoint
         if mode == 'resume':
@@ -169,6 +290,20 @@ def train_model(request):
             checkpoint = validate_checkpoint(original_loader(request['checkpoint']), training, project.counts['train'])
             training._load_checkpoint = lambda path: checkpoint if str(path) == request['checkpoint'] else (_ for _ in ()).throw(CloudInputError('Checkpoint identity changed.'))
         values = recipe(request, training, checkpoint)
+        s1 = values['architecture'] == 'cloudvision_s1_v2'
+        for record in project.manifest['images']:
+            if record['reviewed']:
+                for annotation in record['annotations']:
+                    errors = validate_annotation(annotation, record['width'], record['height'], require_complete=True)
+                    if errors:
+                        raise CloudInputError('A reviewed instance has invalid box or encasing geometry.')
+                    if s1 and record['split'] == 'train' and annotation.get('mask') is not None:
+                        from cloudstudio.masks import annotation_mask, polygon_mask
+                        width, height = record['width'], record['height']
+                        polygon = annotation.get('wrapper') or []
+                        if len(polygon) < 3 or not numpy.array_equal(annotation_mask(annotation, width, height),
+                                                                   polygon_mask(polygon, width, height)):
+                            raise CloudInputError('S1 needs reviewed polygons that preserve each training mask. Choose the S2 spatial mask architecture for this project.')
         emit({'type':'configuration','recipe':recipe_summary(values,checkpoint)})
         config = training.TrainingConfig(**values)
         # The owner's trainer asks Project.open once. Supply the already bounded,
@@ -317,21 +452,30 @@ def main():
     _bootstrap()
     try:
         request = read_request()
-        operations = {'check_project': check_project, 'check_resume':check_resume,'check_model':check_model,'train': train_model, 'inference': inference}
+        operations = {'check_project': check_project, 'check_resume':check_resume,'check_model':check_model,
+                      'train': train_model, 'inference': inference, 'evaluate': evaluate_model, 'inspect': inspect_image,
+                      'export': export_model}
         operation = request.get('operation')
         if operation not in operations:
             raise ValueError('Unsupported .cloud worker operation.')
         from cloud_access import edition
         edition()  # No missing/unknown build may enter any Cloud operation.
-        from cloud_dependencies import activate
+        from cloud_dependencies import activate, activate_common, activate_training
         if operation == 'train':
-            device = request.get('overrides', {}).get('device', 'auto')
-            activate('train-cpu' if device == 'cpu' else 'train-cuda')
+            overrides = request.get('overrides', {})
+            if type(overrides) is not dict:
+                from cloud_contract import CloudInputError
+                raise CloudInputError('Invalid .cloud training overrides.')
+            activate_training(overrides.get('device', 'auto'))
         elif operation == 'inference':
             device = request.get('device', 'cpu').split(':')[0]
             activate('cpu' if device in ('cpu', 'auto') else device)
+        elif operation in ('check_resume', 'export'):
+            activate_training('cpu')
+        elif operation in ('evaluate', 'inspect'):
+            activate_training(request.get('device', 'auto'))
         else:
-            activate('cpu')
+            activate_common()
         operations[operation](request)
         return 0
     except Exception as error:

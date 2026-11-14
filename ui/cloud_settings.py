@@ -11,6 +11,15 @@ def validate(values):
     if values.get('cloud_mode','fresh') not in ('fresh','initialize','resume'): raise ValueError('Invalid .cloud training mode.')
     if re.fullmatch(r'auto|cpu|cuda(?::[0-9]{1,2})?',values.get('cloud_device','auto')) is None: raise ValueError('Invalid .cloud training device.')
     if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,39}',values.get('cloud_run_name','cloud-training')) is None: raise ValueError('Use a short run name containing letters, digits, hyphens or underscores.')
+    preset = values.get('cloud_recipe_preset', 'player')
+    overrides = values.get('cloud_recipe_overrides', {})
+    if preset not in ('player', 'legacy') or type(overrides) is not dict or len(overrides) > 64:
+        raise ValueError('Invalid .cloud training recipe.')
+    if overrides:
+        from cloud_recipe import BASIC_FIELDS, resolve_recipe
+        if BASIC_FIELDS & overrides.keys():
+            raise ValueError('Use the main training controls for device, epochs, batch size, and patience.')
+        resolve_recipe(preset, overrides)
     for name,default,low,high in (('cloud_epochs',300,1,10000),('cloud_batch',8,0,256),('cloud_patience',75,0,10000)):
         value=values.get(name,default)
         if type(value) is not int or not low<=value<=high: raise ValueError('Invalid .cloud training limit.')

@@ -52,7 +52,7 @@ class AnnotationChild(OwnedChild):
                     terminal=self.peer.receive(payload)
                 kind=payload['type']
                 if kind=='annotation_ready':self.ready_seen=True
-                if kind in ('mask_proposed','mask_failed','decoded','decode_failed'):
+                if kind in ('mask_proposed','mask_failed','decoded','decode_failed','decode_exhausted'):
                     request=payload['identity']['request'] if kind.startswith('mask_') else payload['request']
                     with self.pending_lock:
                         expected=self.pending.pop(request,None)

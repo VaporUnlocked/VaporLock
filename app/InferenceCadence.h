@@ -31,9 +31,9 @@ public:
         m_phase = (m_phase + 1) % (frameSkip + 1);
         if (m_phase != 0) return Decision::ExplicitSkip;
 
-        // The headless capture loop already limits acquisition to captureFps.
-        // Applying a second equal/slower clock here can discard fresh frames
-        // solely because capture latency varies from one iteration to another.
+        // A paced producer already limits delivery to captureFps. A second
+        // clock at the same or a higher limit can discard fresh frames solely
+        // because delivery latency varies from one iteration to another.
         if (capturePaced && inferenceFps >= captureFps) return Decision::Run;
 
         const auto period = std::max(Clock::duration{1},

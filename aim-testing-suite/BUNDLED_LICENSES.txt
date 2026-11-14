@@ -19,6 +19,8 @@ Ramon Santamaria and contributors. https://github.com/raysan5/raylib/releases/ta
 zlib/libpng license. Full upstream LICENSE and embedded dependency notices
 remain in vendor/raylib-6.0. Includes GLFW, cgltf, raymath, rlgl and image/font
 loaders with their original notices. The pose baker is separate suite source.
+Audio playback uses miniaudio by David Reid under the public domain option
+in raylib's bundled miniaudio.h. Proving Grounds generates its own sounds.
 The active-bay shadow implementation follows raylib's
 shaders_shadowmap_rendering.c example, with original suite integration and
 shader adaptations under the retained raylib authorship and zlib/libpng terms.

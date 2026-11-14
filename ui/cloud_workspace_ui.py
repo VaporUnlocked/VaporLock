@@ -28,7 +28,12 @@ class CloudWorkspace(QObject):
         self._pending_session=None;self._close_pending=False
         self._pending_training=None;self.training_selection=None
         self.import_cursor=None;self.staging_warning=False
+        self.import_added=0
+        self.import_duplicates=0
         self.status_details=''
+        self.capture_group=None
+        self.capture_pending=False
+        self.capture_was_maximized=False
         self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(200)
 
     def tick(self):
@@ -42,7 +47,9 @@ class CloudWorkspace(QObject):
 
     def mount(self,layout,train_mount):
         from cloud_workspace_form import mount
+        index=self.stack.currentIndex() if hasattr(self,'stack') else 0
         mount(self,layout,train_mount)
+        self.stack.setCurrentIndex(index)
 
     def apply_palette(self):
         if not hasattr(self,'canvas'):return
@@ -125,6 +132,8 @@ class CloudWorkspace(QObject):
 
     def selection_changed(self):
         self.suite.checked=None;self.suite.recipe=None;self.suite.outputs=None;self.suite.percent=None
+        self.suite.evaluation=None
+        if self.suite.results_panel is not None:self.suite.results_panel.show_evaluation(None)
         self.suite.message='Project selection changed. Check the selected project before training.'
         if hasattr(self.suite,'recipe_label'):self.suite.refresh_mode()
 
@@ -251,7 +260,7 @@ class CloudWorkspace(QObject):
         self.center.set_start_enabled(False)
         return self.job
 
-    def decode(self,path,purpose):
+    def decode(self,path,purpose,**options):
         if len(self.decodes)>=1:raise CloudInputError('Wait for the current image to finish loading.')
         from cloud_annotation_artifact import ImageCapability
         from vapor_lock_gui import INITIALIZATION_DIRECTORY
@@ -259,7 +268,7 @@ class CloudWorkspace(QObject):
         parent.mkdir(exist_ok=True)
         cap=ImageCapability(parent)
         self.decodes[cap.request]=(cap,purpose,self.intents.capture())
-        try:self.ensure_job().submit(cap.command(path))
+        try:self.ensure_job().submit(cap.command(path,**options))
         except BaseException:
             self.decodes.pop(cap.request);cap.close();raise
 
@@ -287,19 +296,150 @@ class CloudWorkspace(QObject):
 
     def import_images(self):
         try:
-            self.admit()
-            if not self.session:raise CloudInputError('Open or create a .cloud project first.')
-            if self.import_queue or self.decodes:raise CloudInputError('Wait for the current image operation to finish.')
-            if not self.leave_draft():return
+            if not self.can_import():return
             paths,_=QFileDialog.getOpenFileNames(self.center,self.center.t('Import images'),'',
                 'Images (*.png *.jpg *.jpeg *.bmp *.webp)')
             if not paths:return
             if len(paths)>500:raise CloudInputError('Choose at most 500 images in one import batch.')
-            self.import_queue=[str(reject_reparse(p)) for p in paths]
-            self.import_cursor=self.session.draft['id'] if self.session.draft else None
-            self.import_generation=self.intents.capture()
-            self.import_group=secrets.token_hex(16);self.import_split=self.split.currentData()
-            self.next_import()
+            self.begin_import([(reject_reparse(path), {}, ()) for path in paths])
+        except Exception as exc:self.show_error(str(exc))
+
+    def can_import(self):
+        self.admit()
+        if not self.session:raise CloudInputError('Open or create a .cloud project first.')
+        if self.capture_pending or self.import_generation is not None or self.decodes:
+            raise CloudInputError('Wait for the current image operation to finish.')
+        return self.leave_draft()
+
+    def begin_import(self, items, *, group=None):
+        self.import_queue=items
+        self.import_cursor=self.session.draft['id'] if self.session.draft else None
+        self.import_generation=self.intents.capture()
+        self.import_group=group or secrets.token_hex(16)
+        self.import_split=self.split.currentData()
+        self.import_added=0;self.import_duplicates=0
+        self.next_import()
+
+    def import_yolo(self):
+        try:
+            if not self.can_import():return
+            from annotation_labels import MAX_BYTES, parse_labels, validate_manual_rows
+            from profile_library import checked_path, read_bounded
+            t=self.center.t
+            paths,_=QFileDialog.getOpenFileNames(self.center,t('Choose YOLO images for the selected split'),'',
+                'Images (*.png *.jpg *.jpeg *.bmp *.webp)')
+            if not paths:return
+            if len(paths)>500:raise CloudInputError('Choose at most 500 images in one import batch.')
+            labels=QFileDialog.getExistingDirectory(self.center,t('Choose the matching YOLO labels folder'))
+            if not labels:return
+            items=[];seen=set();total=0
+            for filename in paths:
+                image=reject_reparse(filename)
+                name=image.stem+'.txt'
+                if name.casefold() in seen:
+                    raise CloudInputError('Choose images with unique names for this YOLO import.')
+                seen.add(name.casefold())
+                label=checked_path(labels,name)
+                rows=([row for row in parse_labels(read_bounded(label,MAX_BYTES)) if row['class_id']==0]
+                      if label.exists() else [])
+                total+=len(rows)
+                if len(rows)>300 or total>10_000:
+                    raise CloudInputError('Select a smaller batch of YOLO labels.')
+                validate_manual_rows(rows)
+                items.append((image,{'preserve_orientation':True},rows))
+            self.begin_import(items)
+        except (OSError,ValueError) as exc:self.show_error(str(exc))
+
+    def capture_frame(self):
+        try:
+            if not self.can_import():return
+            from batch4_geometry import enumerate_displays, region_pixels
+            settings=self.center.settings
+            display=next((item for item in enumerate_displays() if item.index==settings.monitor),None)
+            if display is None:
+                raise CloudInputError('The configured capture display is unavailable.')
+            region=region_pixels(display,settings.region_x,settings.region_y,settings.region_width,settings.region_height)
+            split=self.split.currentData()
+            if self.capture_group is None:
+                self.capture_group='capture-'+secrets.token_hex(16)
+            group=self.capture_group
+            existing=next((r['split'] for r in self.session.manifest['images'] if r['group_id']==group),None)
+            if existing is not None and existing!=split:
+                raise CloudInputError('Start a new capture group before changing the split.')
+            owner=self.continuation_stamp()
+            self.capture_was_maximized=self.center.isMaximized()
+            self.capture_pending=True
+            self.message='Capturing the configured region in 3 seconds…'
+            self.render()
+            self.center.showMinimized()
+            QTimer.singleShot(3000,self,lambda:self.finish_capture(owner,display,region,split,group))
+        except Exception as exc:self.show_error(str(exc))
+
+    def finish_capture(self, owner, display, region, split, group):
+        if not self.capture_pending:return
+        self.capture_pending=False
+        try:
+            self.admit()
+            from batch4_geometry import enumerate_displays
+            if owner!=self.continuation_stamp() or display not in enumerate_displays():
+                raise CloudInputError('The project or display changed during capture. Try again.')
+            from crosshair_reference import capture_desktop_pixels
+            from cloud_editor_import import append_capture
+            left,top,width,height=region
+            image=capture_desktop_pixels(display.left+left,display.top+top,width,height)
+            result=append_capture(self.session.store,image,revision=self.session.revision,split=split,group=group)
+            self.suite.checked=None
+            self.session=AnnotationSession(self.session.store)
+            cursor=next(i for i,record in enumerate(self.session.manifest['images'])
+                        if record['id']==result['record']['id'])
+            self.session.navigate(cursor,discard=True)
+            if not result['duplicate']:
+                self.image=image
+                record=result['record']
+                self.image_identity=(self.session.session,record['id'],record['pixel_sha256'],record['width'],record['height'])
+            self.message='Capture already in project.' if result['duplicate'] else 'Captured pixels saved as an unreviewed PNG.'
+            self.refresh_document()
+            if result['duplicate']:self.load_image()
+        except Exception as exc:
+            from cloud_editor_import import ImageImportUncertain
+            if isinstance(exc,ImageImportUncertain):self.import_uncertain=exc
+            self.show_error(str(exc))
+        finally:
+            self.restore_capture_window()
+            self.render()
+
+    def restore_capture_window(self):
+        if self.capture_was_maximized:self.center.showMaximized()
+        else:self.center.showNormal()
+
+    def new_capture_group(self):
+        self.capture_group=None
+        self.message='The next capture will start a new source group.'
+        self.render()
+
+    def import_video(self):
+        try:
+            if not self.can_import():return
+            t=self.center.t
+            path,_=QFileDialog.getOpenFileName(self.center,t('Import video frames'),'',
+                'Video (*.mp4 *.mkv *.avi *.mov *.webm)')
+            if not path:return
+            path=reject_reparse(path)
+            interval,ok=QInputDialog.getDouble(self.center,t('Import video frames'),
+                t('Seconds between frames'),2,.1,1200,1)
+            if not ok:return
+            maximum,ok=QInputDialog.getInt(self.center,t('Import video frames'),
+                t('Maximum frames'),100,1,500)
+            if not ok:return
+            from hashlib import sha256
+            from dataset_paths import lock_identity
+            # Reimporting the same source keeps its samples in the original split.
+            group='video-'+sha256(lock_identity(path).encode()).hexdigest()
+            existing=next((r['split'] for r in self.session.manifest['images'] if r['group_id']==group), None)
+            if existing is not None and existing!=self.split.currentData():
+                raise CloudInputError('Choose the video’s existing split before importing more frames.')
+            step=round(interval*1000)
+            self.begin_import([(path, {'video_time_ms': index*step}, ()) for index in range(maximum)], group=group)
         except Exception as exc:self.show_error(str(exc))
 
     def next_import(self):
@@ -310,21 +450,30 @@ class CloudWorkspace(QObject):
         if self.import_generation is None or not self.intents.accepts(self.import_generation):return
         if not self.import_queue:
             self.import_generation=None
-            self.message='Image import completed. New images are unreviewed.'
-            self.refresh_document();self.load_image();return
-        self.admit();path=self.import_queue.pop(0)
-        self.message='Importing image…';self.decode(path,('import',self.session.session))
+            self.message=self.center.tf('Imported {added} unreviewed images · {duplicates} duplicates skipped',
+                                        added=self.import_added,duplicates=self.import_duplicates)
+            self.refresh_document()
+            if self.stack.currentIndex()==1:self.load_image()
+            return
+        self.admit();path,options,labels=self.import_queue.pop(0)
+        self.message='Importing image…';self.decode(path,('import',self.session.session,labels),**options)
 
     def worker_event(self,value):
         try:
             kind=value['type']
-            if kind in ('decoded','decode_failed'):
+            if kind in ('decoded','decode_failed','decode_exhausted'):
                 entry=self.decodes.pop(value['request'],None)
                 if entry is None:return
                 cap,purpose,generation=entry
                 if not self.intents.accepts(generation):
                     self.decodes[value['request']]=entry;return  # retained until exact child cleanup
                 try:
+                    if kind=='decode_exhausted':
+                        self.import_queue=[]
+                        try:cap.cleanup(exhausted=value)
+                        except (OSError,ValueError):self.staging_warning=True
+                        QTimer.singleShot(0,self.next_import)
+                        return
                     if kind=='decode_failed':raise CloudInputError(value['message'])
                     artifacts=cap.read(value)
                     if purpose[0]=='import':
@@ -332,7 +481,9 @@ class CloudWorkspace(QObject):
                         self.admit()
                         from cloud_editor_import import append_image
                         result=append_image(self.session.store,value,artifacts,revision=self.session.revision,
-                            split=self.import_split,group=self.import_group)
+                            split=self.import_split,group=self.import_group,yolo_rows=purpose[2])
+                        if result['duplicate']:self.import_duplicates+=1
+                        else:self.import_added+=1
                         self.suite.checked=None
                         self.session=AnnotationSession(self.session.store)
                         # Keep the active project session identity for this explicit
@@ -351,7 +502,9 @@ class CloudWorkspace(QObject):
                             raise CloudInputError('Image pixels disagree with the saved project. Import a separate verified copy before annotation.')
                         self.image=QImage(artifacts['rgb'],value['width'],value['height'],value['width']*3,QImage.Format.Format_RGB888).copy()
                         self.image_identity=(self.session.session,record['id'],record.get('pixel_sha256'),record['width'],record['height'])
-                        self.loading=False;self.refresh_document();self.message='Draw a box to generate its mask, or select a target to correct it.'
+                        self.loading=False;self.refresh_document()
+                        if self.stack.currentIndex()==1:
+                            self.message='Draw a box to generate its mask, or select a target to correct it.'
                 finally:
                     if cap.verified:
                         try:cap.cleanup()
@@ -519,6 +672,37 @@ class CloudWorkspace(QObject):
     def skip(self):
         if self.session:self.choose_image(min(len(self.session.manifest['images'])-1,self.session.cursor+1))
 
+    def move_image_group(self):
+        try:
+            self.admit()
+            if not self.image_matches() or self.handoff_reason():return
+            if not self.leave_draft():return
+            t=self.center.t
+            labels=(t('Training'),t('Validation'),t('Test'))
+            splits=('train','val','test')
+            index=splits.index(self.session.draft['split'])
+            owner=self.continuation_stamp()
+            session=self.session
+            record=session.draft['id']
+            generation=session.generation
+            chosen,ok=QInputDialog.getItem(self.center,t('Move image group'),
+                t('Dataset split for this image and its source group'),list(labels),index,False)
+            if not ok or chosen==labels[index]:return
+            self.admit()
+            if (owner!=self.continuation_stamp() or self.session is not session or session.draft['id']!=record
+                    or session.generation!=generation or self.handoff_reason()):
+                raise CloudInputError('The active image or project changed. Choose the split again.')
+            count=session.store.move_group(session.draft['group_id'],splits[labels.index(chosen)],
+                                           revision=session.revision)
+            self.session=AnnotationSession(session.store)
+            self.session.session=session.session
+            self.session.navigate(session.cursor,discard=True)
+            self.points={};self.suite.checked=None;self.suite.evaluation=None
+            self.suite.results_panel.show_evaluation(None)
+            self.message=self.center.tf('Moved {count} images to {split}.',count=count,split=chosen)
+            self.refresh_document(reset=False)
+        except (OSError,ValueError) as exc:self.show_error(str(exc))
+
     def approve(self):
         try:
             self.admit(allow_reconcile=True)
@@ -574,6 +758,9 @@ class CloudWorkspace(QObject):
         self.action(apply);self.refresh_document(reset=False)
 
     def cancel(self):
+        if self.capture_pending:
+            self.capture_pending=False
+            if not self._close_pending:self.restore_capture_window()
         self.intents.revoke();self.after_stop=None;self.import_generation=None
         self.discard_pending(self.pending_owner())
         if self.session:self.session.cancel()
@@ -594,7 +781,7 @@ class CloudWorkspace(QObject):
     def handoff_reason(self):
         if self.import_uncertain:return 'Reconcile the previous image import before continuing.'
         if self.session and self.session.uncertain:return 'Reconcile the previous save before continuing.'
-        if self.import_queue or self.decodes or self.loading or (self.session and self.session.pending):
+        if self.capture_pending or self.import_generation is not None or self.decodes or self.loading or (self.session and self.session.pending):
             return 'Finish or cancel annotation work before training.'
         if hasattr(self,'canvas') and self.canvas.drawing:return 'Finish or cancel the current stroke first.'
         if self.job and not self.job.done and self.job.closing:return 'Waiting for annotation cancellation to finish.'
@@ -603,7 +790,8 @@ class CloudWorkspace(QObject):
     def continuation_stamp(self):
         from dataclasses import asdict
         c=self.center
-        return (id(c.settings),str(c._active_profile_path),0,
+        return (id(c.settings),str(c._active_profile_path),
+            (c.settings.monitor,c.settings.region_x,c.settings.region_y,c.settings.region_width,c.settings.region_height),
             json.dumps({k:v for k,v in asdict(c.settings).items() if k.startswith('cloud_')},sort_keys=True),
             self.intents.capture(),self.session.session if self.session else None)
 
@@ -628,6 +816,16 @@ class CloudWorkspace(QObject):
             self.after_stop=(lambda:self._finish_training(callback),self.continuation_stamp())
             self.job.stop();self.message='Closing annotation before training…';self.render();return False
         self._release_editor()
+        return True
+
+    def prepare_analysis(self, callback):
+        reason=self.handoff_reason()
+        if reason:self.show_error(reason);return False
+        if self.job and not self.job.done:
+            self.intents.revoke()
+            self.after_stop=(callback,self.continuation_stamp())
+            self.job.stop()
+            return False
         return True
 
     def _finish_training(self,callback):
@@ -659,7 +857,8 @@ class CloudWorkspace(QObject):
         if not hasattr(self,'annotation_status'):return
         try:
             reason=self.reason();closing=bool(self.job and not self.job.done and self.job.closing)
-            blocked=bool(reason or self.loading or self.import_queue or self.decodes or self.import_uncertain or closing)
+            blocked=bool(reason or self.loading or self.capture_pending or self.import_generation is not None
+                         or self.decodes or self.import_uncertain or closing)
             mutation_blocked=blocked or bool(self.session and self.session.uncertain)
             self.canvas.mutable=not mutation_blocked and self.image_matches()
             for control in self.controls:control.setEnabled(not mutation_blocked)
@@ -685,6 +884,8 @@ class CloudWorkspace(QObject):
                     i,target=selected;error=self.session.failures.get(target['id'])
                     if error:blockers.append(self.center.tf('Target {number}: {reason}',number=i+1,reason=self.center.t(error)))
             self.status_details='\n'.join(dict.fromkeys([self.center.t(self.message),*blockers]))
+            self.project_status.setText(self.status_details)
+            self.cancel_import.setVisible(self.import_generation is not None or self.capture_pending)
             self.annotation_status.setText(next(iter(blockers),self.center.t(self.message)))
             self.annotation_status.setToolTip(self.status_details)
             rows=self.session.manifest['images'] if self.session else []
@@ -706,9 +907,5 @@ class CloudWorkspace(QObject):
             else:
                 selected=bool(self.training_selection and self.center.settings.cloud_project==self.training_selection)
                 self.project_summary.setText(self.center.t('Training-only project selected. Open an annotation project to edit images.' if selected else 'Open or create a .cloud project.'))
-            output=self.suite.outputs or {}
-            lines=[]
-            for key,label in (('output','Run folder'),('best_cloud','Best model'),('last_cloud','Latest model'),('checkpoint','Resume checkpoint')):
-                if output.get(key):lines.append(self.center.t(label)+': '+str(output[key]))
-            self.results.setText(self.center.t(self.suite.message));self.results_paths.setText('\n'.join(lines));self.results_paths.setVisible(bool(lines))
+            self.results.setText(self.center.t(self.suite.message))
         except RuntimeError:pass  # Theme/locale rebuild replaces the widgets.

@@ -64,10 +64,19 @@ def sample_template(image,point,mask,source_geometry,origin):
 
 def capture_patch(display):
     """Capture only 127x127 physical pixels. GDI excludes cursor; no disk writes."""
+    if display.index<1 or min(display.width,display.height)<127:raise ValueError('Select a physical display for calibration.')
+    origin=(display.width//2-63,display.height//2-63)
+    return capture_desktop_pixels(display.left+origin[0],display.top+origin[1],127,127),origin
+
+
+def capture_desktop_pixels(left,top,width,height):
+    """Copy a rectangle of physical desktop pixels into an owned image."""
     import ctypes
     from ctypes import wintypes as W
     from PySide6.QtGui import QImage
-    if display.index<1 or min(display.width,display.height)<127:raise ValueError('Select a physical display for calibration.')
+    from cloud_contract import MAX_IMAGE_PIXELS
+    if not (1<=width<=32768 and 1<=height<=32768 and width*height<=MAX_IMAGE_PIXELS):
+        raise ValueError('Desktop capture exceeds the supported image size.')
     u=ctypes.WinDLL('user32',use_last_error=True);g=ctypes.WinDLL('gdi32',use_last_error=True)
     u.GetDC.argtypes=[W.HWND];u.GetDC.restype=W.HDC;u.ReleaseDC.argtypes=[W.HWND,W.HDC]
     u.SetThreadDpiAwarenessContext.argtypes=[W.HANDLE];u.SetThreadDpiAwarenessContext.restype=W.HANDLE
@@ -80,14 +89,15 @@ def capture_patch(display):
         _fields_=[('size',W.DWORD),('width',W.LONG),('height',W.LONG),('planes',W.WORD),('bits',W.WORD),('compression',W.DWORD),('image',W.DWORD),('xp',W.LONG),('yp',W.LONG),('used',W.DWORD),('important',W.DWORD)]
     previous=u.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4));dc=mem=bitmap=old=None
     try:
+        if not previous:raise OSError('Physical DPI context unavailable.')
         dc=u.GetDC(None);mem=g.CreateCompatibleDC(dc)
-        header=Header(ctypes.sizeof(Header),127,-127,1,32,0,0,0,0,0,0);bits=ctypes.c_void_p()
+        header=Header(ctypes.sizeof(Header),width,-height,1,32,0,0,0,0,0,0);bits=ctypes.c_void_p()
         bitmap=g.CreateDIBSection(dc,ctypes.byref(header),0,ctypes.byref(bits),None,0)
-        if not dc or not mem or not bitmap or not bits.value:raise OSError('Calibration capture unavailable')
-        old=g.SelectObject(mem,bitmap);origin=(display.width//2-63,display.height//2-63)
-        if not g.BitBlt(mem,0,0,127,127,dc,display.left+origin[0],display.top+origin[1],0x40CC0020):raise OSError('Calibration capture failed')
-        g.GdiFlush();data=ctypes.string_at(bits,127*127*4)
-        return QImage(data,127,127,127*4,QImage.Format.Format_RGB32).copy(),origin
+        if not dc or not mem or not bitmap or not bits.value:raise OSError('Desktop capture unavailable.')
+        old=g.SelectObject(mem,bitmap)
+        if not old or not g.BitBlt(mem,0,0,width,height,dc,left,top,0x40CC0020):raise OSError('Desktop capture failed.')
+        g.GdiFlush();data=ctypes.string_at(bits,width*height*4)
+        return QImage(data,width,height,width*4,QImage.Format.Format_RGB32).copy()
     finally:
         if old:g.SelectObject(mem,old)
         if bitmap:g.DeleteObject(bitmap)

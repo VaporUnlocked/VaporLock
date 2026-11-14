@@ -1,4 +1,6 @@
 # Generated fixed product constants; never load a renderer-supplied catalog.
+from frame_rate import MAX_FRAME_RATE
+
 CATALOG_SOURCE_SHA256 = '73b6fbc839eaa30b782327939a3b26af6199a08c18506372a750f150c641533a'
 FIELD_ROWS = (
     ('dataset_effects_copies', 'int', 1, 10, 1, 10, 0, True),
@@ -17,7 +19,7 @@ FIELD_ROWS = (
     ('anchor_x', 'float', -1000000, 1000000, -1.0, 1.0, 2, False),
     ('anchor_y', 'float', -1000000, 1000000, -1.0, 1.0, 2, False),
     ('box_smoothing', 'float', 0, 1000000, 0.0, 0.95, 2, False),
-    ('capture_fps', 'int', 1, 1000000, 1, 120, 0, False),
+    ('capture_fps', 'int', 1, MAX_FRAME_RATE, 1, 120, 0, False),
     ('confidence', 'float', 0, 1000000, 0.01, 0.99, 2, False),
     ('dataset_annotation_confidence', 'float', 0, 1000000, 0.01, 0.99, 2, True),
     ('dataset_annotation_iou', 'float', 0, 1000000, 0.05, 0.99, 2, True),
@@ -32,7 +34,7 @@ FIELD_ROWS = (
     ('frame_skip', 'int', 0, 1000000, 0, 60, 0, False),
     ('gain', 'float', 0, 1000000, 0.0, 4.0, 2, False),
     ('hardware_serial_baud', 'int', 0, 1000000, 1200, 1000000, 0, False),
-    ('inference_fps', 'int', 0, 1000000, 1, 120, 0, False),
+    ('inference_fps', 'int', 1, MAX_FRAME_RATE, 1, 120, 0, False),
     ('input_units_per_pixel_x', 'float', 0.001, 1000, 0.001, 10.0, 3, False),
     ('input_units_per_pixel_y', 'float', 0.001, 1000, 0.001, 10.0, 3, False),
     ('kmbox_a_product_id', 'int', 0, 1000000, 0, 65535, 0, False),

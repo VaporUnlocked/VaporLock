@@ -37,9 +37,14 @@ def command(value):
     kind=value.get('command')
     if kind=='close' and set(value)=={'command'}:return kind
     if kind=='decode':
-        if set(value)!={'command','request','path','output','capability'}:
+        required={'command','request','path','output','capability'}
+        if set(value) not in (required, required | {'video_time_ms'}, required | {'preserve_orientation'}):
             raise CloudInputError('Invalid decoder request fields.')
         token(value['request']);token(value['capability']);local_file(value['path']);local_file(value['output'])
+        if 'video_time_ms' in value:
+            integer(value['video_time_ms'],0,7*24*3600*1000,'Video sample time')
+        if 'preserve_orientation' in value and value['preserve_orientation'] is not True:
+            raise CloudInputError('Invalid labeled-image orientation setting.')
         return kind
     if kind=='mask':
         if set(value)!={'command','identity','path','points','labels'}:
@@ -104,6 +109,8 @@ def event(value):
         if type(value['message']) is not str or not 1<=len(value['message'])<=1024:
             raise CloudInputError('Invalid decode failure.')
         return False
+    if kind=='decode_exhausted' and set(value)=={'type','request','capability'}:
+        token(value['request']);token(value['capability']);return False
     raise CloudInputError('Unknown annotation event fields.')
 
 
@@ -143,7 +150,8 @@ class AnnotationPeer:
             if kind.startswith('mask_'):
                 if expected['command']!='mask' or expected['identity']!=value['identity']:
                     raise CloudInputError('Mask response differs from its admitted identity.')
-            elif expected['command']!='decode' or expected['capability']!=value['capability']:
+            elif (expected['command']!='decode' or expected['capability']!=value['capability']
+                    or (kind=='decode_exhausted' and not expected.get('video_time_ms'))):
                 raise CloudInputError('Decoder response differs from its admitted capability.')
             return False
         except BaseException:

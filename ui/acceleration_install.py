@@ -7,7 +7,7 @@ import base64
 import hashlib
 import hmac
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
@@ -26,6 +26,13 @@ TENSORRT_RTX_WINDOWS_URL = (
     "TensorRT-RTX-1.6.1.120-Windows-amd64-cuda-12.9-Release-external.zip"
 )
 TENSORRT_RTX_SHA256 = "a688478af9e7b824f4918ef3b3038c3aca6f1ea84ff30a52d7ba8196c65a5a5a"
+TENSORRT_RTX_RUNTIME_FILES = ("tensorrt_rtx_1_6.dll", "tensorrt_onnxparser_rtx_1_6.dll")
+TENSORRT_RTX_SDK_DIRECTORY = f"TensorRT-RTX-{TENSORRT_RTX_VERSION}"
+TENSORRT_RTX_SDK_REQUIRED = (
+    "include/NvInfer.h", "include/NvOnnxParser.h",
+    *(f"lib/{Path(name).stem}.lib" for name in TENSORRT_RTX_RUNTIME_FILES),
+    *(f"bin/{name}" for name in TENSORRT_RTX_RUNTIME_FILES),
+)
 NUGET_URL = "https://api.nuget.org/v3-flatcontainer/{package}/{version}/{package}.{version}.nupkg"
 # Immutable SHA-512 package values taken from the NuGet catalog records for
 # these exact versions. A changed package is rejected before any DLL is copied
@@ -37,8 +44,8 @@ NUGET_SHA512 = {
 }
 
 
-def report(message: str) -> None:
-    print(json.dumps({"message": message}), flush=True)
+def report(message: str, *, terminal: bool = False) -> None:
+    print(json.dumps({"message": message, "terminal": terminal}), flush=True)
 
 
 def download_package(package: str, version: str, destination: Path) -> None:
@@ -86,7 +93,7 @@ def install_cuda(root: Path) -> None:
     from runtime_generations import prepare_cuda
     with _installation_lock(root):
         prepare_cuda(root, report=report)
-    report("CUDA runtime files are installed and verified. Select CUDA, then Start to use them.")
+    report("CUDA runtime files are installed and verified.", terminal=True)
 
 
 def install_dml(root: Path) -> None:
@@ -101,7 +108,7 @@ def install_dml(root: Path) -> None:
         extract_file(directml, "bin/x64-win/DirectML.dll", destination / "DirectML.dll")
     if not (root / "engine" / "dml" / "onnxruntime.dll").is_file() or not (root / "engine" / "dml" / "DirectML.dll").is_file():
         raise RuntimeError("The DirectML provider was not installed correctly.")
-    report("DirectML acceleration installed.")
+    report("DirectML runtime files are installed.", terminal=True)
 
 
 def download_tensor_rt_rtx(destination: Path) -> None:
@@ -122,18 +129,69 @@ def download_tensor_rt_rtx(destination: Path) -> None:
         raise RuntimeError("The downloaded TensorRT RTX runtime did not match its expected integrity hash.")
 
 
+def tensor_rt_sdk_directory(root: Path) -> Path:
+    return root / "build" / "dependencies" / TENSORRT_RTX_SDK_DIRECTORY
+
+
+def tensor_rt_sdk_present(root: Path) -> bool:
+    directory = tensor_rt_sdk_directory(root)
+    return all((directory / member).is_file() for member in TENSORRT_RTX_SDK_REQUIRED)
+
+
+def stage_tensor_rt_sdk(archive_path: Path, root: Path) -> None:
+    destination = tensor_rt_sdk_directory(root)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(archive_path) as archive:
+        prefix = f"{TENSORRT_RTX_SDK_DIRECTORY}/"
+        names = set(archive.namelist())
+        headers = []
+        for name in names:
+            if name.startswith(prefix + "include/"):
+                member = PurePosixPath(name.removeprefix(prefix))
+                if len(member.parts) == 2 and member.suffix in (".h", ".hpp"):
+                    headers.append(member.as_posix())
+        members = set(TENSORRT_RTX_SDK_REQUIRED) | set(headers)
+        if not all(prefix + member in names for member in members):
+            raise RuntimeError("The TensorRT RTX archive did not contain its required SDK files.")
+        with tempfile.TemporaryDirectory(prefix="tensorrt-sdk-", dir=destination.parent) as temporary:
+            staging = Path(temporary)
+            for member in sorted(members):
+                target = staging / member
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(prefix + member) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+            if not destination.exists():
+                staging.rename(destination)
+            else:
+                for member in sorted(members):
+                    target = destination / member
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    (staging / member).replace(target)
+
+
 def install_tensor_rt_rtx(root: Path) -> None:
+    from dependency_install_lock import _installation_lock
+    with _installation_lock(root):
+        if not getattr(sys, "frozen", False):
+            if not tensor_rt_sdk_present(root):
+                with tempfile.TemporaryDirectory(prefix="vaporlock-tensorrt-rtx-") as temporary:
+                    archive_path = Path(temporary) / "tensorrt-rtx.zip"
+                    download_tensor_rt_rtx(archive_path)
+                    stage_tensor_rt_sdk(archive_path, root)
+            report("TensorRT RTX SDK files are ready for the native build.", terminal=True)
+            return
+        install_tensor_rt_runtime(root)
+
+
+def install_tensor_rt_runtime(root: Path) -> None:
     destination = root / "engine" / "trt"
     with tempfile.TemporaryDirectory(prefix="vaporlock-tensorrt-rtx-") as temporary:
         archive_path = Path(temporary) / "tensorrt-rtx.zip"
         download_tensor_rt_rtx(archive_path)
         with zipfile.ZipFile(archive_path) as archive:
-            wanted = {
-                "TensorRT-RTX-1.6.1.120/bin/tensorrt_rtx_1_6.dll": "tensorrt_rtx_1_6.dll",
-                "TensorRT-RTX-1.6.1.120/bin/tensorrt_onnxparser_rtx_1_6.dll": "tensorrt_onnxparser_rtx_1_6.dll",
-            }
             destination.mkdir(parents=True, exist_ok=True)
-            for member, filename in wanted.items():
+            for filename in TENSORRT_RTX_RUNTIME_FILES:
+                member = f"{TENSORRT_RTX_SDK_DIRECTORY}/bin/{filename}"
                 try:
                     with archive.open(member) as source, (destination / filename).open("wb") as output:
                         shutil.copyfileobj(source, output)
@@ -145,9 +203,9 @@ def install_tensor_rt_rtx(root: Path) -> None:
         "archive_sha256": TENSORRT_RTX_SHA256,
     }
     (destination / "runtime.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    if not all((destination / name).is_file() for name in ("tensorrt_rtx_1_6.dll", "tensorrt_onnxparser_rtx_1_6.dll")):
+    if not all((destination / name).is_file() for name in TENSORRT_RTX_RUNTIME_FILES):
         raise RuntimeError("TensorRT RTX was not installed correctly.")
-    report("TensorRT RTX acceleration installed.")
+    report("TensorRT RTX runtime files are installed.", terminal=True)
 
 
 def main() -> int:
@@ -164,7 +222,7 @@ def main() -> int:
         else:
             install_tensor_rt_rtx(root)
     except Exception as error:
-        report(str(error))
+        report(str(error), terminal=True)
         return 1
     return 0
 

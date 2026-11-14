@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -16,8 +17,8 @@ inline bool identityGeometry(int width, int height, int inputWidth, int inputHei
         && scaleX == 1.0F && scaleY == 1.0F && padX == 0.0F && padY == 0.0F;
 }
 
-// For identity geometry only. Keep division (not reciprocal multiplication)
-// identical to the general bilinear preprocessing path's normalization.
+// For identity geometry only. The lookup values and the planar SIMD path keep
+// division rounding identical to the general bilinear normalization.
 template<class T>
 void copyBgraToRgb(std::span<const std::uint8_t> bgra, std::span<T> rgb, bool nhwc) {
     static_assert(std::is_same_v<T, float> || std::is_same_v<T, std::uint8_t>);
@@ -29,11 +30,21 @@ void copyBgraToRgb(std::span<const std::uint8_t> bgra, std::span<T> rgb, bool nh
         else return value;
     };
     if (nhwc) {
-        for (std::size_t i = 0; i < pixels; ++i) {
-            rgb[i * 3] = convert(bgra[i * 4 + 2]);
-            rgb[i * 3 + 1] = convert(bgra[i * 4 + 1]);
-            rgb[i * 3 + 2] = convert(bgra[i * 4]);
-        }
+        const auto interleave = [&](auto normalized) {
+            for (std::size_t i = 0; i < pixels; ++i) {
+                rgb[i * 3] = normalized(bgra[i * 4 + 2]);
+                rgb[i * 3 + 1] = normalized(bgra[i * 4 + 1]);
+                rgb[i * 3 + 2] = normalized(bgra[i * 4]);
+            }
+        };
+        if constexpr (std::is_same_v<T, float>) {
+            static constexpr auto normalizedBytes = [] {
+                std::array<float, 256> values{};
+                for (std::size_t i = 0; i < values.size(); ++i) values[i] = static_cast<float>(i) / 255.0F;
+                return values;
+            }();
+            interleave([](std::uint8_t value) { return normalizedBytes[value]; });
+        } else interleave(convert);
     } else {
         std::size_t i = 0;
 #if defined(_M_X64) || defined(__SSE2__)

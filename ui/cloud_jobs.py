@@ -13,6 +13,8 @@ from PySide6.QtCore import QObject, QProcess, QTimer, Signal
 class CloudJob(QObject):
     received = Signal(dict)
     completed = Signal(bool, str)
+    TERMINAL_EVENTS = frozenset({'error', 'trained', 'project_checked', 'resume_checked', 'model_checked',
+                                 'inference_closed', 'evaluated', 'image_inspected', 'exported'})
 
     def __init__(self, parent, request, *, training=False):
         super().__init__(parent)
@@ -21,7 +23,8 @@ class CloudJob(QObject):
         self.request = deepcopy(request); self.training = training; self.done = False
         self.terminal = None; self._closing = False
         self.child = OwnedChild(command(), cwd=Path(__file__).resolve().parents[1],
-            memory_bytes=(4 if training else 2) * 1024**3, wall_seconds=86400)
+            memory_bytes=(4 if training or request['operation'] in ('evaluate', 'inspect', 'export') else 2) * 1024**3,
+            wall_seconds=86400)
         try:
             self.child.send(self.request)
         except BaseException:
@@ -48,7 +51,7 @@ class CloudJob(QObject):
         for _ in range(32):
             try: event = self.child.events.get_nowait()
             except queue.Empty: break
-            if event.get('type') in ('error', 'trained', 'project_checked', 'resume_checked','model_checked','inference_closed'):
+            if event.get('type') in self.TERMINAL_EVENTS:
                 self.terminal = event
             self.received.emit(event)
         code = self.child.poll()
@@ -66,7 +69,9 @@ class CloudJob(QObject):
         # Drain a terminal that arrived just after the bounded event loop above.
         try:
             while True:
-                event = self.child.events.get_nowait(); self.terminal = event if event.get('type') in ('error','trained','project_checked','resume_checked','model_checked','inference_closed') else self.terminal
+                event = self.child.events.get_nowait()
+                if event.get('type') in self.TERMINAL_EVENTS:
+                    self.terminal = event
                 self.received.emit(event)
         except queue.Empty: pass
         try: self.child.close()

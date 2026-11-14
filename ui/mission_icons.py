@@ -7,7 +7,7 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 NAVIGATION = {'games':'games','profiles':'profiles','model':'model','overview':'overview',
-    'detection':'detection','selection':'target','output':'movement','dataset':'database',
+    'detection':'detection','selection':'target','output':'movement','dataset':'database','cloud':'model',
     'shortcuts':'keyboard','automation':'code','diagnostics':'pulse','misc':'wrench','capture':'display'}
 
 @lru_cache(maxsize=256)

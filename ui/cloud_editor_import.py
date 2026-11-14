@@ -55,8 +55,32 @@ def reconcile_import(store,outcome):
     raise CloudInputError('Import outcome conflicts with a newer project revision. Reopen and inspect the retained import receipt.')
 
 
-def append_image(store,result,artifacts,*,revision,split='train',group=None):
-    """Consume only ImageCapability.read-verified bytes from the fixed decoder.
+def append_capture(store, image, *, revision, split, group):
+    """Import trusted, unscaled desktop pixels as a canonical PNG."""
+    from PySide6.QtCore import QBuffer, QIODevice
+    from PySide6.QtGui import QImage
+    from cloud_contract import MAX_IMAGE_PIXELS
+
+    width, height = image.width(), image.height()
+    if not (0 < width * height <= MAX_IMAGE_PIXELS):
+        raise CloudInputError('The capture is empty or exceeds the supported image size.')
+    image = image.convertToFormat(QImage.Format.Format_RGB888)
+    stride = image.bytesPerLine()
+    pixels = image.constBits()
+    rgb = b''.join(pixels[row:row+width*3] for row in range(0, stride*height, stride))
+    buffer = QBuffer()
+    if not buffer.open(QIODevice.OpenModeFlag.WriteOnly) or not image.save(buffer, 'PNG'):
+        raise CloudInputError('Could not encode the captured pixels as PNG.')
+    png = bytes(buffer.data())
+    result = dict(type='decoded', request=secrets.token_hex(16), capability=secrets.token_hex(16),
+        width=width, height=height, pixel_sha256=hashlib.sha256(f'{width}x{height}:'.encode()+rgb).hexdigest(),
+        rgb_bytes=len(rgb), rgb_sha256=hashlib.sha256(rgb).hexdigest(),
+        png_bytes=len(png), png_sha256=hashlib.sha256(png).hexdigest())
+    return append_image(store, result, {'png': png, 'rgb': rgb}, revision=revision, split=split, group=group)
+
+
+def append_image(store,result,artifacts,*,revision,split='train',group=None,yolo_rows=()):
+    """Consume verified decoder output or canonical pixels from the native desktop capture.
 
     Files precede DB references. A failure may leave one explicitly receipted
     orphan; retaining it is safer than deleting anything after an uncertain save.
@@ -81,6 +105,13 @@ def append_image(store,result,artifacts,*,revision,split='train',group=None):
     record=dict(id=identity,file='images/image-'+identity+'.png',width=result['width'],height=result['height'],
         pixel_sha256=pixel_sha,split=split,group_id=group or identity,reviewed=False,annotations=[],
         added_at=datetime.now(timezone.utc).isoformat())
+    width,height=record['width'],record['height']
+    for row in yolo_rows:
+        box=[min(1.,max(0.,value))*scale for value,scale in zip(row['box'],(width,height,width,height))]
+        label=dict(id=secrets.token_hex(16),class_id=0,source='yolo',box=box)
+        if row['points']:
+            label['wrapper']=[[x*width,y*height] for x,y in row['points']]
+        record['annotations'].append(label)
     image_record(record);value['images'].append(record);manifest(value)
     images=store.guard._directory(store.root/'images')
     total=0

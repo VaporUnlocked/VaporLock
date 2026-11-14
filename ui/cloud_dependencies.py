@@ -2,6 +2,8 @@
 from pathlib import Path
 import sys
 
+from cloud_contract import CloudInputError
+
 
 def component_roots(kind):
     if kind not in ('cpu', 'directml', 'cuda', 'train-cpu', 'train-cuda'):
@@ -15,9 +17,37 @@ def component_roots(kind):
     component = ('.venv-cloud-dml' if kind == 'directml' else
                  '.venv-cloud-cuda' if kind in ('cuda', 'train-cuda') else '.venv-cloud-cpu')
     selected = root / component / 'Lib' / 'site-packages'
-    if not selected.is_dir() or not common.is_dir():
-        raise RuntimeError('The selected .cloud runtime is missing from this installation.')
     return selected,common
+
+
+def training_runtimes():
+    def installed(kind):
+        try:
+            return (component_roots(kind)[0] / 'torch/__init__.py').is_file()
+        except (OSError, ValueError, RuntimeError):
+            return False
+    return installed('train-cpu'), installed('train-cuda')
+
+
+def training_install_help(kind):
+    if getattr(sys, 'frozen', False):
+        return ('Install the .cloud CUDA add-on or choose CPU.' if kind == 'train-cuda'
+                else 'Restore the .cloud CPU training component from the core package.')
+    flag = '-CloudCUDA' if kind == 'train-cuda' else '-CloudCPU'
+    return f'Run .\\BuildCommunity.ps1 {flag} -SkipNativeBuild from the VaporLock folder.'
+
+
+def activate_training(device):
+    """Select one Torch installation. Automatic can fall back to installed CPU training."""
+    import re
+    if type(device) is not str or re.fullmatch(r'auto|cpu|cuda(?::[0-9]{1,2})?', device) is None:
+        raise CloudInputError('Choose Automatic, CPU, or an NVIDIA CUDA device for .cloud training.')
+    cpu, cuda = training_runtimes()
+    use_cpu = device == 'cpu' or (device == 'auto' and not cuda)
+    kind = 'train-cpu' if use_cpu else 'train-cuda'
+    if not (cpu if use_cpu else cuda):
+        raise CloudInputError('.cloud training needs its PyTorch runtime. ' + training_install_help(kind))
+    activate(kind)
 
 
 def ready_for(provider):
@@ -45,6 +75,8 @@ def activate(kind):
         from cloud_production import activate as admit
         return admit('dml' if kind == 'directml' else 'cuda' if kind in ('cuda','train-cuda') else 'cpu')
     selected,common=component_roots(kind)
+    if not selected.is_dir() or not common.is_dir():
+        raise CloudInputError('The selected .cloud runtime is missing. Prepare the source dependencies with BuildCommunity.ps1.')
     # No model/project paths or environment-selected import directories.
     sys.path[:0] = [str(selected), str(common)]
 
@@ -54,8 +86,8 @@ def activate_common():
         from cloud_production import activate as admit
         return admit('common')
     common = Path(__file__).resolve().parents[1] / '.venv/Lib/site-packages'
-    if not common.is_dir():
-        raise RuntimeError('Install the source workspace dependencies in .venv first.')
+    if not (common / 'PIL/__init__.py').is_file():
+        raise CloudInputError('Run .\\BuildCommunity.ps1 -InstallDependencies -SkipNativeBuild to prepare the source .cloud tools.')
     sys.path.insert(0, str(common))
 
 

@@ -1,10 +1,16 @@
 [CmdletBinding()]
-param([switch]$InstallDependencies, [switch]$CloudCPU, [switch]$CloudDML, [switch]$CloudCUDA, [switch]$SkipNativeBuild,
+param([switch]$InstallDependencies, [switch]$CloudCPU, [switch]$CloudDML, [switch]$CloudCUDA,
+      [switch]$SkipNativeBuild, [switch]$NativeDirectML, [switch]$SyntheticOnly, [switch]$RefreshManifests,
+      [string]$OnnxRoot, [string]$DirectMlOrtRoot, [string]$DirectMlRoot,
+      [string]$TensorRtRoot, [string]$CudaToolkit,
       [ValidatePattern('^https://download\.pytorch\.org/whl/cu[0-9]+$')][string]$TorchCUDAIndex = 'https://download.pytorch.org/whl/cu130')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = $PSScriptRoot
 $python = Join-Path $root '.venv\Scripts\python.exe'
+if ($SkipNativeBuild -and ($NativeDirectML -or $SyntheticOnly -or $OnnxRoot -or $DirectMlOrtRoot -or $DirectMlRoot -or $TensorRtRoot -or $CudaToolkit)) {
+    throw 'Remove -SkipNativeBuild when selecting native build options.'
+}
 function Checked([string]$exe, [string[]]$arguments) {
     & $exe @arguments
     if ($LASTEXITCODE -ne 0) { throw "Build command failed: $exe" }
@@ -14,6 +20,14 @@ if ($InstallDependencies) {
     Checked $python @('-I','-m','pip','install','-r',(Join-Path $root 'requirements-community.txt'))
 }
 if (-not (Test-Path -LiteralPath $python)) { throw 'Run with -InstallDependencies after installing Python 3.12 x64.' }
+if ($InstallDependencies -or $CloudCPU -or $CloudDML -or $CloudCUDA) {
+    # Workers use -I -S and only import from the fixed application and provider folders.
+    $common = Join-Path $root '.venv\Lib\site-packages'
+    if (-not (Test-Path -LiteralPath (Join-Path $common 'PIL\__init__.py')) -or
+        -not (Test-Path -LiteralPath (Join-Path $common 'numpy\__init__.py'))) {
+        Checked $python @('-I','-m','pip','install','--ignore-installed','numpy>=1.26,<3','Pillow>=10,<14')
+    }
+}
 foreach ($kind in @('cpu','dml','cuda')) {
     $requested = ($kind -eq 'cpu' -and ($CloudCPU -or $CloudDML -or $CloudCUDA)) -or ($kind -eq 'dml' -and $CloudDML) -or ($kind -eq 'cuda' -and $CloudCUDA)
     if (-not $requested) { continue }
@@ -27,6 +41,18 @@ foreach ($kind in @('cpu','dml','cuda')) {
         Checked $workerPython @('-I','-m','pip','install','onnxruntime')
     } else { Checked $workerPython @('-I','-m','pip','install','torch','torchvision','--index-url',$TorchCUDAIndex) }
 }
-Checked $python @('-I','-B',(Join-Path $root 'tools\refresh_public_manifests.py'))
-if (-not $SkipNativeBuild) { Checked $python @('-I','-B',(Join-Path $root 'tools\build_public_client.py')) }
+if ($RefreshManifests) {
+    Checked $python @('-I','-B',(Join-Path $root 'tools\refresh_public_manifests.py'))
+}
+if (-not $SkipNativeBuild) {
+    $nativeArguments = @('-I','-B',(Join-Path $root 'tools\build_public_client.py'))
+    if ($NativeDirectML) { $nativeArguments += '--native-directml' }
+    if ($SyntheticOnly) { $nativeArguments += '--synthetic-only' }
+    if ($OnnxRoot) { $nativeArguments += @('--onnx-root', $OnnxRoot) }
+    if ($DirectMlOrtRoot) { $nativeArguments += @('--dml-root', $DirectMlOrtRoot) }
+    if ($DirectMlRoot) { $nativeArguments += @('--directml-root', $DirectMlRoot) }
+    if ($TensorRtRoot) { $nativeArguments += @('--tensorrt-root', $TensorRtRoot) }
+    if ($CudaToolkit) { $nativeArguments += @('--cuda-toolkit', $CudaToolkit) }
+    Checked $python $nativeArguments
+}
 Write-Host 'Source preparation finished. Run RunGui.bat. Optional driver/test-suite dependencies are documented in README.md.'

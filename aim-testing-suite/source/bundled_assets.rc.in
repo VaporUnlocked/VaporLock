@@ -2,7 +2,7 @@
 #include <windows.h>
 #include "@CMAKE_SOURCE_DIR@/source/resource_ids.h"
 
-IDR_SWAT RCDATA "@CMAKE_SOURCE_DIR@/assets/characters/SWAT.glb"
+IDR_SWAT RCDATA "@SUITE_CHARACTER_ASSET@"
 IDR_FONT RCDATA "@CMAKE_SOURCE_DIR@/assets/fonts/Interface.ttf"
 IDR_LICENSES RCDATA "@CMAKE_SOURCE_DIR@/BUNDLED_LICENSES.txt"
 IDR_MODEL_GUIDE RCDATA "@CMAKE_SOURCE_DIR@/MODEL_GUIDE.txt"
@@ -10,8 +10,8 @@ IDR_PORTABLE_GUIDE RCDATA "@CMAKE_SOURCE_DIR@/PORTABLE-README.txt"
 GLFW_ICON ICON "@CMAKE_SOURCE_DIR@/assets/Suite.ico"
 
 1 VERSIONINFO
- FILEVERSION 1,1,0,0
- PRODUCTVERSION 1,1,0,0
+ FILEVERSION 2,0,0,0
+ PRODUCTVERSION 2,0,0,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -22,12 +22,12 @@ BEGIN
  BEGIN
   BLOCK "040904b0"
   BEGIN
-   VALUE "FileDescription", "Vapor Lock Aim Testing Suite"
-   VALUE "FileVersion", "1.1.0.0"
-   VALUE "InternalName", "AimTestingSuite"
-   VALUE "OriginalFilename", "Aim Testing Suite.exe"
-   VALUE "ProductName", "Vapor Lock Aim Testing Suite"
-   VALUE "ProductVersion", "1.1.0"
+   VALUE "FileDescription", "VaporLock Proving Grounds"
+   VALUE "FileVersion", "2.0.0.0"
+   VALUE "InternalName", "VaporLockProvingGrounds"
+   VALUE "OriginalFilename", "VaporLock Proving Grounds.exe"
+   VALUE "ProductName", "VaporLock Proving Grounds"
+   VALUE "ProductVersion", "2.0.0"
   END
  END
  BLOCK "VarFileInfo"

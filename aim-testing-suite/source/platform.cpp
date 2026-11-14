@@ -23,7 +23,7 @@ fs::path executableFolder() {
     if(n==0 || n>=32768) throw std::runtime_error("Cannot locate the program.");
     return fs::path(std::wstring(name,n)).parent_path();
 }
-void showError(const std::string& text) {MessageBoxA(nullptr,text.c_str(),"Vapor Lock | Aim Testing Suite",MB_OK|MB_ICONERROR);}
+void showError(const std::string& text) {MessageBoxA(nullptr,text.c_str(),"VaporLock Proving Grounds",MB_OK|MB_ICONERROR);}
 unsigned long ownProcessId(){return GetCurrentProcessId();}
 void replaceFile(const fs::path& temporary,const fs::path& destination){
     if(!MoveFileExW(temporary.c_str(),destination.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))

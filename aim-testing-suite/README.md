@@ -1,14 +1,39 @@
-# Vapor Lock — Aim Testing Suite
+# VaporLock Proving Grounds
 
-A local C++20 practice range with four connected bays, moving character targets, physical settings panels and a single Esc menu. The cleared CC0 SWAT character is included. Vapor Lock branding and the blue-black/ice-blue palette take direction from **VaporLock.top**.
+A local Windows first-person shooter and testing range. Industrial Yard has container lanes, warehouse cover and a walkable catwalk. The firing range has four connected bays with its original drills and physical settings panels.
 
 ## Start
 
-Open **Aim Testing Suite.exe**. The portable release needs only this one file: the C++ runtime is statically linked, and the included SWAT character, interface font, icon, credits and instructions are inside the executable. There is no installer, Python/.NET requirement, separate runtime installer or asset download. Existing local shortcuts continue to work.
+Open **VaporLock Proving Grounds.exe** or select **Open Proving Grounds** in the VaporLock Control Center. The portable executable includes its character, font, icon and notices.
 
 On first launch it creates **models** beside the EXE for custom `.glb` characters, along with local reports and text guides. Built-in models and the font load directly from executable resources, without extraction. Settings and output stay beside the EXE even when launched from a different working directory. Use a writable location; no administrator access is required. Copy just the EXE for a fresh setup, or move the whole portable folder to retain preferences and custom models. Windows x64 and a working OpenGL 3.3-capable graphics driver are required.
 
-Click once inside the window to enter; that first click does not fire. The window prepares its first frame before appearing and centers itself within the display's work area.
+## Industrial Yard
+
+- **Clear the Yard** gives you 90 seconds to eliminate ten armed bots.
+- **Hold the Line** sends three waves through the yard. Health and ammunition are replenished between waves.
+- **Free Practice** uses respawning, passive bots and replenishes reserve ammunition on reload.
+
+Choose from eight loadouts on the deployment screen. Each has its own fire mode, capacity, recoil, spread, range, and reload time.
+
+| Weapon | Role |
+| --- | --- |
+| Harbor AR-4 | Automatic assault rifle |
+| Vector-9 | Fast-firing SMG |
+| Relay B3 | Three-round burst rifle |
+| Longwatch DMR | Semi-automatic marksman rifle |
+| Crane .308 | Bolt-action sniper rifle |
+| Breach 12 | Pump shotgun with eight pellets per shot |
+| Foundry LMG | Belt-fed automatic |
+| Kite .45 | Semi-automatic sidearm |
+
+Use **WASD** to move, **right mouse** to aim down sights, **R** to reload, **Shift** to sprint and **Ctrl** to crouch. Press **Ctrl** during a sprint to slide. A gamepad supports twin-stick movement and aim, trigger aim and fire, left-stick sprint, **B** crouch or slide, and **X** reload. **Esc** pauses and **F5** restarts the round with the same seed.
+
+Finished combat rounds save a JSON summary and shot CSV. **Review Shots** opens a timeline and overhead map with player and enemy shot paths. **F12** saves a clean PNG and projected target bounds for the current view.
+
+## Firing range controls
+
+Select **Firing Range** on the deployment screen. **F2** returns to mode and loadout selection.
 
 | Control | Action |
 | --- | --- |
@@ -98,17 +123,15 @@ A geometric hit uses the posed character triangles, including carried equipment.
 
 ## Build and verify
 
-For development, install CMake 3.25+ and Visual Studio Desktop C++ Build Tools, then run **build.ps1**. It builds the portable native executable and runs the core tests. **package.ps1** builds and copies the EXE into the release output, with its hash recorded in **portable-package.json**. Only **Aim Testing Suite.exe** needs distribution; the toolchain and build scripts are not needed by users. No Python or browser runtime is involved. Earlier one-time character conversion scripts are not used by the application.
+For development, install CMake 3.25+ and Visual Studio Desktop C++ Build Tools, then run **build.ps1**. It builds the portable executable and runs the core tests. To supply the SWAT file from another location, pass `-CharacterAsset` with its path. The build checks the asset against the hash in `dependency-manifest.json`. **package.ps1** copies the executable into the release output and records its hash.
 
 Additional native validation commands:
 
 ~~~powershell
-& '.\Aim Testing Suite.exe' --range-check SWAT.glb
-& '.\Aim Testing Suite.exe' --startup-check
-& '.\Aim Testing Suite.exe' --fps-check max
-& '.\Aim Testing Suite.exe' --fps-check high
-& '.\Aim Testing Suite.exe' --fps-check mid
-& '.\Aim Testing Suite.exe' --fps-check potato
+& '.\VaporLock Proving Grounds.exe' --yard-check
+& '.\VaporLock Proving Grounds.exe' --range-check SWAT.glb
+& '.\VaporLock Proving Grounds.exe' --startup-check
+& '.\VaporLock Proving Grounds.exe' --fps-check mid
 ~~~
 
 The range check runs hidden for 192 frames at 1920 × 1080, renders all bays and menu/panel states, exercises controls, raycasts, reports, model replacement, collision, timers, countdown, respawning, calibration, graphics allocation, all quality presets, dropdown picking, click-event gates and the website action, then exits. It does not launch a browser. Its simulation uses controlled test timing, not a hardware FPS benchmark. The startup check briefly shows only its own window without requesting foreground focus, verifies visibility and exits. These commands generate local reports; a successful source export is not evidence that a graphical check or FPS benchmark has run.

@@ -106,7 +106,7 @@ class OverlayFrameGate:
 
 
 class PreviewFrameGate(OverlayFrameGate):
-    """JPEGs have their own frame rate, but cannot cross an observed source boundary."""
+    """Preview images have their own rate and cannot cross an observed source boundary."""
     def accept(self, payload: dict, epoch: int, now: int | None, boundary=None) -> bool:
         identity = tuple(payload.get(k) for k in ('session', 'source_generation', 'frame_id', 'config_revision'))
         if boundary is not None:

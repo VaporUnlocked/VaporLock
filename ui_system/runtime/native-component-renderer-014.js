@@ -409,7 +409,7 @@ export function createNativeVaporLockRenderer(mount,{componentPlan,translations,
       control.dataset.vlLiveNumeric=state.record.id;
       range.dataset.vlLiveField=state.record.id+':slider';spin.dataset.vlLiveField=state.record.id+':expert';
       range.min=state.spec.sliderMinimum;range.max=state.spec.sliderMaximum;
-      spin.min=state.spec.minimum*factor;spin.max=(state.record.id==='numeric.capture_fps'?120:state.spec.maximum)*factor;
+      spin.min=state.spec.minimum*factor;spin.max=state.spec.maximum*factor;
       const observed=state.record.value!==null;
       if(observed){const actual=Number(state.record.value);values.set(d.id,actual);
         const visible=editing?.value??actual;
@@ -429,10 +429,8 @@ export function createNativeVaporLockRenderer(mount,{componentPlan,translations,
       if(applyFocused&&(applyValue.hidden||applyValue.disabled))restoreInputFocus=lastDraftInput==='slider'?range:spin;
       for(const old of control.querySelectorAll('.vl-live-unavailable:not([data-vl-numeric-unknown])'))old.remove();
       const actual=observed?Number(state.record.value):null;
-      const guidance=state.record.id==='numeric.capture_fps'&&actual>120
-        ?t('Use native workspace to edit capture rates above 120 fps')
-        :state.record.id==='numeric.training_seed'&&actual>state.spec.maximum
-          ?t('Use the slider to edit training seeds above 1,000,000'):'';
+      const guidance=state.record.id==='numeric.training_seed'&&actual>state.spec.maximum
+        ?t('Use the slider to edit training seeds above 1,000,000'):'';
       const notice=draft.notice(),cancelled=notice==='changed'?t('Draft canceled because the setting or selection changed.')
         :notice==='unavailable'?t('Draft canceled because this control is unavailable.')
           :notice==='discarded'?t('Draft discarded.'):'';

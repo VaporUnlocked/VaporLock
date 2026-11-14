@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from export_public_source import _create_retained_output, _output_identity
@@ -61,24 +62,28 @@ def archive(root, output, rows, *, cuda):
         for name in ('RELEASE_MANIFEST.json','RELEASE_CHECKSUMS.sha256'):
             path=root/'information'/name
             selected.append({'path':'information/'+name,'bytes':path.stat().st_size,'sha256':digest(path)})
+    return verified_archive(root, output, selected, prefix='VaporLock')
+
+
+def verified_archive(root, output, members, *, prefix):
     if output.exists():
         raise ValueError('Refusing existing release archive')
     with _create_retained_output(output) as file:
         with zipfile.ZipFile(file,'w',zipfile.ZIP_DEFLATED,compresslevel=5) as package:
-            for row in selected:
+            for row in members:
                 path=root/row['path']
                 if digest(path)!=row['sha256']:
                     raise ValueError('Release input changed')
-                package.write(path,'VaporLock/'+row['path'])
+                package.write(path,prefix+'/'+row['path'])
         file.flush()
         os.fsync(file.fileno())
         frozen=_output_identity(output,file,links=1)
         file.seek(0)
         with zipfile.ZipFile(file) as package:
-            if len(package.infolist())!=len(selected):raise ValueError('Release member count mismatch')
-            for row in selected:
+            if len(package.infolist())!=len(members):raise ValueError('Release member count mismatch')
+            for row in members:
                 checksum=hashlib.sha256();total=0
-                with package.open('VaporLock/'+row['path']) as member:
+                with package.open(prefix+'/'+row['path']) as member:
                     for chunk in iter(lambda:member.read(1024*1024),b''):
                         checksum.update(chunk);total+=len(chunk)
                 if total!=row['bytes'] or checksum.hexdigest()!=row['sha256']:
@@ -88,7 +93,17 @@ def archive(root, output, rows, *, cuda):
         _output_identity(output,file,links=1,frozen=frozen)
     if output.stat().st_size>=2*1024**3:
         raise ValueError('Release asset exceeds GitHub per-file limit')
-    return {'name':output.name,'bytes':output.stat().st_size,'sha256':sha,'files':len(selected),'all_members_readback':True}
+    return {'name':output.name,'bytes':output.stat().st_size,'sha256':sha,'files':len(members),'all_members_readback':True}
+
+
+def standalone_proving_grounds(executable, output, version, source):
+    with tempfile.TemporaryDirectory(prefix='proving-grounds-', dir=output) as staging:
+        root=Path(staging)
+        copied(executable,root/'VaporLock Proving Grounds.exe')
+        for name in ('LICENSE','PORTABLE-README.txt','THIRD_PARTY_NOTICES.md'):
+            copied(source/name,root/name)
+        name='VaporLock-Proving-Grounds-'+version+'-Windows-x64.zip'
+        return verified_archive(root,output/name,inventory(root),prefix='VaporLock Proving Grounds')
 
 
 def main():
@@ -113,19 +128,21 @@ def main():
             ('trt',('VaporLockTensorRt.exe','onnxruntime.dll','onnxruntime_providers_shared.dll','tensorrt_rtx_1_6.dll','tensorrt_onnxparser_rtx_1_6.dll'))):
             for name in names:
                 copied(args.native/directory/name,package/'engine'/directory/name)
-        # DirectML is an independently licensed vendor runtime already present
-        # in the verified Cloud DML cohort. Do not copy an old product engine.
-        copied(package/'runtime/cloud/dml/onnxruntime/capi/DirectML.dll',package/'engine/dml/DirectML.dll')
+        native_directml = args.native/'dml/DirectML.dll'
+        if not native_directml.is_file():
+            # Older native builds staged the redistributable in the Cloud cohort.
+            native_directml = package/'runtime/cloud/dml/onnxruntime/capi/DirectML.dll'
+        copied(native_directml,package/'engine/dml/DirectML.dll')
         qt=package/'app/_internal'
         for directory in ('','dml','trt'):
             for name in ('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','msvcp140_1.dll','msvcp140_2.dll','msvcp140_codecvt_ids.dll','concrt140.dll'):
                 if (qt/name).is_file():copied(qt/name,package/'engine'/directory/name)
-        copied(args.suite,package/'testing-suite/Official Aim Testing Suite.exe')
+        copied(args.suite,package/'testing-suite/VaporLock Proving Grounds.exe')
         for name in ('LICENSE','PRIVACY.md','README.md','THIRD_PARTY_NOTICES.md'):
             copied(root/name,package/'information'/name)
         for name in ('LICENSE-GPL-3.0.txt','LICENSE-LGPL-3.0.txt'):
             copied(root/'third_party/qt'/name,package/'information/third-party/qt'/name)
-        copied(root/'docs/EULA.md',package/'information/EULA.md')
+        copied(root/'docs/RELEASE_NOTES.md',package/'information/docs/RELEASE_NOTES.md')
         for directory, dirs, files in os.walk(root/'guides',followlinks=False):
             plain(Path(directory))
             for name in dirs:plain(Path(directory)/name)
@@ -134,7 +151,15 @@ def main():
                 if path.suffix.casefold() in ('.html','.css','.png','.svg'):
                     copied(path,package/'guides'/path.relative_to(root/'guides'))
         copied(root/'VaporLock-Settings-Guide.html',package/'VaporLock-Settings-Guide.html')
-        (package/'README.txt').write_text('VaporLock '+version+' Community\n\nExtract the core ZIP, then open VaporLock.exe. No account or key is required.\nFor .cloud CUDA, extract the optional CUDA ZIP into the same parent so its VaporLock folder merges with this one.\nThe Windows controller-output component is not bundled because its embedded dependency redistribution permissions are unresolved.\nNo installer or automatic updates are included. See information/README.md, LICENSE and THIRD_PARTY_NOTICES.md.\n',encoding='utf-8')
+        (package/'README.txt').write_text(
+            'VaporLock '+version+' Community\n\n'
+            'Extract into a fresh folder and run VaporLock.exe. No account or key is required.\n'
+            'Open Proving Grounds in VaporLock to play Industrial Yard or the Firing Range.\n'
+            'For detection, import a compatible model from Model Library or add it to models.\n'
+            'For .cloud CUDA, extract the add-on into the same parent to merge the VaporLock folders.\n'
+            'See information/docs/RELEASE_NOTES.md for setup, migration and GPU requirements.\n'
+            'See information/LICENSE and information/THIRD_PARTY_NOTICES.md for terms.\n',
+            encoding='utf-8')
     rows=inventory(package)
     metadata={'schema_version':1,'version':version,'edition':'community','unsigned':True,
               'purpose':'local file integrity and optional reproducible dependency reuse; no activation or update gate','files':rows}
@@ -146,7 +171,9 @@ def main():
         return
     output=plain(args.output);output.mkdir(parents=True,exist_ok=True)
     results=[archive(package,output/('VaporLock-'+version+'-Community-Windows-x64.zip'),rows,cuda=False),
-             archive(package,output/('VaporLock-'+version+'-Cloud-CUDA-Addon.zip'),rows,cuda=True)]
+             archive(package,output/('VaporLock-'+version+'-Cloud-CUDA-Addon.zip'),rows,cuda=True),
+             standalone_proving_grounds(package/'testing-suite/VaporLock Proving Grounds.exe',
+                                        output,version,root/'aim-testing-suite')]
     (output/'release-artifacts.json').write_text(json.dumps({'version':version,'assets':results},indent=2)+'\n',encoding='utf-8')
     (output/'SHA256SUMS.txt').write_text(''.join(r['sha256']+'  '+r['name']+'\n' for r in results),encoding='utf-8')
     print(json.dumps({'assets':results}))

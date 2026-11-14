@@ -1,8 +1,8 @@
-VAPOR LOCK | AIM TESTING SUITE 1.1
+VAPORLOCK PROVING GROUNDS 2.0
 PORTABLE WINDOWS x64 EDITION
 
 START
-Keep Aim Testing Suite.exe in a writable folder and double-click it.
+Keep VaporLock Proving Grounds.exe in a writable folder and double-click it.
 Only the EXE needs to be copied. No installer, launcher, Python, .NET,
 Visual C++ redistributable or separate asset download is required.
 The included SWAT character, font and notices are
@@ -20,10 +20,11 @@ To move your saved settings and custom models, move the whole folder.
 Copying only the EXE elsewhere starts a fresh portable setup.
 
 CONTROLS
-Click once to enter the range. Mouse looks; left click fires one shot.
-W/A/S/D walk; Shift sprints; Ctrl crouches.
-Esc opens the character, quality, unstuck, exit and project source menu.
-F11 toggles borderless; F12 saves a clean range capture.
+Choose a mode and weapon, then Deploy. Select Firing Range for the four drills.
+W/A/S/D move. Mouse looks. Left mouse fires and right mouse aims.
+R reloads. Shift sprints. Ctrl crouches, or slides while sprinting.
+Esc pauses. F5 restarts the yard. F2 returns from the firing range.
+F11 toggles borderless. F12 saves a clean PNG and target bounds.
 Shoot the physical settings panels to change the occupied bay's drill.
 Only the occupied bay has active targets; other bays retain paused state.
 Quality choices are Max, High, Mid (default) and Potato.

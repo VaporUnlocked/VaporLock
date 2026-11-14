@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QDoubleSpinBox, QWidget
 from shiboken6 import isValid
 
 from vlui_numeric_catalog import FIELDS, native_numeric_value, parse_numeric_value
+from frame_rate import valid_frame_rate
 
 
 class NativeNumericRegistry:
@@ -164,7 +165,7 @@ class NativeNumericRegistry:
 
     def apply_capture_rate(self, fps, *, free, denied, guard):
         # Dedicated product capability, not an alias through the generic parser.
-        if type(fps) is not int or not 1 <= fps <= 120:
+        if not valid_frame_rate(fps):
             raise ValueError('INVALID_CAPTURE_RATE')
         return self._apply_admitted('numeric.capture_fps', fps, free=free, denied=denied, guard=guard)
 

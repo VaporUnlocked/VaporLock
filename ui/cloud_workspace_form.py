@@ -97,7 +97,11 @@ def mount(owner,layout,train_mount):
         owner.pages[name]=box
         button.clicked.connect(lambda checked=False,i=index:stack.setCurrentIndex(i))
         if index==0:button.setChecked(True)
-    stack.currentChanged.connect(lambda index:group.button(index).setChecked(True) if group.button(index) else None)
+    def tab_changed(index):
+        group.button(index).setChecked(True)
+        if index==1 and owner.session and owner.session.draft and not owner.image_matches() and not owner.loading:
+            owner.load_image()
+    stack.currentChanged.connect(tab_changed)
     layout.addWidget(row);layout.addWidget(stack,1)
     def actions(parent,items):
         host=QWidget();line=ActionFlow(host)
@@ -123,10 +127,25 @@ def mount(owner,layout,train_mount):
     owner.project_actions.setMenu(project_menu);owner.controls.append(owner.project_actions);project_flow.addWidget(owner.project_actions)
     owner.import_button=FittedActionButton(t('Import images…'));owner.import_button.setAutoDefault(False)
     owner.import_button.setProperty('missionIcon','upload');owner.import_button.clicked.connect(owner.import_images)
-    owner.controls.append(owner.import_button);project_flow.addWidget(owner.import_button);project.addWidget(project_row)
+    owner.controls.append(owner.import_button);project_flow.addWidget(owner.import_button)
+    yolo=FittedActionButton(t('Import YOLO labels…'));yolo.setProperty('missionIcon','upload')
+    yolo.setToolTip(t('Import images and class 0 boxes or polygons. Review each image and complete missing masks before training.'))
+    yolo.clicked.connect(owner.import_yolo);owner.controls.append(yolo);project_flow.addWidget(yolo)
+    video=FittedActionButton(t('Import video frames…'));video.setProperty('missionIcon','upload')
+    video.clicked.connect(owner.import_video);owner.controls.append(video);project_flow.addWidget(video)
+    capture=FittedActionButton(t('Capture region in 3 s'));capture.setProperty('missionIcon','image')
+    capture.clicked.connect(owner.capture_frame);owner.controls.append(capture);project_flow.addWidget(capture)
+    new_group=FittedActionButton(t('New capture group'));new_group.setProperty('missionIcon','folder')
+    new_group.clicked.connect(owner.new_capture_group);owner.controls.append(new_group);project_flow.addWidget(new_group)
+    owner.cancel_import=FittedActionButton(t('Cancel import'));owner.cancel_import.setProperty('missionIcon','stop')
+    owner.cancel_import.clicked.connect(owner.cancel);project_flow.addWidget(owner.cancel_import)
+    project.addWidget(project_row)
     owner.project_path=WrappedPath();project.addWidget(owner.project_path)
     owner.project_summary=QLabel();owner.project_summary.setProperty('_vaporlock_i18n_skip',True)
     owner.project_summary.setWordWrap(True);project.addWidget(owner.project_summary)
+    owner.project_status=QLabel();owner.project_status.setTextFormat(Qt.TextFormat.PlainText)
+    owner.project_status.setProperty('_vaporlock_i18n_skip',True)
+    owner.project_status.setWordWrap(True);project.addWidget(owner.project_status)
     import_row=QWidget();import_layout=QVBoxLayout(import_row);import_layout.setContentsMargins(0,0,0,0);import_layout.setSpacing(3)
     import_layout.addWidget(QLabel(t('Import split')));owner.split=QComboBox()
     for name in ('train','val','test'):owner.split.addItem(t({'train':'Training','val':'Validation','test':'Test'}[name]),name)
@@ -178,6 +197,7 @@ def mount(owner,layout,train_mount):
         ('Regenerate mask',owner.regenerate,True,True,'refresh'),
         ('Delete target',owner.delete_target,True,True,'trash'),
         ('No targets',owner.mark_negative,True,True,'exclude'),
+        ('Move image group…',owner.move_image_group,True,True,'folder'),
         ('Save image draft',owner.save_draft,True,True,'save'),
         ('Retry image',owner.retry_image,True,False,'refresh')):
         action=menu.addAction(icon(symbol,colors['ice'],colors['baby'],colors['steel']),t(name));action.triggered.connect(callback)
@@ -213,10 +233,11 @@ def mount(owner,layout,train_mount):
     train_mount(owner.pages['Train'])
     results=owner.pages['Results'];text_content=FitColumn();text_layout=FitVBox(text_content);text_layout.setContentsMargins(0,0,0,0)
     owner.results=QLabel();owner.results.setProperty('_vaporlock_i18n_skip',True);owner.results.setWordWrap(True);text_layout.addWidget(owner.results)
-    owner.results_paths=WrappedPath();text_layout.addWidget(owner.results_paths);text_layout.addStretch(1)
+    from cloud_results_ui import CloudResults
+    owner.suite.results_panel=CloudResults(owner.suite)
+    text_layout.addWidget(owner.suite.results_panel);text_layout.addStretch(1)
     owner.results_scroll=InventoryScroll();owner.results_scroll.setWidgetResizable(True);owner.results_scroll.setWidget(text_content)
     owner.results_scroll.setFrameShape(QFrame.Shape.NoFrame);owner.results_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     for surface in (text_content,owner.results_scroll,owner.results_scroll.viewport()):surface.setPalette(palette);owner.surfaces.append(surface)
     results.addWidget(owner.results_scroll,1)
-    actions(results,[('Check saved project',owner.check_project,True)])
     owner.refresh_document();owner.render()

@@ -6,14 +6,14 @@ from pathlib import Path
 import secrets
 
 from PySide6.QtCore import QObject,QTimer
-from PySide6.QtWidgets import (QWidget,QHBoxLayout,QVBoxLayout,QLabel,QPushButton,QFileDialog,
-                              QComboBox,QMessageBox,QProgressBar)
+from PySide6.QtWidgets import QMessageBox
 
 
 class CloudSuite(QObject):
     def __init__(self,center):
         super().__init__(center);self.center=center;self.job=None;self.message='Choose a reviewed .cloud project to begin.'
         self.outputs=None;self.recipe=None;self.percent=None;self.widgets={};self.checked=None
+        self.evaluation=None;self.inspection=None;self.results_panel=None
         self.timer=QTimer(self);self.timer.setInterval(400);self.timer.timeout.connect(self.render);self.timer.start()
 
     def fingerprint(self):
@@ -27,7 +27,60 @@ class CloudSuite(QObject):
         from cloud_suite_form import mount
         from cloud_workspace_ui import CloudWorkspace
         if not hasattr(self,'workspace'):self.workspace=CloudWorkspace(self)
+        self.results_panel=None
         self.workspace.mount(layout,lambda train_layout:mount(self,train_layout))
+
+    def output_parent(self):
+        from vapor_lock_gui import ROOT, resolve_product_path
+        output = self.center.settings.cloud_output
+        return resolve_product_path(output) if output else ROOT / 'cloud-training'
+
+    def draft_overrides(self):
+        s = self.center.settings
+        return {**s.cloud_recipe_overrides, 'epochs': s.cloud_epochs, 'patience': s.cloud_patience,
+                'device': s.cloud_device, 'batch_size': s.cloud_batch or -1}
+
+    def apply_recipe(self, preset, values):
+        from cloud_recipe import BASIC_FIELDS, resolve_recipe
+
+        if self.reason() or self.center.settings.cloud_mode == 'resume':
+            raise ValueError('The training recipe cannot be edited during this operation.')
+        values = resolve_recipe(preset, values)
+        s = self.center.settings
+        advanced = {name: value for name, value in values.items()
+                    if name not in BASIC_FIELDS and value is not None}
+        updates = {'cloud_recipe_preset': preset, 'cloud_recipe_overrides': advanced,
+                   'cloud_epochs': values['epochs'], 'cloud_patience': values['patience'],
+                   'cloud_batch': max(0, values['batch_size']), 'cloud_device': values['device']}
+        from cloud_settings import validate
+        validate({**vars(s), **updates})
+        self.center.change('cloud_recipe_overrides', advanced)
+        for name, value in updates.items():
+            if name != 'cloud_recipe_overrides':
+                self.center.change(name, value)
+        for name, spin in self.parameter_spins.items():
+            blocked = spin.blockSignals(True)
+            spin.setValue(getattr(s, name))
+            spin.blockSignals(blocked)
+        device = self.device_combo
+        blocked = device.blockSignals(True)
+        if device.findData(s.cloud_device) < 0:
+            device.addItem(s.cloud_device, s.cloud_device)
+        device.setCurrentIndex(device.findData(s.cloud_device))
+        device.blockSignals(blocked)
+        self.checked=None
+        self.invalidate_recipe_if_changed()
+        self.message = 'Training recipe updated.'
+        self.render()
+
+    def edit_recipe(self):
+        if self.reason() or self.center.settings.cloud_mode == 'resume':
+            return
+        from cloud_recipe_ui import RecipeDialog
+        try:
+            RecipeDialog(self).exec()
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self.center, '.cloud training recipe', str(error))
 
     def refresh_mode(self):
         mode=self.center.settings.cloud_mode
@@ -43,7 +96,7 @@ class CloudSuite(QObject):
         self.fresh_panel.setVisible(mode!='resume')
         self.widgets['cloud_initial_model'].setVisible(mode=='initialize')
         self.widgets['cloud_checkpoint'].setVisible(mode=='resume')
-        guidance=self.center.t('Resume inherits the verified checkpoint recipe. Use Check project / checkpoint to inspect it.') if mode=='resume' else self.center.t('Compatible S2 weights initialize a new run with a fresh optimizer.') if mode=='initialize' else self.center.t('From scratch uses fresh S2 weights. No YOLO model or pretrained foundation is required.')
+        guidance=self.center.t('Resume inherits the verified checkpoint recipe. Use Check project / checkpoint to inspect it.') if mode=='resume' else self.center.t('A compatible .cloud model supplies the initial weights and model dimensions.') if mode=='initialize' else self.center.t('From scratch uses the selected recipe and starts with fresh weights.')
         self.mode_combo.setToolTip(guidance)
         current=bool(self.recipe and self.checked==self.fingerprint())
         self.recipe_label.setPlainText(self.recipe_text() if current else '')
@@ -109,9 +162,20 @@ class CloudSuite(QObject):
             self.center._cloud_training_job=self.job
             self.center.set_start_enabled(False)
         except Exception as error:
-            self.message='.cloud worker could not start ('+type(error).__name__+').';self.render();return
+            from cloud_contract import CloudInputError
+            self.message=str(error) if isinstance(error,CloudInputError) else '.cloud worker could not start ('+type(error).__name__+').'
+            self.render();return
         if training:self.outputs=None
-        self.percent=None;self.checked=self.fingerprint();self.message='Checking .cloud inputs…'
+        operation = request['operation']
+        if operation == 'evaluate':
+            self.evaluation = None
+            if self.results_panel is not None:self.results_panel.show_evaluation(None)
+        elif operation == 'inspect':
+            self.inspection = None
+            if self.results_panel is not None:self.results_panel.show_inspection(None)
+        self.percent=None;self.checked=self.fingerprint()
+        self.message={'evaluate':'Evaluating .cloud model…', 'inspect':'Inspecting image…',
+                      'export':'Exporting .cloud ONNX graphs…'}.get(operation,'Checking .cloud inputs…')
         self.job.received.connect(self.handle_event);self.job.completed.connect(self.completed);self.render()
 
     def preflight(self):
@@ -129,18 +193,104 @@ class CloudSuite(QObject):
         try:
             if hasattr(self,'workspace') and not self.workspace.prepare_training(self.start):return
             if not self.admission():return
-            from vapor_lock_gui import ROOT,resolve_product_path
-            s=self.center.settings;output=resolve_product_path(s.cloud_output) if s.cloud_output else ROOT/'cloud-training'
+            from vapor_lock_gui import resolve_product_path
+            s=self.center.settings;output=self.output_parent()
             if not s.cloud_output:output.mkdir(exist_ok=True)
             name=s.cloud_run_name+'-'+datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(2)
             request={'operation':'train','project':str(resolve_product_path(s.cloud_project)),'output_parent':str(output),'run_name':name,
                      'mode':s.cloud_mode,'overrides':{'device':s.cloud_device}}
             if s.cloud_mode=='resume':request['checkpoint']=str(resolve_product_path(s.cloud_checkpoint))
             else:
-                request['overrides'].update(epochs=s.cloud_epochs,batch_size=-1 if s.cloud_batch==0 else s.cloud_batch,patience=s.cloud_patience)
-                if s.cloud_mode=='initialize':request['initial_model']=str(resolve_product_path(s.cloud_initial_model))
+                request['preset'] = s.cloud_recipe_preset
+                request['overrides'] = self.draft_overrides()
+                if s.cloud_mode=='initialize':
+                    from cloud_recipe import MODEL_FIELDS
+                    request['initial_model']=str(resolve_product_path(s.cloud_initial_model))
+                    request['overrides'] = {key: value for key, value in request['overrides'].items() if key not in MODEL_FIELDS}
             self.launch(request,training=True)
         except Exception as error:QMessageBox.information(self.center,'.cloud',str(error))
+
+    def use_result(self, path, mode):
+        if self.reason():
+            return
+        from dataset_paths import display_path, reject_reparse
+        try:
+            path = reject_reparse(path)
+            if not path.is_file():
+                raise ValueError('This run artifact is no longer available.')
+            field = 'cloud_checkpoint' if mode == 'resume' else 'cloud_initial_model'
+            self.center.change(field, display_path(path))
+            self.center.change('cloud_mode', mode)
+            for edit in self.path_edits:
+                if edit.property('guideField') == field:
+                    edit.setText(getattr(self.center.settings, field))
+                    break
+            self.mode_combo.setCurrentIndex(self.mode_combo.findData(mode))
+            self.refresh_mode()
+            self.workspace.stack.setCurrentIndex(2)
+        except (OSError, ValueError) as error:
+            QMessageBox.information(self.center, '.cloud', str(error))
+
+    def evaluate(self, path, split, confidence):
+        try:
+            from vapor_lock_gui import resolve_product_path
+            s = self.center.settings
+            if not s.cloud_project:
+                raise ValueError('Select a reviewed .cloud project before evaluating.')
+            if not self.workspace.prepare_training(lambda: self.evaluate(path, split, confidence)):
+                return
+            if self.admission():
+                self.launch({'operation': 'evaluate', 'project': str(resolve_product_path(s.cloud_project)),
+                             'model': str(path), 'split': split, 'confidence': confidence,
+                             'device': s.cloud_device})
+        except (OSError, ValueError) as error:
+            QMessageBox.information(self.center, '.cloud evaluation', str(error))
+
+    def publish_model(self, path):
+        if self.reason():
+            return
+        from cloud_results import publish_model
+        from vapor_lock_gui import ROOT
+        try:
+            model = publish_model(path, ROOT / 'models', self.center.settings.cloud_run_name)
+            self.center.refresh_model_library()
+            self.message = self.center.tf('Added {model} to the model library.', model=model.name)
+            self.render()
+        except (OSError, ValueError) as error:
+            QMessageBox.information(self.center, '.cloud model library', str(error))
+
+    def inspect_image(self, model, image, confidence, nms_iou, maximum, min_height):
+        try:
+            if not self.workspace.prepare_analysis(lambda: self.inspect_image(model, image, confidence, nms_iou,
+                                                                            maximum, min_height)):
+                return
+            if self.admission():
+                self.launch({'operation':'inspect', 'model':str(model), 'image':str(image),
+                             'confidence':confidence, 'nms_iou':nms_iou, 'max_detections':maximum,
+                             'min_height':min_height, 'device':self.center.settings.cloud_device})
+        except (OSError, ValueError) as error:
+            QMessageBox.information(self.center, '.cloud inspection', str(error))
+
+    def check_runtimes(self):
+        from cloud_dependencies import training_install_help, training_runtimes
+        runtimes = training_runtimes()
+        labels = ('CPU', 'NVIDIA CUDA')
+        self.runtime_status.setText(' · '.join(
+            f"{self.center.t(label)} {self.center.t('installed' if ready else 'missing')}"
+            for label, ready in zip(labels, runtimes)))
+        self.runtime_setup.setText('\n'.join(training_install_help(kind)
+            for kind, ready in zip(('train-cpu', 'train-cuda'), runtimes) if not ready))
+        self.runtime_setup.setVisible(not all(runtimes))
+
+    def export_model(self, model, parent):
+        try:
+            if not self.workspace.prepare_analysis(lambda: self.export_model(model, parent)):
+                return
+            if self.admission():
+                name = 'cloud-onnx-' + datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(2)
+                self.launch({'operation':'export', 'model':str(model), 'output_parent':str(parent), 'run_name':name})
+        except (OSError, ValueError) as error:
+            QMessageBox.information(self.center, '.cloud ONNX export', str(error))
 
     def stop(self):
         if self.job and not self.job.done:
@@ -157,19 +307,38 @@ class CloudSuite(QObject):
         elif kind=='phase':self.message='Checking .cloud inputs…' if value['phase']=='checking' else 'Starting .cloud training…'
         elif kind=='progress':
             epoch=value.get('epoch');epochs=value.get('epochs');batch=value.get('batch');batches=value.get('batches')
-            self.message=self.center.tf('Epoch {epoch}/{epochs} · batch {batch}/{batches}',epoch=epoch or '—',epochs=epochs or '—',batch=batch or '—',batches=batches or '—')
+            if value.get('event')=='validation_start':
+                self.message=self.center.tf('Validating epoch {epoch}/{epochs}',epoch=epoch,epochs=epochs)
+            elif batch and batches:
+                self.message=self.center.tf('Epoch {epoch}/{epochs} · batch {batch}/{batches}',epoch=epoch,epochs=epochs,batch=batch,batches=batches)
+            else:
+                self.message=self.center.tf('Epoch {epoch}/{epochs}',epoch=epoch,epochs=epochs)
             if 'loss' in value:self.message+=' · '+self.center.t('Loss')+': '+format(value['loss'],'.5g')
             if 'resolved_batch_size' in value:self.message+=' · '+self.center.t('Images per batch')+': '+str(value['resolved_batch_size'])
             if 'effective_batch_size' in value:self.message+=' · '+self.center.t('Target effective batch')+': '+str(value['effective_batch_size'])
             if 'device' in value:self.message+=' · '+self.center.t('Training device')+': '+str(value['device'])
             if type(epoch) is int and type(epochs) is int and epochs>0:self.percent=max(0,min(99,int(100*epoch/epochs)))
         elif kind=='trained':
-            self.outputs=value;self.message={'completed':'Training completed.','early_stopped':'Training stopped early after validation.','stopped':'Training stopped. Saved outputs are listed below.'}[value['status']];self.percent=100 if value['status']=='completed' else self.percent
+            self.outputs=value;self.message={'completed':'Training completed.','early_stopped':'Training stopped early after validation.','stopped':'Training stopped. See Results for saved artifacts.'}[value['status']];self.percent=100 if value['status']=='completed' else self.percent
+        elif kind=='evaluated':
+            self.evaluation={**value, 'model':Path(self.job.request['model']).name};self.message='Model evaluation completed.'
+            if self.results_panel is not None:self.results_panel.show_evaluation(self.evaluation)
+        elif kind=='image_inspected':
+            self.inspection={**value, 'model':Path(self.job.request['model']).name, 'image':Path(self.job.request['image']).name}
+            self.message='Image inspection completed.'
+            if self.results_panel is not None:self.results_panel.show_inspection(self.inspection)
+        elif kind=='exported':
+            from dataset_paths import display_path
+            self.message=self.center.tf('ONNX graphs saved to {folder}',folder=display_path(value['output']))
         elif kind=='error':self.message=value['message']
         self.render()
 
     def completed(self,success,message):
-        if not success:self.message=message or '.cloud processing failed. Source inputs were not changed. Check this run’s saved files before resuming.'
+        if not success:
+            self.message = ('Operation canceled.' if self.job._closing and not self.job.training
+                            else message or '.cloud processing failed. Check the selected project and run.')
+        elif self.job.training and self.outputs and self.results_panel is not None:
+            self.results_panel.refresh_runs(self.outputs['output'])
         self.render()
         self.center.set_start_enabled(not self.center.engine.active)
 
@@ -188,6 +357,7 @@ class CloudSuite(QObject):
             self.bar.setVisible(active or self.percent is not None)
             if self.percent is not None:self.bar.setValue(self.percent)
             self.check.setEnabled(not active and not reason);self.train.setEnabled(not active and not reason);self.stop_button.setEnabled(active)
+            self.advanced_button.setEnabled(not active and not reason and c.settings.cloud_mode != 'resume')
             self.check.setVisible(not active);self.train.setVisible(not active);self.stop_button.setVisible(active)
             self.check.setText(c.t('Check'))
             check_scope=c.t('Check project / checkpoint');self.check.setAccessibleName(check_scope);self.check.setToolTip(check_scope)
@@ -196,12 +366,9 @@ class CloudSuite(QObject):
             self.stop_button.setText(c.t('Stop training' if training else 'Cancel'))
             stop_scope=c.t('Stop .cloud training' if training else 'Cancel check')
             self.stop_button.setAccessibleName(stop_scope);self.stop_button.setToolTip(stop_scope)
-            self.open_button.setEnabled(bool(self.outputs))
             for holder in self.input_holders:holder.setEnabled(not active)
-            self.open_button.setVisible(bool(self.outputs))
-            from vapor_lock_gui import ROOT,resolve_product_path
             from dataset_paths import display_path
-            parent=resolve_product_path(c.settings.cloud_output) if c.settings.cloud_output else ROOT/'cloud-training'
+            parent=self.output_parent()
             destination=c.t('Output folder')+': '+display_path(parent/(c.settings.cloud_run_name+'-…'))
             self.destination_details.toggle_button.setToolTip(destination)
             self.destination_details.toggle_button.setAccessibleDescription(destination)
@@ -211,14 +378,8 @@ class CloudSuite(QObject):
                 if selected and selected.name=='project.json':selected=selected.parent
                 self.project_context.setText(selected.name if selected else c.t('Choose a project on the Project tab.'))
                 self.project_context.setToolTip(c.settings.cloud_project)
+            if self.results_panel is not None:self.results_panel.update_actions()
         except RuntimeError:pass  # a theme/language rebuild will mount fresh widgets
-
-    def open_output(self):
-        if not self.outputs:return
-        import os
-        path=Path(self.outputs['output'])
-        if path.is_dir():os.startfile(path)
-
 
 def mount(center,layout):
     suite=getattr(center,'_cloud_suite',None)

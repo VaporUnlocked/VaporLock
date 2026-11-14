@@ -221,8 +221,10 @@ def freeze(output,label,entry,*,environment,onefile=False,hidden=(),exclude=(),c
     if windowed:arguments+=['--icon',str(ROOT/'assets/VaporLock.ico')]
     arguments.append(str(source/entry))
     bootstrap="import sys; assert sys.stdin.buffer.readline(64)==b'COMMUNITY-FREEZE-GO\\n'; sys.path.insert(0,sys.argv[1]); from PyInstaller.__main__ import run; run(sys.argv[2:])"
-    command=[str(Path(getattr(sys,'_base_executable',sys.executable))),'-I','-B','-c',bootstrap,str(environment/'Lib/site-packages'),*arguments]
-    result=owned_run(command,phase/'freeze.log',environment=compiler_environment(environment),input_bytes=b'COMMUNITY-FREEZE-GO\n')
+    command=[str(Path(getattr(sys,'_base_executable',sys.executable))),'-I','-S','-B','-c',bootstrap,str(environment/'Lib/site-packages'),*arguments]
+    compiler_env=compiler_environment(environment)
+    compiler_env['PYINSTALLER_CONFIG_DIR']=str(phase/'compiler-cache')
+    result=owned_run(command,phase/'freeze.log',environment=compiler_env,input_bytes=b'COMMUNITY-FREEZE-GO\n')
     write(phase/'completion.json',result)
     return phase/'d'/((label+'.exe') if onefile else label)
 

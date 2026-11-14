@@ -175,17 +175,17 @@ class OwnedChild:
                     return
                 if len(raw) > MAX_JSON or not raw.endswith(b'\n'):
                     raise CloudInputError('Cloud worker event exceeded its record limit.')
-                if self._operation != 'inference' and len(raw) > 128 * 1024:
+                if self._operation not in ('inference', 'inspect') and len(raw) > 128 * 1024:
                     raise CloudInputError('Cloud status event exceeds its operation limit.')
                 payload = json_value(raw)
                 terminal = worker_event(payload, self._operation)
-                if payload.get('type') == 'trained':
+                if payload.get('type') in ('trained', 'exported'):
                     from dataset_paths import local_path
                     canonical = lambda value: os.path.normcase(str(local_path(value)))
                     if self._admitted_run is None or canonical(payload['output']) != canonical(self._admitted_run):
                         raise CloudInputError('Cloud completion output does not match its admitted run.')
                     for key, filename in (('best_cloud', 'best.cloud'), ('last_cloud', 'last.cloud'), ('checkpoint', 'last.cloudtrain')):
-                        if payload[key] is not None and canonical(payload[key]) != canonical(self._admitted_run / filename):
+                        if payload.get(key) is not None and canonical(payload[key]) != canonical(self._admitted_run / filename):
                             raise CloudInputError('Cloud artifact path does not belong to its admitted run.')
                 if payload.get('type') == 'detections':
                     with self._frame_lock:
@@ -256,10 +256,10 @@ class OwnedChild:
             raise CloudInputError('Cloud worker is unavailable or its command exceeds the limit.')
         if self._operation is None:
             operation = payload.get('operation')
-            if operation not in ('train', 'check_project', 'check_resume', 'check_model', 'inference'):
+            if operation not in ('train', 'check_project', 'check_resume', 'check_model', 'inference', 'evaluate', 'inspect', 'export'):
                 raise CloudInputError('Invalid initial Cloud operation.')
             self._operation = operation
-            if operation == 'train':
+            if operation in ('train', 'export'):
                 from dataset_paths import local_path
                 import re
                 name = payload.get('run_name')

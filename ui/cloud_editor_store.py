@@ -260,6 +260,32 @@ class EditorStore:
             db.execute('BEGIN')
             return self._snapshot(db)
 
+    def move_group(self, group, split, *, revision):
+        if split not in ('train', 'val', 'test'):
+            raise CloudInputError('Choose a supported dataset split.')
+        with self.connection() as db:
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                value, actual = self._snapshot(db)
+                if actual != revision:
+                    raise CloudInputError(STALE)
+                if actual >= 2**53 - 1:
+                    raise CloudInputError('The project revision limit has been reached.')
+                changed = [record for record in value['images']
+                           if record['group_id'] == group and record['split'] != split]
+                if not changed:
+                    return 0
+                for record in changed:
+                    record['split'] = split
+                manifest(value)
+                db.executemany('UPDATE images SET record=? WHERE id=?',
+                               ((encoded(record).decode('utf-8'), record['id']) for record in changed))
+                metadata = {k: v for k, v in value.items() if k != 'images'}
+                metadata['updated_at'] = datetime.now(timezone.utc).isoformat()
+                db.execute('UPDATE state SET revision=?,metadata=? WHERE singleton=1',
+                           (actual + 1, encoded(metadata).decode('utf-8')))
+        return len(changed)
+
     def commit(self, record, *, revision, previous_digest, operation):
         """One atomic image/review commit. The operation token makes lost ACKs safe."""
         image_record(record)

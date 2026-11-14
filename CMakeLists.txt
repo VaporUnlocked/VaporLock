@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(VaporLock
-    VERSION 0.2.1
+    VERSION 2.0.0
     DESCRIPTION "ONNX-based user-controlled aim assistance"
     LANGUAGES CXX)
 
@@ -138,7 +138,10 @@ if(NOT VAPORLOCK_EDITION MATCHES "^(community|premium|free)$")
 endif()
 
 set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime-gpu" CACHE PATH "Path to an extracted ONNX Runtime Windows SDK")
+option(VAPORLOCK_REQUIRE_ONNXRUNTIME "Require a complete native ONNX Runtime build" OFF)
 set(ONNXRUNTIME_DML_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime-directml-1.24.4" CACHE PATH "Path to an extracted ONNX Runtime DirectML package")
+set(VAPORLOCK_DIRECTML_ROOT "" CACHE PATH "Path to an extracted Microsoft.AI.DirectML package")
+option(VAPORLOCK_REQUIRE_DIRECTML "Require a complete native DirectML build" OFF)
 set(VAPORLOCK_CUDA_RUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cuda-runtime" CACHE PATH "Directory containing CUDA/cuDNN runtime DLLs")
 set(VAPORLOCK_TENSORRT_RTX_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorrt-rtx-1.6.1.120/TensorRT-RTX-1.6.1.120" CACHE PATH "Path to an extracted TensorRT RTX Windows SDK")
 option(VAPORLOCK_BUILD_CUDA_PREPROCESS "Build the optional custom CUDA preprocessing module" OFF)
@@ -227,22 +230,49 @@ function(vaporlock_common_target target)
     )
 endfunction()
 
-# CPU and CUDA share the CUDA-enabled ONNX Runtime distribution. The UI chooses
-# CPU explicitly; CUDA is only activated when the user selects it.
+set(VAPORLOCK_ORT_INCLUDE "${ONNXRUNTIME_ROOT}/include")
+set(VAPORLOCK_ORT_NATIVE "${ONNXRUNTIME_ROOT}/lib")
+if(EXISTS "${ONNXRUNTIME_ROOT}/runtimes/win-x64/native/onnxruntime.dll")
+    set(VAPORLOCK_ORT_NATIVE "${ONNXRUNTIME_ROOT}/runtimes/win-x64/native")
+    if(EXISTS "${ONNXRUNTIME_ROOT}/buildTransitive/native/include/onnxruntime_cxx_api.h")
+        set(VAPORLOCK_ORT_INCLUDE "${ONNXRUNTIME_ROOT}/buildTransitive/native/include")
+    else()
+        set(VAPORLOCK_ORT_INCLUDE "${ONNXRUNTIME_ROOT}/build/native/include")
+    endif()
+endif()
+set(VAPORLOCK_ORT_MISSING)
+foreach(sdk_file IN ITEMS "${VAPORLOCK_ORT_INCLUDE}/onnxruntime_cxx_api.h"
+                         "${VAPORLOCK_ORT_INCLUDE}/onnxruntime_cxx_inline.h"
+                         "${VAPORLOCK_ORT_INCLUDE}/onnxruntime_c_api.h"
+                         "${VAPORLOCK_ORT_INCLUDE}/onnxruntime_float16.h"
+                         "${VAPORLOCK_ORT_NATIVE}/onnxruntime.lib"
+                         "${VAPORLOCK_ORT_NATIVE}/onnxruntime.dll")
+    if(NOT EXISTS "${sdk_file}" OR IS_DIRECTORY "${sdk_file}")
+        list(APPEND VAPORLOCK_ORT_MISSING "${sdk_file}")
+    endif()
+endforeach()
+if(VAPORLOCK_ORT_MISSING AND (VAPORLOCK_REQUIRE_ONNXRUNTIME OR EXISTS "${VAPORLOCK_TENSORRT_RTX_ROOT}/include/NvInfer.h"))
+    list(JOIN VAPORLOCK_ORT_MISSING "\n  " missing_files)
+    message(FATAL_ERROR "Native ONNX Runtime SDK is incomplete:\n  ${missing_files}\n"
+        "Set ONNXRUNTIME_ROOT to an extracted Windows SDK, or use BuildCommunity.ps1 to restore it.")
+endif()
+
+# The base executable uses ONNX Runtime's CPU provider. The same compiled CUDA
+# API is available when launched with the separately installed CUDA runtime.
 vaporlock_common_target(VaporLock)
-if(ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h")
+if(ONNXRUNTIME_ROOT AND NOT VAPORLOCK_ORT_MISSING)
     if(BUILD_TESTING)
         add_executable(CpuPlacementTests tests/cpu_placement_tests.cpp)
-        target_include_directories(CpuPlacementTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${ONNXRUNTIME_ROOT}/include")
+        target_include_directories(CpuPlacementTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${VAPORLOCK_ORT_INCLUDE}")
         target_compile_definitions(CpuPlacementTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-        target_link_libraries(CpuPlacementTests PRIVATE "${ONNXRUNTIME_ROOT}/lib/onnxruntime.lib")
+        target_link_libraries(CpuPlacementTests PRIVATE "${VAPORLOCK_ORT_NATIVE}/onnxruntime.lib")
     endif()
     if(BUILD_TESTING)
         add_executable(InferenceMetadataTests tests/inference_metadata_tests.cpp)
-        target_include_directories(InferenceMetadataTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${ONNXRUNTIME_ROOT}/include")
-        target_link_libraries(InferenceMetadataTests PRIVATE "${ONNXRUNTIME_ROOT}/lib/onnxruntime.lib")
+        target_include_directories(InferenceMetadataTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${VAPORLOCK_ORT_INCLUDE}")
+        target_link_libraries(InferenceMetadataTests PRIVATE "${VAPORLOCK_ORT_NATIVE}/onnxruntime.lib")
         add_custom_command(TARGET InferenceMetadataTests POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ONNXRUNTIME_ROOT}/lib/onnxruntime.dll" "$<TARGET_FILE_DIR:InferenceMetadataTests>/onnxruntime.dll")
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VAPORLOCK_ORT_NATIVE}/onnxruntime.dll" "$<TARGET_FILE_DIR:InferenceMetadataTests>/onnxruntime.dll")
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tensorrt-identity.onnx")
             add_test(NAME InferenceMetadata COMMAND InferenceMetadataTests "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/tensorrt-identity.onnx")
             set_tests_properties(InferenceMetadata PROPERTIES TIMEOUT 20)
@@ -251,16 +281,20 @@ if(ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.
         endif()
     endif()
     target_compile_definitions(VaporLock PRIVATE VAPORLOCK_HAS_ONNXRUNTIME=1 VAPORLOCK_HAS_CUDA=1)
-    target_include_directories(VaporLock PRIVATE "${ONNXRUNTIME_ROOT}/include")
+    target_include_directories(VaporLock PRIVATE "${VAPORLOCK_ORT_INCLUDE}")
     # The CPU base engine requires only ONNX Runtime itself. CUDA provider and
     # NVIDIA runtime files are fetched on demand by the acceleration manager.
     foreach(runtime_dll IN ITEMS onnxruntime.dll onnxruntime_providers_shared.dll)
-        if(EXISTS "${ONNXRUNTIME_ROOT}/lib/${runtime_dll}")
-            add_custom_command(TARGET VaporLock POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ONNXRUNTIME_ROOT}/lib/${runtime_dll}" "$<TARGET_FILE_DIR:VaporLock>/${runtime_dll}"
-            )
+        if(EXISTS "${VAPORLOCK_ORT_NATIVE}/${runtime_dll}")
+            list(APPEND VAPORLOCK_ORT_RUNTIME_FILES "${VAPORLOCK_ORT_NATIVE}/${runtime_dll}")
         endif()
     endforeach()
+    add_custom_target(VaporLockRuntime
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:VaporLock>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VAPORLOCK_ORT_RUNTIME_FILES} "$<TARGET_FILE_DIR:VaporLock>"
+        DEPENDS ${VAPORLOCK_ORT_RUNTIME_FILES}
+        VERBATIM)
+    add_dependencies(VaporLock VaporLockRuntime)
     if(VAPORLOCK_BUILD_CUDA_PREPROCESS AND EXISTS "${VAPORLOCK_CUDA_RUNTIME_ROOT}")
         file(GLOB_RECURSE VAPORLOCK_CUDA_RUNTIME_DLLS CONFIGURE_DEPENDS "${VAPORLOCK_CUDA_RUNTIME_ROOT}/*.dll")
         foreach(runtime_dll IN LISTS VAPORLOCK_CUDA_RUNTIME_DLLS)
@@ -283,34 +317,73 @@ if(ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.
         target_compile_definitions(VaporLock PRIVATE VAPORLOCK_HAS_CUDA_PREPROCESS=1)
         set_target_properties(VaporLock PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES native)
     endif()
+else()
+    message(STATUS "Native ONNX Runtime SDK unavailable: VaporLock supports the synthetic signal only.")
 endif()
 
 # DirectML ships with a different ONNX Runtime binary, so it is a deliberately
 # separate executable. This prevents incompatible provider DLLs from being
 # loaded into one process.
 set(VAPORLOCK_DML_NATIVE "${ONNXRUNTIME_DML_ROOT}/runtimes/win-x64/native")
-if(EXISTS "${ONNXRUNTIME_DML_ROOT}/build/native/include/onnxruntime_cxx_api.h" AND EXISTS "${VAPORLOCK_DML_NATIVE}/onnxruntime.lib")
+set(VAPORLOCK_DML_INCLUDE "${ONNXRUNTIME_DML_ROOT}/build/native/include")
+set(VAPORLOCK_DML_RUNTIME_FILES
+    "${VAPORLOCK_DML_NATIVE}/onnxruntime.dll"
+    "${VAPORLOCK_DML_NATIVE}/onnxruntime_providers_shared.dll")
+set(VAPORLOCK_DML_MISSING)
+foreach(sdk_file IN ITEMS "${VAPORLOCK_DML_INCLUDE}/onnxruntime_cxx_api.h"
+                         "${VAPORLOCK_DML_INCLUDE}/dml_provider_factory.h"
+                         "${VAPORLOCK_DML_NATIVE}/onnxruntime.lib" ${VAPORLOCK_DML_RUNTIME_FILES})
+    if(NOT EXISTS "${sdk_file}" OR IS_DIRECTORY "${sdk_file}")
+        list(APPEND VAPORLOCK_DML_MISSING "${sdk_file}")
+    endif()
+endforeach()
+
+set(VAPORLOCK_DIRECTML_DLL "${VAPORLOCK_DML_NATIVE}/DirectML.dll")
+if(VAPORLOCK_DIRECTML_ROOT)
+    set(VAPORLOCK_DIRECTML_DLL "${VAPORLOCK_DIRECTML_ROOT}/bin/x64-win/DirectML.dll")
+    if(NOT EXISTS "${VAPORLOCK_DIRECTML_ROOT}/include/DirectML.h" OR IS_DIRECTORY "${VAPORLOCK_DIRECTML_ROOT}/include/DirectML.h")
+        list(APPEND VAPORLOCK_DML_MISSING "${VAPORLOCK_DIRECTML_ROOT}/include/DirectML.h")
+    endif()
+endif()
+if(EXISTS "${VAPORLOCK_DIRECTML_DLL}" AND NOT IS_DIRECTORY "${VAPORLOCK_DIRECTML_DLL}")
+    list(APPEND VAPORLOCK_DML_RUNTIME_FILES "${VAPORLOCK_DIRECTML_DLL}")
+elseif(VAPORLOCK_REQUIRE_DIRECTML OR VAPORLOCK_DIRECTML_ROOT)
+    list(APPEND VAPORLOCK_DML_MISSING "${VAPORLOCK_DIRECTML_DLL}")
+endif()
+
+if(VAPORLOCK_DML_MISSING)
+    if(VAPORLOCK_REQUIRE_DIRECTML)
+        list(JOIN VAPORLOCK_DML_MISSING "\n  " missing_files)
+        message(FATAL_ERROR "Native DirectML was requested but these SDK files are missing:\n  ${missing_files}\n"
+            "Set ONNXRUNTIME_DML_ROOT and VAPORLOCK_DIRECTML_ROOT, or use BuildCommunity.ps1 -NativeDirectML.")
+    endif()
+    message(STATUS "Native DirectML engine disabled because the SDK is incomplete. Use BuildCommunity.ps1 -NativeDirectML to enable it.")
+else()
     vaporlock_common_target(VaporLockDml)
     set_target_properties(VaporLockDml PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/dml")
     target_compile_definitions(VaporLockDml PRIVATE VAPORLOCK_HAS_ONNXRUNTIME=1 VAPORLOCK_HAS_DML=1 VAPORLOCK_FORCE_DML=1)
-    target_include_directories(VaporLockDml PRIVATE "${ONNXRUNTIME_DML_ROOT}/build/native/include")
+    target_include_directories(VaporLockDml PRIVATE "${VAPORLOCK_DML_INCLUDE}")
+    if(VAPORLOCK_DIRECTML_ROOT)
+        target_include_directories(VaporLockDml PRIVATE "${VAPORLOCK_DIRECTML_ROOT}/include")
+    endif()
     target_link_libraries(VaporLockDml PRIVATE d3d12)
-    foreach(runtime_dll IN ITEMS onnxruntime.dll onnxruntime_providers_shared.dll)
-        add_custom_command(TARGET VaporLockDml POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VAPORLOCK_DML_NATIVE}/${runtime_dll}" "$<TARGET_FILE_DIR:VaporLockDml>/${runtime_dll}"
-        )
-    endforeach()
+    add_custom_target(VaporLockDmlRuntime
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:VaporLockDml>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VAPORLOCK_DML_RUNTIME_FILES} "$<TARGET_FILE_DIR:VaporLockDml>"
+        DEPENDS ${VAPORLOCK_DML_RUNTIME_FILES}
+        VERBATIM)
+    add_dependencies(VaporLockDml VaporLockDmlRuntime)
 endif()
 
 # TensorRT RTX is a dedicated NVIDIA consumer-GPU engine. It shares the
 # ordinary ONNX Runtime binary only for model metadata and output decoding;
 # model execution, engine building, and caching use NVIDIA's direct runtime.
-if(EXISTS "${VAPORLOCK_TENSORRT_RTX_ROOT}/include/NvInfer.h" AND ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h")
+if(EXISTS "${VAPORLOCK_TENSORRT_RTX_ROOT}/include/NvInfer.h" AND ONNXRUNTIME_ROOT AND NOT VAPORLOCK_ORT_MISSING)
     find_package(CUDAToolkit REQUIRED)
     vaporlock_common_target(VaporLockTensorRt)
     set_target_properties(VaporLockTensorRt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/trt")
     target_compile_definitions(VaporLockTensorRt PRIVATE VAPORLOCK_HAS_ONNXRUNTIME=1 VAPORLOCK_FORCE_TENSORRT_RTX=1)
-    target_include_directories(VaporLockTensorRt PRIVATE "${ONNXRUNTIME_ROOT}/include" "${VAPORLOCK_TENSORRT_RTX_ROOT}/include")
+    target_include_directories(VaporLockTensorRt PRIVATE "${VAPORLOCK_ORT_INCLUDE}" "${VAPORLOCK_TENSORRT_RTX_ROOT}/include")
     target_link_libraries(VaporLockTensorRt PRIVATE VaporLockTensorRtRtx VaporLockTensorRtRtxOnnxParser CUDA::cudart_static)
     # The static CUDA runtime uses the static CRT. Match every object in this
     # executable instead of suppressing conflicting CRT defaults at link time.
@@ -347,9 +420,9 @@ if(EXISTS "${VAPORLOCK_TENSORRT_RTX_ROOT}/include/NvInfer.h" AND ONNXRUNTIME_ROO
         target_link_options(VaporLockTensorRt PRIVATE $<$<CONFIG:Debug>:/MAP>)
     endif()
     foreach(runtime_dll IN ITEMS onnxruntime.dll onnxruntime_providers_shared.dll)
-        if(EXISTS "${ONNXRUNTIME_ROOT}/lib/${runtime_dll}")
+        if(EXISTS "${VAPORLOCK_ORT_NATIVE}/${runtime_dll}")
             add_custom_command(TARGET VaporLockTensorRt POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ONNXRUNTIME_ROOT}/lib/${runtime_dll}" "$<TARGET_FILE_DIR:VaporLockTensorRt>/${runtime_dll}")
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VAPORLOCK_ORT_NATIVE}/${runtime_dll}" "$<TARGET_FILE_DIR:VaporLockTensorRt>/${runtime_dll}")
         endif()
     endforeach()
     foreach(runtime_dll IN ITEMS tensorrt_rtx_1_6.dll tensorrt_onnxparser_rtx_1_6.dll)

@@ -24,7 +24,6 @@ ROWS = {
     'Maximum 96 Unicode characters': ('最多 96 个 Unicode 字符', 'Höchstens 96 Unicode-Zeichen', 'Не более 96 символов Unicode', '96 caractères Unicode au maximum'),
     'Unconnected controls do not show native settings': ('未连接的控件不显示本机设置', 'Nicht verbundene Bedienelemente zeigen keine nativen Einstellungen', 'Неподключённые элементы не показывают настройки приложения', 'Les commandes non connectées n’affichent pas les paramètres natifs'),
     'Verification session': ('验证会话', 'Prüfsitzung', 'Проверочная сессия', 'Session de vérification'),
-    'Use native workspace to edit capture rates above 120 fps': ('请在本机工作区编辑超过 120 fps 的捕获速率', 'Erfassungsraten über 120 fps im nativen Arbeitsbereich bearbeiten', 'Изменяйте частоту захвата выше 120 fps в рабочей области приложения', 'Modifiez les fréquences au-delà de 120 fps dans l’espace de travail natif'),
     'Current configuration': ('当前配置', 'Aktuelle Konfiguration', 'Текущая конфигурация', 'Configuration actuelle'),
     'Input settings': ('输入设置', 'Eingabeeinstellungen', 'Настройки входа', 'Paramètres d’entrée'),
     'Capture settings': ('捕获设置', 'Erfassungseinstellungen', 'Настройки захвата', 'Paramètres de capture'),

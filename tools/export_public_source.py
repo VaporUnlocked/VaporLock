@@ -19,7 +19,7 @@ import zipfile
 
 
 ROOT_FILES = frozenset({
-    ".gitignore",
+    ".gitattributes", ".gitignore",
     "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "PRIVACY.md",
     "requirements-community.txt", "requirements-vlui.txt", "BuildCommunity.ps1",
     "CMakeLists.txt", "CMakePresets.json", "product_version.txt", "RunGui.bat",
@@ -87,12 +87,13 @@ PUBLIC_TEST_FILES = frozenset("tests/" + name for name in (
     "tensorrt_rtx_smoke.cpp", "aim_output_tests.h", "compensation_output_tests.h",
     "controller_pipe_tests.h", "feature_batch3_tests.h", "feature_batch5_tests.h",
     "crosshair_reference_tests.h", "capture_recovery_tests.h",
-    "test_public_source_export.py", "test_public_client_access.py", "test_public_build_tools.py", "test_community_bundle.py", "test_community_package.py"))
+    "test_public_source_export.py", "test_public_client_access.py", "test_public_build_tools.py",
+    "test_community_bundle.py", "test_community_package.py", "test_cloud_studio.py"))
 CLOUD_BRANCHES = ("runtime_sdk", "training_source", "config")
 CLOUD_FILES = frozenset({"IMPORT_MANIFEST.json", "requirements-runtime.txt",
     "requirements-training.txt", "RUN_CLOUD.md", "TRAIN_CLOUD.md", "run_cloud.py", "train_cloud.py"})
 DOC_BRANCHES = ("settings-guide",)
-DOC_FILES = frozenset({"PUBLIC_SOURCE_EXPORT_SCOPE.txt"})
+DOC_FILES = frozenset({"PUBLIC_SOURCE_EXPORT_SCOPE.txt", "RELEASE_NOTES.md"})
 SUITE_ROOT_FILES = frozenset({"CMakeLists.txt", "build.ps1", "package.ps1", "README.md",
     "LICENSE",
     "BUNDLED_LICENSES.txt", "LICENSES.txt", "MODEL_GUIDE.txt", "PORTABLE-README.txt",

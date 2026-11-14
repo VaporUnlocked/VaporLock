@@ -34,9 +34,10 @@ class ImageCapability:
         except BaseException:
             self.guard.stack.close();raise
 
-    def command(self,path):
+    def command(self,path,**options):
         if self.closed:raise CloudInputError('Image staging capability is closed.')
-        return dict(command='decode',request=self.request,path=str(path),output=str(self.root),capability=self.token)
+        payload=dict(command='decode',request=self.request,path=str(path),output=str(self.root),capability=self.token)
+        return {**payload, **options}
 
     def read(self,result):
         event(result)
@@ -60,9 +61,16 @@ class ImageCapability:
         self.verified=True
         return outputs
 
-    def cleanup(self):
-        """Delete only the exact three verified owned files and empty owned dir."""
-        if not self.verified or set(self.expected_files)!={'capability.json','image.rgb','image.png'}:
+    def cleanup(self, *, exhausted=None):
+        """Delete only verified owned files and their empty directory."""
+        if exhausted is not None:
+            event(exhausted)
+            verified = (not self.closed and exhausted == dict(type='decode_exhausted',
+                request=self.request, capability=self.token) and set(self.expected_files)=={'capability.json'}
+                and {p.name for p in self.root.iterdir()}=={'capability.json'})
+        else:
+            verified = self.verified and set(self.expected_files)=={'capability.json','image.rgb','image.png'}
+        if not verified:
             raise CloudInputError('Incomplete image staging was retained for inspection.')
         self.close()
         from dataset_transaction import HeldFile,_api

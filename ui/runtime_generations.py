@@ -67,10 +67,14 @@ def require_x64(path: Path) -> None:
             raise RuntimeIntegrityError('The runtime must be Windows x64.')
 
 
-def binding_sources(root: Path) -> dict:
-    from native_engine_layout import source_engine
+def binding_sources(root: Path, *, require_cuda=False) -> dict:
+    from native_engine_layout import has_model_support, source_engine
     root=Path(root)
-    engine=source_engine(root,'cpu') or root/'engine/VaporLock.exe'
+    source = source_engine(root, 'cpu', require_model=require_cuda)
+    engine = source or root/'engine/VaporLock.exe'
+    if require_cuda and not has_model_support(engine, 'cuda'):
+        raise RuntimeIntegrityError(
+            'The native engine lacks CUDA ONNX support. Build the native engine before installing CUDA.')
     plain(engine)
     files={'engine/VaporLock.exe': engine}
     for name in VC_NAMES:
@@ -81,13 +85,18 @@ def binding_sources(root: Path) -> dict:
     return files
 
 
-def current_binding(root: Path) -> dict:
+def current_binding(root: Path, *, require_cuda=False) -> dict:
     # Bind the local built engine/dependencies, never a publisher authorization.
-    return {'engine_files': {relative:digest(path) for relative,path in binding_sources(root).items()}, 'lock': LOCK_ID}
+    sources = binding_sources(root, require_cuda=require_cuda)
+    return {'engine_files': {relative:digest(path) for relative,path in sources.items()}, 'lock': LOCK_ID}
 
 
 def generation_root(root: Path) -> Path:
     return root / 'acceleration/cuda/generations'
+
+
+def cuda_setup_present(root: Path) -> bool:
+    return (root / 'acceleration/cuda/active.json').is_file()
 
 
 def _pointer(root: Path) -> dict:
@@ -121,7 +130,7 @@ class NativeRuntime:
 def resolve_cuda(root: Path) -> NativeRuntime:
     plain(root)
     pointer = _pointer(root)
-    binding = current_binding(root)
+    binding = current_binding(root, require_cuda=True)
     if pointer['binding'] != binding:
         raise RuntimeIntegrityError('CUDA runtime must be refreshed for this release.')
     folder = generation_root(root) / pointer['generation']
@@ -145,23 +154,30 @@ def resolve_cuda(root: Path) -> NativeRuntime:
 
 
 def cuda_installed(root: Path) -> bool:
-    """Cache UI status by file identity; every actual launch verifies again."""
+    return cached_cuda_runtime(root) is not None
+
+
+def cached_cuda_runtime(root: Path) -> NativeRuntime | None:
+    """Cache UI discovery by file identity; every actual launch verifies again."""
     try:
         pointer = _pointer(root)
         folder = generation_root(root) / pointer['generation']
-        files = [root / 'acceleration/cuda/active.json', *binding_sources(root).values()]
+        files = [root / 'acceleration/cuda/active.json', *binding_sources(root, require_cuda=True).values()]
         for path in folder.rglob('*'):
             plain(path)
             if path.is_file(): files.append(path)
         state = tuple((str(path), path.stat().st_ino, path.stat().st_size,
                        path.stat().st_mtime_ns, path.stat().st_ctime_ns) for path in files)
         with _status_lock:
-            if _status_cache.get(str(root)) == state: return True
-        resolve_cuda(root)
-        with _status_lock: _status_cache[str(root)] = state
-        return True
+            cached = _status_cache.get(str(root))
+            if cached is not None and cached[0] == state:
+                return cached[1]
+        runtime = resolve_cuda(root)
+        with _status_lock:
+            _status_cache[str(root)] = (state, runtime)
+        return runtime
     except (OSError, ValueError, KeyError, RuntimeIntegrityError):
-        return False
+        return None
 
 
 def _archive_path(cache: Path, entry: dict, *, download: bool, report) -> Path:
@@ -242,7 +258,7 @@ def _local_payloads(root: Path) -> dict[str, Path]:
 def prepare_cuda(root: Path, *, reuse_root: Path | None = None, download=True, report=lambda _message: None) -> NativeRuntime:
     """Caller holds the common app/runtime installation mutex through commit."""
     plain(root)
-    binding = current_binding(root)
+    binding = current_binding(root, require_cuda=True)
     source_root = reuse_root or root
     payloads = _local_payloads(source_root)
     identifier = uuid.uuid4().hex
@@ -274,7 +290,8 @@ def prepare_cuda(root: Path, *, reuse_root: Path | None = None, download=True, r
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(base64.b64decode(entry['data'], validate=True))
             if not valid_payload(target, entry): raise RuntimeIntegrityError('Invalid bundled runtime notice.')
-        if current_binding(root) != binding: raise RuntimeIntegrityError('The application changed during runtime preparation.')
+        if current_binding(root, require_cuda=True) != binding:
+            raise RuntimeIntegrityError('The application changed during runtime preparation.')
         for relative, expected_digest in binding['engine_files'].items():
             if digest(folder / relative) != expected_digest: raise RuntimeIntegrityError('The copied engine changed during preparation.')
         pointer = root / 'acceleration/cuda/active.json'

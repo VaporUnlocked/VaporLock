@@ -1,5 +1,36 @@
 """Model tools copy: Simplified Chinese, German, Russian, French."""
 ROWS = {
+ 'Compare available providers using a centered 640 × 640 capture.': (
+     '使用居中的 640 × 640 捕获区域比较可用的推理后端。',
+     'Verfügbare Backends mit einem zentrierten 640 × 640-Aufnahmebereich vergleichen.',
+     'Сравните доступные серверные части на центральной области захвата 640 × 640.',
+     'Comparez les moteurs disponibles sur une zone de capture centrée de 640 × 640.'),
+ 'Capture must be stopped first. The benchmark runs with output, preview and dataset writing disabled.': (
+     '请先停止捕获。测试期间禁用输出、预览和数据集写入。',
+     'Aufnahme zuerst stoppen. Während des Benchmarks sind Ausgabe, Vorschau und Datensatzerfassung deaktiviert.',
+     'Сначала остановите захват. Во время теста вывод, предпросмотр и запись датасета отключены.',
+     'Arrêtez d’abord la capture. Le test désactive la sortie, l’aperçu et l’écriture du jeu de données.'),
+ 'Benchmarking {provider} at 640 × 640…': (
+     '正在以 640 × 640 测试 {provider}…', 'Benchmark für {provider} mit 640 × 640…',
+     'Тестирование {provider} при 640 × 640…', 'Test de {provider} en 640 × 640…'),
+ 'Measures a centered 640 × 640 region by default. Output, previews, dataset writing and frame skipping are disabled during measurement.': (
+     '默认测量居中的 640 × 640 区域。测量期间禁用输出、预览、数据集写入和跳帧。',
+     'Misst standardmäßig einen zentrierten 640 × 640-Bereich. Ausgabe, Vorschau, Datensatzerfassung und Frame-Skipping sind während der Messung deaktiviert.',
+     'По умолчанию измеряется центральная область 640 × 640. На время замера отключены вывод, предпросмотр, запись датасета и пропуск кадров.',
+     'Mesure par défaut une zone centrée de 640 × 640. La sortie, les aperçus, l’écriture du jeu de données et le saut d’images sont désactivés pendant la mesure.'),
+ 'Measure the current profile region': (
+     '测量当前配置文件的捕获区域', 'Aufnahmebereich des aktuellen Profils messen',
+     'Измерять область текущего профиля', 'Mesurer la zone du profil actuel'),
+ 'Benchmark region ({x}, {y}, {width}, {height}) on monitor {monitor}': (
+     '显示器 {monitor} 上的测试区域 ({x}, {y}, {width}, {height})',
+     'Messbereich ({x}, {y}, {width}, {height}) auf Monitor {monitor}',
+     'Область тестирования ({x}, {y}, {width}, {height}) на мониторе {monitor}',
+     'Zone du test ({x}, {y}, {width}, {height}) sur l’écran {monitor}'),
+ 'Recommendations leave 10% headroom and respect the configured FPS limits. Results describe this machine and capture scene.': (
+     '建议保留 10% 余量并遵守配置的帧率上限。结果仅适用于此设备和捕获场景。',
+     'Empfehlungen lassen 10 % Reserve und beachten die konfigurierten FPS-Grenzen. Die Ergebnisse gelten für diesen Rechner und diese Aufnahmeszene.',
+     'В рекомендациях оставлен запас 10% с учётом заданных ограничений FPS. Результаты относятся к этому ПК и сцене захвата.',
+     'Les recommandations gardent 10 % de marge et respectent les limites de FPS configurées. Les résultats concernent cette machine et cette scène.'),
  'Changing the model or provider stops the current session. The new selection loads when you select Start.': ('更改模型或推理后端会停止当前会话。点击“开始”后将加载新选择。','Das Ändern des Modells oder Backends stoppt die aktuelle Sitzung. Die neue Auswahl wird geladen, wenn Sie Start wählen.','Смена модели или бэкенда останавливает текущий сеанс. Новый выбор загружается после нажатия «Старт».','Changer de modèle ou de moteur arrête la session en cours. La nouvelle sélection est chargée lorsque vous choisissez Démarrer.'),
  'Selection updated. Select Start to load it.': ('选择已更新。点击“开始”以加载。','Auswahl aktualisiert. Wählen Sie Start, um sie zu laden.','Выбор обновлён. Нажмите «Старт», чтобы загрузить его.','Sélection mise à jour. Choisissez Démarrer pour la charger.'),
  'Changing the model or provider stops the current session and validates the selection. Output remains stopped until you select Start.': ('更改模型或推理后端会停止当前会话并验证所选配置。选择“开始”之前，输出将保持停止。','Das Ändern des Modells oder Backends stoppt die aktuelle Sitzung und prüft die Auswahl. Die Ausgabe bleibt gestoppt, bis Sie Start wählen.','Смена модели или бэкенда останавливает текущий сеанс и проверяет выбор. Вывод останется остановленным, пока вы не нажмёте «Старт».','Changer de modèle ou de moteur arrête la session et valide la sélection. La sortie reste arrêtée jusqu’à ce que vous sélectionniez Démarrer.'),

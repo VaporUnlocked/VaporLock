@@ -76,6 +76,9 @@ class ModelSelection(QObject):
         self._deadline=time.monotonic()+5
         generation = self._generation
         self._next = lambda: callback() if generation == self._generation and self._current() else None
+        if self._session_stopped():
+            self._poll()
+            return True
         self.set_status('Waiting for the previous session to stop…')
         self._refresh_buttons(); c.set_start_enabled(False); c.stop_button.setEnabled(True)
         self.timer.start()
@@ -89,18 +92,20 @@ class ModelSelection(QObject):
                 and self._stamp==asdict(self.center.settings)
                 and self._session_generation==self.center.engine._launch_generation)
 
+    def _session_stopped(self):
+        c = self.center
+        return (not c.engine.active and not c.xbox_compatible_bridge.preparing
+                and c.xbox_compatible_bridge.safely_stopped()
+                and c._pending_controller_start is None and not c._policy_start_pending
+                and getattr(c.engine, '_controller_host_session', None) is None)
+
     def _poll(self):
         self._refresh_buttons()
         if not self.busy: self.center.set_start_enabled(not self.center.engine.active)
         if self.busy and not self._current():
             self.center.cancel_model_probes(); return
         if self._next is not None:
-            c=self.center
-            stopped=(not c.engine.active and not c.xbox_compatible_bridge.preparing
-                and c.xbox_compatible_bridge.safely_stopped()
-                and c._pending_controller_start is None and not c._policy_start_pending
-                and getattr(c.engine,'_controller_host_session',None) is None)
-            if stopped:
+            if self._session_stopped():
                 callback,self._next=self._next,None; callback()
             elif time.monotonic()>self._deadline:
                 self._fail('Previous session did not stop. Configuration retained.'); return

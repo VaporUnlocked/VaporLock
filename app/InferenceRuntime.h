@@ -10,6 +10,9 @@
 #include <thread>
 #include <vector>
 #include "CpuPlacement.h"
+#if VAPORLOCK_HAS_CUDA
+#include "CudaGraphReplay.h"
+#endif
 
 namespace vaporlock::inference {
 
@@ -40,10 +43,24 @@ public:
     Runtime& operator=(const Runtime&)=delete;
     std::vector<float>& floats() noexcept { return m_floats; }
     std::vector<std::uint8_t>& bytes() noexcept { return m_bytes; }
+#if VAPORLOCK_HAS_CUDA
+    void enableCudaGraph(HMODULE ortModule, int device) {
+        m_options.AddConfigEntry("gpu_graph_id","-1");
+        m_cudaGraph=std::make_unique<CudaGraphReplay>(*m_session,ortModule,device);
+    }
+
+    bool cudaGraphActive() const noexcept { return m_cudaGraph && !m_cudaGraphRetired; }
+#endif
     // Only cancellation may be called from another thread. The owner must join
     // its Run before destroying this object. A stuck provider remains subject
     // to the existing owned-process Stop timeout, never a detached thread.
-    void cancel() { m_cancelled=true; m_options.SetTerminate(); }
+    void cancel() {
+        m_cancelled=true;
+        m_options.SetTerminate();
+#if VAPORLOCK_HAS_CUDA
+        m_graphOptions.SetTerminate();
+#endif
+    }
     // TensorRT executes the model itself. Keep only tensor storage/ORT views;
     // discard the metadata session's CPU graph, weights and thread pool.
     void retireMetadataSession() {
@@ -55,9 +72,23 @@ public:
         if (!m_session) throw std::runtime_error("TensorRT metadata session cannot execute CPU inference.");
         if(std::this_thread::get_id()!=m_owner || m_cancelled)
             throw std::runtime_error("Inference session is cancelled or used by another owner.");
+        if(deviceInput && (m_type!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT || deviceCapacity<m_floats.size() || deviceId<0 || deviceId>=64))
+            throw std::runtime_error("CUDA image tensor capacity is invalid.");
+#if VAPORLOCK_HAS_CUDA
+        if(cudaGraphActive()) {
+            try {
+                const void* input = deviceInput ? static_cast<const void*>(deviceInput)
+                    : m_type==ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ? static_cast<const void*>(m_floats.data()) : m_bytes.data();
+                const auto& output = m_cudaGraph->run(*m_session,m_graphOptions,input,deviceInput!=nullptr);
+                if(m_cancelled) throw std::runtime_error("Inference session was cancelled.");
+                return output;
+            } catch(const std::exception&) {
+                if(m_cancelled) throw;
+                m_cudaGraphRetired = true;
+            }
+        }
+#endif
         if(deviceInput) {
-            if(m_type!=ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT || deviceCapacity<m_floats.size() || deviceId<0 || deviceId>=64)
-                throw std::runtime_error("CUDA image tensor capacity is invalid.");
             if(deviceInput!=m_boundDevice || deviceId!=m_boundDeviceId) {
                 Ort::MemoryInfo memory("Cuda",OrtDeviceAllocator,deviceId,OrtMemTypeDefault);
                 m_input=Ort::Value::CreateTensor<float>(memory,deviceInput,m_floats.size(),m_shape.data(),m_shape.size());
@@ -116,6 +147,11 @@ private:
     int m_boundDeviceId=-1;
     std::vector<Ort::Value> m_outputs;
     Ort::RunOptions m_options;
+#if VAPORLOCK_HAS_CUDA
+    Ort::RunOptions m_graphOptions;
+    std::unique_ptr<CudaGraphReplay> m_cudaGraph;
+    bool m_cudaGraphRetired = false;
+#endif
     std::atomic<bool> m_cancelled{false};
 };
 } // namespace vaporlock::inference

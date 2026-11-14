@@ -12,7 +12,7 @@ class FrameSchedule {
 public:
     using Clock = std::chrono::steady_clock;
     Clock::time_point begin(Clock::time_point now, int fps) {
-        fps = std::clamp(fps, 1, 1000000);
+        fps = std::max(fps, 1);
         const auto period = std::max(Clock::duration{1},
             std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0/fps)));
         if (fps != m_fps || !m_valid || now-m_deadline >= period) {

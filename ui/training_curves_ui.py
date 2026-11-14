@@ -33,9 +33,12 @@ class CurvePlot(QWidget):
 
 
 class TrainingCurves(QWidget):
-    def __init__(self,center,root):
+    def __init__(self,center,root,*,metrics=METRICS,reader=read_run,list_runs=run_names):
         super().__init__(); self.center=center; self.root=root; self.data=None; self.list_unavailable=False; self.empty_message=''
         self.setObjectName('trainingCurves')
+        self.metric_labels = metrics
+        self.read_run = reader
+        self.list_runs = list_runs
         layout=QVBoxLayout(self); layout.setContentsMargins(0,0,0,0)
         self.intro=label(''); layout.addWidget(self.intro)
         self.run_label=label(''); layout.addWidget(self.run_label)
@@ -62,7 +65,7 @@ class TrainingCurves(QWidget):
         self.refresh_button.setText(c.t('Refresh runs')); self.runs.setAccessibleName(c.t('Local training run'))
         self.run_label.setText(c.t('Local training run')); self.metric_label.setText(c.t('Training metric'))
         self.metrics.setAccessibleName(c.t('Training metric'))
-        for i in range(self.metrics.count()): self.metrics.setItemText(i,c.t(METRICS[self.metrics.itemData(i)]))
+        for i in range(self.metrics.count()): self.metrics.setItemText(i,c.t(self.metric_labels[self.metrics.itemData(i)]))
         if self.empty_message: self.status.setText(c.t(self.empty_message))
         self.plot.update()
         self.refresh_plot()
@@ -75,7 +78,7 @@ class TrainingCurves(QWidget):
         if not self.allowed(): self.load(); return
         selected=self.runs.currentData()
         self.list_unavailable=False
-        try: names=run_names(self.root)
+        try: names=self.list_runs(self.root)
         except (OSError,ValueError):
             self.list_unavailable=True; names=[]
         self.runs.blockSignals(True); self.runs.clear()
@@ -87,13 +90,13 @@ class TrainingCurves(QWidget):
         if self.list_unavailable: self.clear('Training runs are unavailable. Check the folder and refresh.'); return
         name=self.runs.currentData()
         if name is None: self.clear('No local training runs yet.'); return
-        try: self.data=read_run(self.root,name)
+        try: self.data=self.read_run(self.root,name)
         except FileNotFoundError:
             self.clear('No results saved for this run yet.'); return
         except (OSError,ValueError,UnicodeError,OverflowError):
             self.clear('Run data unavailable or changing. Refresh after the next epoch.'); return
         key=self.metrics.currentData(); self.metrics.blockSignals(True); self.metrics.clear()
-        for metric in self.data['metrics']: self.metrics.addItem(self.center.t(METRICS[metric]),metric)
+        for metric in self.data['metrics']: self.metrics.addItem(self.center.t(self.metric_labels[metric]),metric)
         self.metrics.setCurrentIndex(max(0,self.metrics.findData(key))); self.metrics.blockSignals(False); self.refresh_plot()
     def clear(self,message):
         self.empty_message=message

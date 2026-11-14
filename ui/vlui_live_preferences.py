@@ -2,6 +2,7 @@
 import json
 import re
 from types import MappingProxyType
+from frame_rate import valid_frame_rate
 from vlui_numeric_catalog import validate_numeric_projection
 from vlui_discrete_catalog import validate_projection as validate_discrete_projection
 
@@ -61,7 +62,7 @@ def validate_preferences_bytes(raw: bytes):
     require(positive(value['rendererGeneration']) and positive(value['sequence']))
     require(type(value['locale']) is str and value['locale'] in LOCALES)
     require(type(value['textScale']) is str and value['textScale'] in SCALES)
-    require(positive(value['captureRate']))
+    require(valid_frame_rate(value['captureRate']))
     require(valid_display_label(value['profileName']))
     profile = value['profile']
     closed(profile, ('state', 'displayId', 'name', 'dirty', 'undoAvailable'))

@@ -9,6 +9,7 @@
 #include "render_profile.hpp"
 #include "world_batch.hpp"
 #include "bundled_assets.hpp"
+#include "yard_view.hpp"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 #include <cstdarg>
@@ -57,6 +58,18 @@ struct App {
     int testFrame=0,startupFrames=0,shaderCamera=0,shaderFog=0,shaderExposure=0,shaderTint=0,shotSequence=0,hoveredBay=-1,appliedCap=-1;Control hoveredControl;
     std::string notification,testModel="SWAT.glb",modelKey;double notifyUntil=0,lastBoards=-100,lastShot=-100,hitMarker=-100,elapsed=0,frameAverage=8.3;float kick=0;
     std::vector<BoundingBox>solids;std::vector<Impact>impacts;
+    WorldBatch yardWorld,yardLights;
+    YardRound yard;
+    std::array<Sound,YardWeapons.size()> yardSounds{};
+    Sound enemyShot{};
+    std::array<Character,4> yardStride;
+    bool yardAssets=false,audioReady=false,frontMenu=false,inYard=false,reviewYard=false,reviewSaved=false;
+    bool previousPadFire=false;
+    YardMode selectedMode=YardMode::Clear;
+    int selectedWeapon=0,roundSeed=407;
+    float reviewTime=0,weaponRecoil=0,eyeHeight=1.62f;
+    Vector3 yardFeet{0,0,-8}, rangeReturn{24,1.62f,-6.5f};
+    float rangeYaw=0,rangePitch=-1.2f;
     uint64_t pausedTestTicks=0;int websiteRequests=0,menuFocus=-1;
     void notify(const std::string& message){notification=message;notifyUntil=GetTime()+4;appLog<<"NOTICE: "<<message<<std::endl;}
     void release(){if(captured){EnableCursor();captured=false;}}
@@ -85,7 +98,8 @@ struct App {
         try{saveSettings(settings);for(int i=0;i<BayCount;i++)saveSettings(bays[i].settings,"range-bay-"+std::to_string(i+1)+".ini");}
         catch(const std::exception& e){notify(e.what());}
     }
-    void updateCamera(){camera={position,Vector3Add(position,forward(yaw,pitch)),{0,1,0},verticalFov(settings.fov,float(std::max(1,GetScreenWidth()))/std::max(1,GetScreenHeight())),CAMERA_PERSPECTIVE};}
+    void updateCamera(){float fov=inYard?settings.fov*(1.f-yard.ads*(1.f-yard.gun().zoom)):settings.fov;
+        camera={position,Vector3Add(position,forward(yaw,pitch)),{0,1,0},verticalFov(fov,float(std::max(1,GetScreenWidth()))/std::max(1,GetScreenHeight())),CAMERA_PERSPECTIVE};}
     void setup(bool check,bool startup,const std::string& requested){
         testing=check;startupCheck=startup;settings=(testing||startup)?Settings{}:loadSettings();
         if(!requested.empty()){
@@ -101,7 +115,7 @@ struct App {
             sanitizeBay(bays[i].settings);bays[i].reset();
         }
         SetTraceLogCallback(logger);SetConfigFlags(FLAG_WINDOW_RESIZABLE|FLAG_MSAA_4X_HINT|FLAG_WINDOW_HIDDEN);
-        InitWindow((testing||startup||benchmarking)?1920:1440,(testing||startup||benchmarking)?1080:900,"Vapor Lock | Aim Testing Suite");SetWindowMinSize(1040,720);SetExitKey(KEY_NULL);
+        InitWindow((testing||startup||benchmarking)?1920:1440,(testing||startup||benchmarking)?1080:900,"VaporLock Proving Grounds");SetWindowMinSize(1040,720);SetExitKey(KEY_NULL);
         if(!IsWindowReady())throw std::runtime_error("Could not create the range window.");
         // Windows otherwise constrains a resizable window to the current monitor's width.
         // Test windows alone use a fixed client size; normal play remains freely resizable.
@@ -139,7 +153,457 @@ struct App {
             SetTextureFilter(distancePlates[i].texture,TEXTURE_FILTER_BILINEAR);
         }
         rifle.load(shader);buildWorld();rebuildSolids();updateCamera();wasFocused=IsWindowFocused();
+        frontMenu=!testing&&!startup&&!benchmarking;
         appLog<<"STARTUP: range ready; "<<character.filename<<"; "<<character.triangles<<" triangles; "<<character.query.nodes.size()<<" BVH nodes"<<std::endl;
+    }
+    void loadYard(){
+        if(yardAssets)return;
+        buildYard(yardWorld,yardLights,cube.meshes[0],environmentShader,neon.core);
+        // Cache a small walk cycle. Render and hit-test the same posed mesh.
+        Settings pose;
+        const auto source=local("assets/characters/SWAT.glb");
+        for(int i=0;i<int(yardStride.size());++i){
+            pose.pose=22;pose.poseFrame=float(i)/yardStride.size();
+            if(!yardStride[i].load(source,shader,pose))throw std::runtime_error(yardStride[i].status);
+        }
+        if(!startupCheck&&!testing){
+            InitAudioDevice();audioReady=IsAudioDeviceReady();
+            if(audioReady)for(size_t i=0;i<YardWeapons.size();++i){
+                yardSounds[i]=yardShotSound(YardWeapons[i]);
+                if(IsSoundValid(yardSounds[i]))SetSoundVolume(yardSounds[i],.42f);
+            }
+            if(audioReady){
+                enemyShot=yardShotSound(YardWeapons[0]);
+                if(IsSoundValid(enemyShot))SetSoundVolume(enemyShot,.13f);
+            }
+        }
+        yardAssets=true;
+    }
+    void enterYard(){
+        loadYard();
+        yard.reset(selectedMode,selectedWeapon,roundSeed);
+        yardFeet={0,0,-8};eyeHeight=1.62f;position={0,eyeHeight,-8};yaw=0;pitch=-1.2f;
+        weaponRecoil=0;reviewTime=0;previousPadFire=false;impacts.clear();pendingClicks=0;
+        reviewYard=reviewSaved=false;inYard=true;frontMenu=menu=false;
+        updateCamera();capture();
+    }
+    void enterRange(){
+        if(inYard)saveYardRound();
+        inYard=frontMenu=menu=reviewYard=false;
+        pendingClicks=0;impacts.clear();position=rangeReturn;yaw=rangeYaw;pitch=rangePitch;
+        active=closestBay(position);updateCamera();capture();
+    }
+    void openFrontMenu(){
+        if(inYard)saveYardRound();
+        else {rangeReturn=position;rangeYaw=yaw;rangePitch=pitch;}
+        release();frontMenu=true;menu=false;reviewYard=false;pendingClicks=0;
+    }
+    const Character& yardCharacter(int id)const{
+        const auto& bot=yard.bots[id];
+        return yardStride[bot.moving?(int(yard.time*10)+id)%int(yardStride.size()):0];
+    }
+    Settings yardPose(int id)const{
+        Settings pose;const auto& bot=yard.bots[id];pose.height=bot.height;pose.facing=bot.facing;return pose;
+    }
+    bool visibleYardBot(int id)const{
+        const auto& bot=yard.bots[id];
+        return bot.active&&yard.time>=bot.reappear&&yard.phase!=YardPhase::Intermission;
+    }
+    void fireYard(){
+        const auto& gun=yard.gun();
+        if(audioReady&&IsSoundValid(yardSounds[yard.weaponIndex]))PlaySound(yardSounds[yard.weaponIndex]);
+        bool landed=false;
+        for(int pellet=0;pellet<gun.pellets;++pellet){
+            const float spread=gun.spread+(gun.aimedSpread-gun.spread)*yard.ads;
+            const float drift=unitHash(yard.seed,yard.shots,pellet*2)*2-1;
+            const float lift=unitHash(yard.seed,yard.shots,pellet*2+1)*2-1;
+            Ray ray{position,forward(yaw+drift*spread,pitch+weaponRecoil+lift*spread)};
+            float nearest=yardWallDistance(ray,120);
+            int target=-1;
+            for(int i=0;i<yard.population();++i){
+                if(!visibleYardBot(i))continue;
+                auto& model=yardCharacter(i);auto pose=yardPose(i);
+                Entity body{i,yard.bots[i].position,true};
+                float near=0;
+                if(!rayBox(ray.position,ray.direction,model.bounds(body,pose),near)||near>=nearest)continue;
+                float hit=model.query.worldHit(ray,model.transform(body,pose),nearest);
+                if(hit<nearest){nearest=hit;target=i;}
+            }
+            const auto point=Vector3Add(position,Vector3Scale(ray.direction,nearest));
+            if(target>=0){
+                const bool head=point.y-yard.bots[target].position.y>yard.bots[target].height*.80f;
+                const float falloff=nearest<=gun.reach?1.f:std::max(.24f,1.f-(nearest-gun.reach)/gun.reach);
+                yard.damage(target,gun.damage*falloff*(head?1.65f:1.f),head);
+                landed=true;
+            }
+            if(pellet==0||target>=0)yard.record({yard.time,position,point,target,target>=0,false});
+            if(pellet==0||target>=0)impacts.push_back({point,elapsed+.24,target>=0});
+        }
+        if(landed)++yard.hits;
+        if(impacts.size()>36)impacts.erase(impacts.begin(),impacts.end()-36);
+        weaponRecoil=std::min(11.f,weaponRecoil+gun.recoil*(yard.ads>.6f?.7f:1.f));
+    }
+    void yardInput(float dt){
+        int clicks=std::exchange(pendingClicks,0);
+        if(!IsWindowFocused()){
+            if(captured){release();menu=true;}
+            return;
+        }
+        const bool pad=IsGamepadAvailable(0);
+        auto padPress=[&](int button){return pad&&IsGamepadButtonPressed(0,button);};
+        auto padDown=[&](int button){return pad&&IsGamepadButtonDown(0,button);};
+        auto axis=[&](int input){float value=pad?GetGamepadAxisMovement(0,input):0;return std::abs(value)>.13f?value:0;};
+        if(IsKeyPressed(KEY_F11)){release();ToggleBorderlessWindowed();if(!menu&&!yard.finished())capture();}
+        if(IsKeyPressed(KEY_F12))captureNext=true;
+        if(IsKeyPressed(KEY_ESCAPE)||padPress(GAMEPAD_BUTTON_MIDDLE_RIGHT)){
+            if(yard.finished()){if(reviewYard)reviewYard=false;else openFrontMenu();return;}
+            menu=!menu;
+            if(menu)release();else capture();
+            return;
+        }
+        if(IsKeyPressed(KEY_F5)||(yard.finished()&&padPress(GAMEPAD_BUTTON_RIGHT_FACE_DOWN))){enterYard();return;}
+        if(menu||yard.finished())return;
+        if(!captured){if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)||padPress(GAMEPAD_BUTTON_RIGHT_FACE_DOWN))capture();return;}
+        auto mouse=GetMouseDelta();
+        const bool aiming=IsMouseButtonDown(MOUSE_BUTTON_RIGHT)||(pad&&GetGamepadAxisMovement(0,GAMEPAD_AXIS_LEFT_TRIGGER)>.25f);
+        const bool sprint=IsKeyDown(KEY_LEFT_SHIFT)||padDown(GAMEPAD_BUTTON_LEFT_THUMB);
+        const bool crouch=IsKeyDown(KEY_LEFT_CONTROL)||padDown(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+        yard.ads+=((aiming&&!sprint?1.f:0.f)-yard.ads)*std::min(1.f,dt*(yard.gun().type==WeaponClass::Lmg?8.f:15.f));
+        const float sensitivity=settings.sensitivity*(1.f-yard.ads*.45f);
+        yaw=std::remainder(yaw-mouse.x*sensitivity-axis(GAMEPAD_AXIS_RIGHT_X)*dt*(aiming?92.f:181.f),360.f);
+        pitch=std::clamp(pitch-mouse.y*sensitivity-axis(GAMEPAD_AXIS_RIGHT_Y)*dt*(aiming?73.f:137.f),-83.f,83.f);
+        const auto f=forward(yaw,0);
+        const Vector3 right{-f.z,0,f.x};
+        const float forwardAxis=float(IsKeyDown(KEY_W))-float(IsKeyDown(KEY_S))-axis(GAMEPAD_AXIS_LEFT_Y);
+        const float rightAxis=float(IsKeyDown(KEY_D))-float(IsKeyDown(KEY_A))+axis(GAMEPAD_AXIS_LEFT_X);
+        auto movement=Vector3Add(Vector3Scale(f,forwardAxis),Vector3Scale(right,rightAxis));
+        const float movementLength=Vector3Length(movement);
+        if(movementLength>1)movement=Vector3Scale(movement,1.f/movementLength);
+        yard.slideReady=std::max(0.f,yard.slideReady-dt);
+        if(!yard.slideReady&&sprint&&movementLength>.1f&&(IsKeyPressed(KEY_LEFT_CONTROL)||padPress(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))){
+            yard.slide=.54f;yard.slideReady=.96f;yard.slideDirection=Vector3Normalize(movement);
+        }
+        const float speed=yard.slide>0?6.8f+yard.slide*3.6f:crouch?2.0f:sprint?6.1f:aiming?2.6f:3.9f;
+        yardFeet=moveYardPlayer(yardFeet,Vector3Scale(yard.slide>0?yard.slideDirection:movement,speed*dt));
+        const float eye=yard.slide>0?.77f:crouch?1.04f:1.62f;
+        eyeHeight+=(eye-eyeHeight)*std::min(1.f,dt*15.f);
+        yard.slide=std::max(0.f,yard.slide-dt);
+        position=Vector3Add(yardFeet,{0,eyeHeight,0});
+        const auto before=yard.events.size();
+        yard.advance(dt,position);
+        if(audioReady&&yard.events.size()>before&&yard.events.back().enemy&&IsSoundValid(enemyShot))PlaySound(enemyShot);
+        weaponRecoil=std::max(0.f,weaponRecoil-dt*(4.3f+weaponRecoil*5.f));
+        if(IsKeyPressed(KEY_R)||padPress(GAMEPAD_BUTTON_RIGHT_FACE_LEFT))yard.reload();
+        const bool padFire=pad&&GetGamepadAxisMovement(0,GAMEPAD_AXIS_RIGHT_TRIGGER)>.25f;
+        if((!sprint||yard.burstLeft)&&yard.trigger(clicks>0||(padFire&&!previousPadFire),IsMouseButtonDown(MOUSE_BUTTON_LEFT)||padFire))
+            fireYard();
+        previousPadFire=padFire;
+        if(yard.finished()){release();saveYardRound();}
+    }
+    void saveYardRound(){
+        if(reviewSaved||testing||startupCheck||!yard.finished())return;
+        reviewSaved=true;
+        try{
+            const auto file="reports/yard-"+timestamp()+"-"+std::to_string(ownProcessId())+"-"+std::to_string(++shotSequence);
+            std::ostringstream summary;
+            summary<<"{\"mode\":\""<<yardModeName(yard.mode)<<"\",\"weapon\":\""<<yard.gun().name
+                <<"\",\"seed\":"<<yard.seed<<",\"won\":"<<(yard.phase==YardPhase::Won?"true":"false")
+                <<",\"seconds\":"<<yard.time<<",\"kills\":"<<yard.kills<<",\"shots\":"<<yard.shots
+                <<",\"hits\":"<<yard.hits<<",\"headshots\":"<<yard.headshots<<"}\n";
+            writeText(file+".json",summary.str());
+            std::ostringstream shots;
+            shots<<"seconds,enemy,hit,target,start_x,start_y,start_z,end_x,end_y,end_z\n";
+            for(const auto& e:yard.events)
+                shots<<e.time<<','<<e.enemy<<','<<e.hit<<','<<e.target<<','<<e.start.x<<','<<e.start.y<<','<<e.start.z
+                    <<','<<e.end.x<<','<<e.end.y<<','<<e.end.z<<'\n';
+            writeText(file+"-shots.csv",shots.str());
+        }catch(const std::exception& e){notify(e.what());}
+    }
+    void drawYardWorld(){
+        yardWorld.draw();yardLights.draw();
+        for(int i=0;i<yard.population();++i){
+            if(!visibleYardBot(i))continue;
+            const auto& bot=yard.bots[i];
+            auto pose=yardPose(i);auto& model=yardCharacter(i);Entity entity{i,bot.position,true};
+            model.draw(entity,pose,yard.time<bot.flashUntil?Color{255,164,142,255}:WHITE);
+            if(yard.time<bot.fireUntil){
+                const auto f=forward(bot.facing,0);
+                const auto muzzle=Vector3Add(bot.position,Vector3Add({0,bot.height*.73f,0},Vector3Scale(f,.48f)));
+                DrawSphere(muzzle,.071f,YardAmber);
+            }
+        }
+        for(const auto& impact:impacts)if(elapsed<impact.until)
+            DrawSphere(impact.point,impact.target?.048f:.032f,impact.target?YardTeal:YardAmber);
+        drawRain(position,elapsed);
+    }
+    void drawYardWeapon(){
+        if(!settings.weapon)return;
+        const auto& gun=yard.gun();
+        const auto f=forward(yaw,pitch+weaponRecoil*.25f);
+        const auto r=Vector3Normalize(Vector3CrossProduct(f,{0,1,0}));
+        const auto u=Vector3CrossProduct(r,f);
+        const bool pistol=gun.type==WeaponClass::Pistol;
+        const bool shortGun=gun.type==WeaponClass::Smg||pistol;
+        const float barrel=shortGun?.27f:gun.type==WeaponClass::Sniper?.64f:gun.type==WeaponClass::Shotgun?.54f:.44f;
+        const float width=gun.type==WeaponClass::Lmg?.115f:pistol?.05f:.078f;
+        const float sight=yard.ads;
+        const float reload=yard.reloadLeft>0?std::sin(PI*(1-yard.reloadLeft/gun.reload)):0;
+        const float cycle=yard.cooldown>0&&(gun.type==WeaponClass::Shotgun||gun.type==WeaponClass::Sniper)
+            ?std::sin(PI*(1-yard.cooldown/gun.interval)):0;
+        const float sway=std::sin(float(elapsed)*3.4f)*(.007f-.005f*sight);
+        const auto origin=Vector3Add(position,Vector3Add(Vector3Scale(f,.28f-weaponRecoil*.014f),
+            Vector3Add(Vector3Scale(r,.19f*(1-sight)+sway),Vector3Scale(u,-.19f+.10f*sight-.23f*reload))));
+        const Matrix basis={r.x,u.x,f.x,0,r.y,u.y,f.y,0,r.z,u.z,f.z,0,0,0,0,1};
+        const auto original=cube.transform;
+        auto part=[&](Vector3 offset,Vector3 size,Color color){
+            auto point=Vector3Add(origin,Vector3Add(Vector3Scale(r,offset.x),Vector3Add(Vector3Scale(u,offset.y),Vector3Scale(f,offset.z))));
+            cube.transform=MatrixMultiply(MatrixScale(size.x,size.y,size.z),basis);
+            DrawModelEx(cube,point,{0,1,0},0,{1,1,1},color);
+        };
+        rlDrawRenderBatchActive();sceneAA.clearDepth();rlEnableDepthTest();
+        const Color steel{50,61,68,255}, black{26,32,36,255};
+        part({0,0,.10f},{width,.093f,pistol?.21f:.31f},steel);
+        part({0,.046f,.11f},{width*.88f,.028f,pistol?.19f:.32f},{86,98,101,255});
+        part({0,.025f,barrel*.63f+.08f},{.025f,.026f,barrel*.65f},black);
+        part({0,.025f,barrel+.04f},{.044f,.039f,.080f},steel);
+        part({.012f,-.128f,.047f},{.10f,.085f,.17f},{95,83,68,255});
+        part({0,-.092f,.052f},{.043f,.13f,.067f},black);
+        if(!pistol)part({0,0,-.078f},{width*.7f,.073f,.175f},black);
+        if(gun.type==WeaponClass::Lmg)part({.018f,-.105f,.185f},{.137f,.12f,.145f},steel);
+        else if(gun.type==WeaponClass::Shotgun)part({0,-.028f,.34f-.11f*cycle},{.059f,.052f,.18f},gun.accent);
+        else if(!pistol)part({0,-.096f-.10f*reload,.162f},{.058f,.14f,.072f},black);
+        if(gun.type==WeaponClass::Marksman||gun.type==WeaponClass::Sniper){
+            part({0,.083f,.14f},{.065f,.065f,.19f},black);
+            part({0,.083f,.23f},{.078f,.077f,.054f},steel);
+        }else part({0,.067f,.18f},{.034f,.032f,.046f},black);
+        if(gun.type==WeaponClass::Sniper)
+            part({width*.58f,.034f,.06f-.12f*cycle},{.04f,.03f,.04f},steel);
+        part({0,.089f,.16f},{.009f,.009f,.027f},gun.accent);
+        if(yard.time-yard.shotAt<.045f)
+            DrawSphere(Vector3Add(origin,Vector3Scale(f,barrel+.105f)),.035f,YardAmber);
+        cube.transform=original;
+        rlDrawRenderBatchActive();rlEnableDepthTest();
+    }
+    void exportYardCapture(){
+        const std::string stem="reports/yard-capture-"+timestamp()+"-"+std::to_string(ownProcessId())+"-"+std::to_string(++shotSequence);
+        Image shot=LoadImageFromTexture(viewport.texture);
+        ImageFlipVertical(&shot);
+        const bool ok=ExportImage(shot,utf8(local(stem+".png")).c_str());
+        UnloadImage(shot);
+        if(!ok){notify("Could not save the yard capture.");return;}
+        std::ostringstream out;
+        const int w=viewport.texture.width,h=viewport.texture.height;
+        out<<"{\"capture_schema\":2,\"scene\":\"Industrial Yard\",\"mode\":\""<<yardModeName(yard.mode)
+            <<"\",\"width\":"<<w<<",\"height\":"<<h<<",\"seed\":"<<yard.seed<<",\"targets\":[";
+        bool first=true;
+        for(int i=0;i<yard.population();++i){
+            if(!visibleYardBot(i))continue;
+            const auto& bot=yard.bots[i];Entity entity{i,bot.position,true};
+            auto bounds=projectBounds(yardCharacter(i).bounds(entity,yardPose(i)),camera,w,h);
+            if(!bounds.visible)continue;
+            const auto r=bounds.rectangle;
+            if(!first)out<<',';
+            first=false;
+            out<<"{\"id\":"<<i<<",\"bbox\":["<<r.x<<','<<r.y<<','<<r.x+r.width<<','<<r.y+r.height
+                <<"],\"aimpoint_unoccluded_by_range\":"
+                <<(!covered(position,Vector3Add(bot.position,{0,bot.height*.76f,0}),yardSolids())?"true":"false")<<'}';
+        }
+        out<<"]}\n";
+        writeText(stem+".json",out.str());
+        notify("Clean yard image and target bounds saved.");
+    }
+    void yardCard(Rectangle area,bool selected){
+        DrawRectangleRec(area,selected?Color{36,41,43,255}:Color{18,25,31,255});
+        DrawRectangleLinesEx(area,1,selected?YardAmber:Line);
+        if(selected)DrawRectangleRec({area.x,area.y,3,area.height},YardAmber);
+    }
+    bool yardChoice(Rectangle area,const std::string& title,const std::string& description,bool selected){
+        const bool hover=CheckCollisionPointRec(GetMousePosition(),area);
+        yardCard(area,selected||hover);
+        text(title,area.x+16,area.y+10,21,selected?YardAmber:Text);
+        fitText(description,area.x+16,area.y+36,area.width-30,15,Muted);
+        return hover&&IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    }
+    void frontScreen(){
+        const float w=float(GetScreenWidth()),h=float(GetScreenHeight());
+        DrawRectangle(0,0,int(w),int(h),Color{10,16,22,255});
+        DrawRectangleGradientH(0,0,int(w),int(h),Color{11,17,23,255},Color{29,39,43,255});
+        for(int i=1;i<16;++i)DrawLine(int(w*i/16),0,int(w*i/16),int(h),Fade(YardTeal,.055f));
+        for(int i=1;i<12;++i)DrawLine(0,int(h*i/12),int(w),int(h*i/12),Fade(YardTeal,.055f));
+        const float gutter=std::clamp(w*.057f,32.f,100.f);
+        const float content=w-2*gutter, left=content*.40f, right=content-left-35;
+        const float column=gutter+left+35;
+        brandMark(gutter,33,46);
+        text("VAPORLOCK",gutter+60,35,22);
+        text("PROVING GROUNDS",gutter+60,61,13,YardTeal);
+        text("INDUSTRIAL YARD",w-gutter-181,56,19,Muted);
+        DrawLine(int(gutter),93,int(w-gutter),93,Line);
+        text("Industrial",gutter,109,62);
+        text("Yard",gutter,170,62,YardAmber);
+        text("MODE",gutter,250,16,Muted);
+        const char* explanations[]={"Sweep the yard in 90 seconds.","Defend against three waves.","Unlimited ammo and passive bots."};
+        for(int i=0;i<3;++i){
+            auto mode=static_cast<YardMode>(i);
+            if(yardChoice({gutter,277.f+i*70,left,62},yardModeName(mode),explanations[i],selectedMode==mode))selectedMode=mode;
+        }
+        text("LOADOUT",column,133,19,YardAmber);
+        fitText(YardWeapons[selectedWeapon].description,column,165,right,17,Muted);
+        const float cardWidth=(right-12)*.5f;
+        for(int i=0;i<int(YardWeapons.size());++i){
+            const auto& item=YardWeapons[i];
+            if(yardChoice({column+(i%2)*(cardWidth+12),201.f+(i/2)*65,cardWidth,57},
+                          item.name,item.role,i==selectedWeapon))selectedWeapon=i;
+        }
+        const auto& item=YardWeapons[selectedWeapon];
+        const float detailsY=482;
+        text(std::to_string(item.magazine)+" ROUNDS",column,detailsY,17,Text);
+        text(std::to_string(int(60/item.interval))+" RPM",column+right*.34f,detailsY,17,Text);
+        text(num(item.reload,2)+" s RELOAD",column+right*.65f,detailsY,17,Text);
+        const float bottom=h-166;
+        const float featureTop=526;
+        const float featureHeight=bottom-featureTop-36;
+        if(featureHeight>110){
+            const Rectangle map{column,featureTop,right,featureHeight};
+            yardCard(map,false);
+            text("YARD MAP",map.x+14,map.y+11,15,YardTeal);
+            const float planScale=std::min((map.width-75)/61,(map.height-62)/48);
+            auto point=[&](float x,float z){
+                return Vector2{map.x+34+(z+15)*planScale,map.y+44+(24-x)*planScale};
+            };
+            for(const auto& structure:YardStructures){
+                const auto a=point(structure.bounds.max.x,structure.bounds.min.z);
+                const auto b=point(structure.bounds.min.x,structure.bounds.max.z);
+                DrawRectangleRec({a.x,a.y,b.x-a.x,b.y-a.y},ColorBrightness(structure.color,.35f));
+            }
+            DrawCircleV(point(0,-8),5,YardAmber);
+            DrawCircleV(point(-16,35),5,YardTeal);
+            DrawCircleV(point(18,35),5,YardTeal);
+            if(map.width-61*planScale>190){
+                const float tx=map.x+61*planScale+66;
+                text("ENTRY",tx,map.y+55,15,YardAmber);
+                text("WAREHOUSE",tx,map.y+82,15,Muted);
+                text("CATWALK",tx,map.y+109,15,Muted);
+            }
+            text("FIELD CONTROLS",gutter,featureTop+11,15,YardTeal);
+            text("WASD  Move",gutter,featureTop+46,19);
+            text("RMB  Aim     R  Reload",gutter,featureTop+76,19);
+            text("Shift + Ctrl  Slide",gutter,featureTop+106,19);
+        }
+        text("SEED",gutter,bottom-12,15,Muted);
+        text(std::to_string(roundSeed),gutter+66,bottom-16,20);
+        if(button({gutter+139,bottom-22,44,36},"-",YardTeal))roundSeed=roundSeed>1?roundSeed-1:999999;
+        if(button({gutter+191,bottom-22,44,36},"+",YardTeal))roundSeed=roundSeed<999999?roundSeed+1:1;
+        const bool deploy=button({gutter,bottom+34,left,53},"DEPLOY",YardAmber);
+        const bool range=button({column,bottom+34,right,53},"FIRING RANGE",YardTeal);
+        text(IsGamepadAvailable(0)?"A deploy   /   D-pad mode and weapon":"ENTER deploy   /   1-8 select weapon",gutter,h-47,15,Muted);
+        text(IsGamepadAvailable(0)?"X firing range   /   Precision, Tracking, Reflex, Cover":"Precision, Tracking, Reflex, and Cover drills",column,h-47,15,Muted);
+        if(deploy||IsKeyPressed(KEY_ENTER))enterYard();
+        else if(range)enterRange();
+    }
+    void yardHud(){
+        const float w=float(GetScreenWidth()),h=float(GetScreenHeight());
+        const float x=w*.5f,y=h*.5f;
+        const auto& gun=yard.gun();
+        DrawRectangleGradientV(0,0,int(w),133,Fade(BLACK,.64f),Fade(BLACK,0.f));
+        DrawRectangleGradientV(0,int(h-146),int(w),146,Fade(BLACK,0.f),Fade(BLACK,.8f));
+        if(yard.time-yard.hurtAt<.42f){
+            const auto tint=Fade(Color{217,46,29,255},.58f*(1-(yard.time-yard.hurtAt)/.42f));
+            DrawRectangleGradientV(0,0,int(w),94,tint,BLANK);
+            DrawRectangleGradientV(0,int(h-104),int(w),104,BLANK,tint);
+        }
+        text("INDUSTRIAL YARD",33,24,16,YardTeal);
+        text(yardModeName(yard.mode),33,47,27);
+        const std::string objective=yard.mode==YardMode::Clear?std::to_string(yard.kills)+" / 10 CLEARED"
+            :yard.mode==YardMode::Hold?"WAVE "+std::to_string(yard.wave)+" / 3":std::to_string(yard.kills)+" ELIMINATED";
+        centered(objective,{x-132,22,264,30},24);
+        const float timer=yard.mode==YardMode::Clear?std::max(0.f,90-yard.time):yard.time;
+        centered(num(timer,1)+" s",{x-130,55,260,25},18,YardAmber);
+        text("HEALTH",32,h-88,16,Muted);
+        text(std::to_string(int(yard.health)),32,h-69,35);
+        DrawRectangle(107,int(h-50),157,5,Fade(Text,.24f));
+        DrawRectangle(107,int(h-50),int(157*yard.health/100),5,yard.health<34?Color{240,93,77,255}:YardTeal);
+        text(gun.name,w-260,h-108,19,gun.accent);
+        text(std::to_string(yard.ammo)+" / "+std::to_string(yard.reserve),w-260,h-83,43);
+        if(yard.reloadLeft>0){
+            DrawRectangle(int(w-259),int(h-29),208,3,Fade(Text,.26f));
+            DrawRectangle(int(w-259),int(h-29),int(208*(1-yard.reloadLeft/gun.reload)),3,gun.accent);
+        }
+        if(!menu&&!yard.finished()&&settings.crosshair){
+            const float radius=4.f+(1-yard.ads)*7.f+weaponRecoil*.8f;
+            const Color color=yard.time-yard.impactAt<.14f?YardAmber:Text;
+            const float recoilPixels=std::tan(weaponRecoil*DEG2RAD)*h*.5f/std::tan(camera.fovy*DEG2RAD*.5f);
+            const float sightY=y-recoilPixels;
+            for(int sign:{-1,1}){
+                DrawLineEx({x+sign*radius,sightY},{x+sign*(radius+4),sightY},1.6f,color);
+                DrawLineEx({x,sightY+sign*radius},{x,sightY+sign*(radius+4)},1.6f,color);
+            }
+            DrawCircleV({x,sightY},1.3f,color);
+        }
+        if(!menu&&(yard.phase==YardPhase::Ready||yard.phase==YardPhase::Intermission)){
+            const std::string ready=yard.phase==YardPhase::Ready?"GET READY":"NEXT WAVE";
+            centered(ready,{x-165,y-139,330,34},21,YardTeal);
+            centered(std::to_string(int(std::ceil(yard.ready))),{x-160,y-101,320,52},48);
+        }
+        if(!captured&&!menu&&!yard.finished()&&!testing)
+            centered("Click to take control",{x-164,h-123,328,34},20);
+        text("ESC menu   F5 restart   F12 capture",x-154,h-41,15,Muted);
+        if(GetTime()<notifyUntil&&!notification.empty())centered(notification,{x-310,h-168,620,30},17,YardTeal);
+    }
+    void drawYardReview(Rectangle area){
+        const float duration=std::max(1.f,yard.time);
+        const Rectangle map{area.x+26,area.y+85,area.width-52,area.height-207};
+        auto point=[&](Vector3 p){return Vector2{map.x+(p.x+24)/48*map.width,map.y+(46-p.z)/61*map.height};};
+        DrawRectangleRec(map,Color{18,26,30,255});
+        for(const auto& structure:YardStructures){
+            auto lo=point(structure.bounds.min),hi=point(structure.bounds.max);
+            DrawRectangleRec({lo.x,hi.y,hi.x-lo.x,lo.y-hi.y},Fade(Text,.20f));
+        }
+        const Rectangle slider{map.x,map.y+map.height+28,map.width,16};
+        if(CheckCollisionPointRec(GetMousePosition(),{slider.x,slider.y-9,slider.width,34})&&IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+            reviewTime=std::clamp((GetMouseX()-slider.x)/slider.width,0.f,1.f)*duration;
+        if(IsKeyPressed(KEY_LEFT))reviewTime=std::max(0.f,reviewTime-.5f);
+        if(IsKeyPressed(KEY_RIGHT))reviewTime=std::min(duration,reviewTime+.5f);
+        DrawRectangleRec(slider,Color{44,57,61,255});
+        const YardReplayEvent* latest=nullptr;
+        for(const auto& event:yard.events){
+            if(!event.enemy){
+                const float marker=slider.x+slider.width*event.time/duration;
+                DrawRectangleRec({marker,slider.y,1,slider.height},event.hit?YardTeal:Muted);
+            }
+            if(event.time<=reviewTime)latest=&event;
+            if(event.time>reviewTime||reviewTime-event.time>2.0f)continue;
+            auto color=event.enemy?Color{241,119,99,255}:event.hit?YardTeal:YardAmber;
+            DrawLineEx(point(event.start),point(event.end),1.7f,color);
+            DrawCircleV(point(event.end),3,color);
+        }
+        DrawRectangleRec({slider.x+slider.width*reviewTime/duration-3,slider.y-4,6,24},Text);
+        std::string status=num(reviewTime,1)+" / "+num(yard.time,1)+" s";
+        if(latest)status+=latest->enemy?(latest->hit?"    Enemy hit":"    Enemy miss"):(latest->hit?"    Target hit":"    Miss");
+        text(status,map.x,slider.y+29,18);
+    }
+    void yardMenu(){
+        if(!menu&&!yard.finished())return;
+        const float w=float(GetScreenWidth()),h=float(GetScreenHeight());
+        DrawRectangle(0,0,int(w),int(h),Fade(Ink,.78f));
+        const Rectangle card{w*.5f-303,h*.5f-257,606,514};
+        yardCard(card,true);
+        text(reviewYard?"SHOT REVIEW":yard.finished()?(yard.phase==YardPhase::Won?"ROUND COMPLETE":"ROUND LOST"):"PAUSED",
+             card.x+26,card.y+24,31,YardAmber);
+        if(reviewYard){
+            drawYardReview(card);
+            if(button({card.x+26,card.y+448,554,39},"BACK",YardTeal))reviewYard=false;
+            return;
+        }
+        text(yardModeName(yard.mode),card.x+27,card.y+81,24);
+        text(yard.gun().name,card.x+27,card.y+121,18,Muted);
+        text(std::to_string(yard.kills)+" eliminations    "+num(yard.accuracy(),0)+"% accuracy    "+num(yard.time,1)+" s",
+             card.x+27,card.y+167,22);
+        if(yard.finished()){
+            if(button({card.x+26,card.y+226,554,52},"REVIEW SHOTS",YardTeal)){reviewYard=true;reviewTime=yard.time;}
+        }else if(button({card.x+26,card.y+226,554,52},"RESUME",YardTeal)){menu=false;capture();}
+        if(button({card.x+26,card.y+294,554,52},"RESTART WITH SAME SEED",YardAmber))enterYard();
+        if(button({card.x+26,card.y+362,554,52},"CHANGE MODE OR LOADOUT",YardTeal))openFrontMenu();
+        if(button({card.x+26,card.y+430,554,52},"FIRING RANGE",YardTeal))enterRange();
     }
     Entity entity(int bay,int id)const{
         if(bay!=occupiedBay(position))return {id,{},false};auto& b=bays[bay];auto e=rangeEntity(b.settings,bay,id,b.clock.time());
@@ -254,6 +718,7 @@ struct App {
         fireCount=0;int clicks=pendingClicks;pendingClicks=0;if(testing||startupCheck||benchmarking)return;bool focused=IsWindowFocused();
         if(!focused){if(wasFocused&&captured){release();menu=true;}wasFocused=false;return;}wasFocused=true;
         if(IsKeyPressed(KEY_ESCAPE)){if(qualityOpen){qualityOpen=false;return;}menu=!menu;if(menu)release();else {capture();return;}}
+        if(IsKeyPressed(KEY_F2)){openFrontMenu();return;}
         if(IsKeyPressed(KEY_F11)){release();ToggleBorderlessWindowed();if(!menu)capture();}
         if(IsKeyPressed(KEY_F12))captureNext=true;if(menu)return;
         if(!captured){if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT))capture();return;}
@@ -460,7 +925,7 @@ struct App {
             if(!IsRenderTextureValid(presentation))throw std::runtime_error("Could not allocate the range view.");
         }
         if(captureNext&&!viewport.id){viewport=LoadRenderTexture(width,height);if(!IsRenderTextureValid(viewport))throw std::runtime_error("Could not allocate clean capture.");}const auto& graphics=graphicsPreset(settings.quality);sceneAA.resize(width,height,settings.antialias?graphics.samples:0);shadows.configure(graphics.shadowSize,graphics.shadowRadius);float detail=graphics.detail?1.0f:0.0f;SetShaderValue(environmentShader,GetShaderLocation(environmentShader,"surfaceDetail"),&detail,SHADER_UNIFORM_FLOAT);
-        if(shadows.ready&&occupiedBay(position)>=0){
+        if(shadows.ready&&!inYard&&occupiedBay(position)>=0){
             shadows.begin({BayCenters[active],0,bays[active].settings.distance+FiringLine+2});
             cube.materials[0].shader=shadows.shader;
             for(auto& cover:bayCover(bays[active].settings,active))box(cover,WHITE);
@@ -471,14 +936,26 @@ struct App {
         }
         profile.mark(2);float cameraValue[]={position.x,position.y,position.z},fog[]={.09f,.10f,.14f};float exposure=settings.light==0?1.05f:settings.light==1?1.20f:.55f;
         float tint[3]={1,1,1};if(settings.light==1){tint[0]=1.12f;tint[1]=1.01f;tint[2]=.84f;}if(settings.light==2){tint[0]=.82f;tint[1]=.91f;tint[2]=1.10f;}
+        if(inYard){fog[0]=.17f;fog[1]=.22f;fog[2]=.27f;exposure=.90f;tint[0]=.93f;tint[1]=1.03f;tint[2]=1.13f;}
         SetShaderValue(shader,shaderCamera,cameraValue,SHADER_UNIFORM_VEC3);SetShaderValue(shader,shaderFog,fog,SHADER_UNIFORM_VEC3);SetShaderValue(shader,shaderExposure,&exposure,SHADER_UNIFORM_FLOAT);SetShaderValue(shader,shaderTint,tint,SHADER_UNIFORM_VEC3);
         SetShaderValue(environmentShader,GetShaderLocation(environmentShader,"cameraPosition"),cameraValue,SHADER_UNIFORM_VEC3);
         SetShaderValue(environmentShader,GetShaderLocation(environmentShader,"fogColor"),fog,SHADER_UNIFORM_VEC3);
         SetShaderValue(environmentShader,GetShaderLocation(environmentShader,"exposure"),&exposure,SHADER_UNIFORM_FLOAT);
         SetShaderValue(environmentShader,GetShaderLocation(environmentShader,"lightTint"),tint,SHADER_UNIFORM_VEC3);
-        shadows.bind(shader,true);shadows.bind(environmentShader,true);
-        BeginTextureMode(presentation);sceneAA.begin();ClearBackground(Ink);BeginMode3D(camera);world();if(graphics.glow)glowAccents();EndMode3D();
-        if(captureNext){sceneAA.copyColor(sceneAA.fbo?sceneAA.fbo:presentation.id,viewport.id);exportCapture();captureNext=false;}profile.mark(3);if(!menu){BeginMode3D(camera);weapon();EndMode3D();}sceneAA.resolve(presentation.id);EndTextureMode();
+        shadows.bind(shader,!inYard);shadows.bind(environmentShader,!inYard);
+        BeginTextureMode(presentation);sceneAA.begin();
+        ClearBackground(inYard?Color{45,58,72,255}:Ink);
+        BeginMode3D(camera);
+        if(inYard)drawYardWorld();else{world();if(graphics.glow)glowAccents();}
+        EndMode3D();
+        if(captureNext){
+            sceneAA.copyColor(sceneAA.fbo?sceneAA.fbo:presentation.id,viewport.id);
+            if(inYard)exportYardCapture();else exportCapture();
+            captureNext=false;
+        }
+        profile.mark(3);
+        if(!menu&&!frontMenu){BeginMode3D(camera);if(inYard)drawYardWeapon();else weapon();EndMode3D();}
+        sceneAA.resolve(presentation.id);EndTextureMode();
     }
     void exportCapture(){
         std::string stem="reports/capture-"+timestamp()+"-"+std::to_string(ownProcessId())+"-"+std::to_string(++shotSequence);
@@ -509,7 +986,7 @@ struct App {
             text("FRAME "+num(frameAverage,1)+" ms   /   "+std::to_string(GetFPS())+" FPS",w-302,57,17,Muted);
             DrawRectangle(0,int(h-81),int(w),81,Fade(Ink,.92f));
             text("WASD move   Shift sprint   Ctrl crouch   LMB fire",26,h-67,18,Text);text("Shoot the physical panels to change settings",26,h-36,18,accent);
-            text("Esc menu   F12 capture   F11 window",w-343,h-36,17,Text);
+            text("Esc menu   F2 Proving Grounds   F12 capture",w-390,h-36,17,Text);
         }
         if(b.readyLeft>0&&!menu){DrawRectangleRec({w/2-145,h*.32f,290,162},Fade(Ink,.94f));centered("GET READY",{w/2-145,h*.32f+16,290,32},24,accent);centered(std::to_string(int(std::ceil(b.readyLeft))),{w/2-145,h*.32f+48,290,93},78,Text);}
         if(settings.crosshair&&!menu){
@@ -547,9 +1024,9 @@ struct App {
         Rectangle card=pauseCard(w,h);neonBorder(card,NeonViolet,.85f,24);DrawRectangleRec(card,Panel);DrawRectangleLinesEx(card,1,Line);
         neonBorder({card.x,card.y,660,3},NeonCyan,.7f,16);
         DrawRectangleGradientH(int(card.x),int(card.y),660,3,Cyan,Violet);
-        brandMark(card.x+32,card.y+28,44);text(BrandName,card.x+92,card.y+28,24);text("AIM TESTING SUITE",card.x+92,card.y+59,14,Cyan);
+        brandMark(card.x+32,card.y+28,44);text(BrandName,card.x+92,card.y+28,24);text("PROVING GROUNDS",card.x+92,card.y+59,14,Cyan);
         text("LOCAL RANGE",card.x+510,card.y+43,14,Muted);
-        text("Range paused",card.x+32,card.y+92,38);text("Esc to return. Tab and Enter also select menu actions.",card.x+32,card.y+144,18,Muted);
+        text("Range paused",card.x+32,card.y+92,38);text("Esc to resume. F2 returns to Proving Grounds.",card.x+32,card.y+144,18,Muted);
         DrawLine(int(card.x+32),int(card.y+176),int(card.x+628),int(card.y+176),Line);text("01  CHARACTER",card.x+32,card.y+191,18,Cyan);
         Rectangle field{card.x+32,card.y+220,596,62};DrawRectangleRec(field,Ink);
         if(menuButton({field.x,field.y,54,62},"<",0))chooseModel(-1);if(menuButton({field.x+542,field.y,54,62},">",1))chooseModel(1);
@@ -768,6 +1245,38 @@ struct App {
     }
     void frame(){profile.begin();
         double dt=testing?1.0/60:double(GetFrameTime());if(!std::isfinite(dt)||dt<0)dt=0;elapsed+=std::min(dt,.25);
+        if(frontMenu){
+            const int cap=IsWindowFocused()?60:30;
+            if(appliedCap!=cap){SetTargetFPS(cap);appliedCap=cap;}
+            for(int i=0;i<int(YardWeapons.size());++i)if(IsKeyPressed(KEY_ONE+i))selectedWeapon=i;
+            if(IsGamepadAvailable(0)&&IsWindowFocused()){
+                const int mode=static_cast<int>(selectedMode);
+                if(IsGamepadButtonPressed(0,GAMEPAD_BUTTON_LEFT_FACE_UP))selectedMode=static_cast<YardMode>((mode+2)%3);
+                if(IsGamepadButtonPressed(0,GAMEPAD_BUTTON_LEFT_FACE_DOWN))selectedMode=static_cast<YardMode>((mode+1)%3);
+                if(IsGamepadButtonPressed(0,GAMEPAD_BUTTON_LEFT_FACE_LEFT))selectedWeapon=(selectedWeapon+7)%8;
+                if(IsGamepadButtonPressed(0,GAMEPAD_BUTTON_LEFT_FACE_RIGHT))selectedWeapon=(selectedWeapon+1)%8;
+                if(IsGamepadButtonPressed(0,GAMEPAD_BUTTON_RIGHT_FACE_DOWN))enterYard();
+                else if(IsGamepadButtonPressed(0,GAMEPAD_BUTTON_RIGHT_FACE_LEFT))enterRange();
+                if(!frontMenu)return;
+            }
+            BeginDrawing();frontScreen();EndDrawing();
+            if(!shown){ClearWindowState(FLAG_WINDOW_HIDDEN);showStartupWindow(GetWindowHandle(),true);shown=true;}
+            return;
+        }
+        if(inYard){
+            if(IsWindowMinimized()&&!testing){PollInputEvents();WaitTime(.03);return;}
+            if(!testing&&!startupCheck&&!benchmarking)yardInput(float(std::min(dt,.10)));
+            if(frontMenu||!inYard)return;
+            const int cap=menu||yard.finished()||!IsWindowFocused()?60:FrameCaps[settings.frameCap];
+            if(cap!=appliedCap){SetTargetFPS(cap);appliedCap=cap;}
+            updateCamera();renderScene();
+            BeginTextureMode(presentation);yardHud();yardMenu();EndTextureMode();
+            BeginDrawing();ClearBackground(Ink);
+            DrawTexturePro(presentation.texture,{0,0,float(presentation.texture.width),-float(presentation.texture.height)},
+                {0,0,float(GetScreenWidth()),float(GetScreenHeight())},{0,0},0,WHITE);
+            EndDrawing();
+            return;
+        }
         bool previousMenu=menu;input(dt);if(menu&&!previousMenu){refreshModels();for(auto& b:bays)b.dirty=true;}
         for(int i=0;i<BayCount;i++)if(bays[i].running&&(bays[i].runWidth!=GetScreenWidth()||bays[i].runHeight!=GetScreenHeight()))finish(i,"viewport resized");
         int cap=benchmarking?0:testing?60:(!captured||menu||!IsWindowFocused())?30:FrameCaps[settings.frameCap];
@@ -793,11 +1302,47 @@ struct App {
         }
         if(testing)checkFrame();
     }
+    void checkYardRender(){
+        testing=true;
+        ClearWindowState(FLAG_WINDOW_HIDDEN);
+        showStartupWindow(GetWindowHandle(),false);
+        shown=true;
+        frontMenu=true;
+        BeginDrawing();frontScreen();EndDrawing();
+        Image menuImage=LoadImageFromScreen();
+        verify(ExportImage(menuImage,utf8(local("reports/proving-grounds-menu.png")).c_str()),"loadout screenshot");
+        UnloadImage(menuImage);
+        selectedMode=YardMode::Practice;
+        enterYard();
+        for(int i=0;i<240;++i)yard.tick(float(TickSeconds),position);
+        captureNext=true;
+        frame();
+        screenshot("proving-grounds-yard.png");
+        verify(viewport.id&&yardWorld.ready&&yardStride[0].loaded,"yard renders and exports at native resolution");
+        auto& bot=yard.bots[0];
+        auto target=Vector3Add(bot.position,{0,bot.height*.72f,0});
+        auto delta=Vector3Subtract(target,position);
+        yaw=std::atan2(delta.x,delta.z)*RAD2DEG;
+        pitch=std::atan2(delta.y,std::hypot(delta.x,delta.z))*RAD2DEG;
+        yard.ads=1;
+        verify(yard.trigger(true,true),"yard round can fire");
+        fireYard();
+        verify(yard.hits==1&&yard.events.size()>0&&yard.events.back().hit,"yard ray hits rendered bot");
+        enterRange();frame();
+        verify(!inYard&&occupiedBay(position)==active&&character.loaded,"firing range still renders");
+        writeText("reports/proving-grounds-check.json","{\"result\":\"passed\"}\n");
+    }
     void close(){
         glfwSetMouseButtonCallback(glfwGetCurrentContext(),previousButtonHandler);inputOwner=nullptr;
         finishAll("exited");release();save();for(auto& batch:environment)batch.unload();for(auto& batch:emissive)batch.unload();character.unload();rifle.unload();UnloadModel(cube);UnloadShader(shader);UnloadShader(environmentShader);sceneAA.unload();shadows.unload();neon.unload();profile.unload();
         for(auto& b:boards)if(b.id)UnloadRenderTexture(b);for(auto& s:signs)if(s.id)UnloadRenderTexture(s);
         for(auto& plate:distancePlates)if(plate.id)UnloadRenderTexture(plate);
+        yardWorld.unload();yardLights.unload();for(auto& pose:yardStride)pose.unload();
+        if(audioReady){
+            for(auto sound:yardSounds)if(IsSoundValid(sound))UnloadSound(sound);
+            if(IsSoundValid(enemyShot))UnloadSound(enemyShot);
+            CloseAudioDevice();
+        }
         if(viewport.id)UnloadRenderTexture(viewport);if(presentation.id)UnloadRenderTexture(presentation);if(uiFont.texture.id!=GetFontDefault().texture.id)UnloadFont(uiFont);CloseWindow();
     }
 };
@@ -805,6 +1350,7 @@ struct App {
 }
 int main(int argc,char** argv){
     bool test=argc>1&&(std::string(argv[1])=="--render-check"||std::string(argv[1])=="--range-check");
+    bool yardTest=argc>1&&std::string(argv[1])=="--yard-check";
     bool startup=argc>1&&std::string(argv[1])=="--startup-check";
     bool profiling=argc>1&&std::string(argv[1])=="--profile-check";bool benchmark=profiling||(argc>1&&std::string(argv[1])=="--fps-check");
     try{
@@ -815,9 +1361,11 @@ int main(int argc,char** argv){
         if(benchmark&&argc>2){std::string wanted=argv[2];std::transform(wanted.begin(),wanted.end(),wanted.begin(),[](unsigned char c){return char(std::tolower(c));});quality=-1;
             for(int i=0;i<QualityCount;i++){std::string name=graphicsPreset(i).name;std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return char(std::tolower(c));});if(wanted==name)quality=i;}
             if(quality<0)throw std::runtime_error("FPS quality must be max, high, mid or potato.");}
-        App app;app.profile.enabled=profiling;app.benchmarking=benchmark;app.setup(test,startup,model);
-        if(benchmark)runFpsBenchmark(app,quality);else while(!app.quit&&!WindowShouldClose())app.frame();
+        App app;app.profile.enabled=profiling;app.benchmarking=benchmark;app.setup(test||yardTest,startup,model);
+        if(yardTest)app.checkYardRender();
+        else if(benchmark)runFpsBenchmark(app,quality);
+        else while(!app.quit&&!WindowShouldClose())app.frame();
         app.close();appLog<<"SHUTDOWN: clean exit"<<std::endl;return 0;
-    }catch(const std::exception& e){if(appLog)appLog<<"FATAL: "<<e.what()<<std::endl;if(!test&&!startup&&!benchmark)showError(e.what());return 1;}
+    }catch(const std::exception& e){if(appLog)appLog<<"FATAL: "<<e.what()<<std::endl;if(!test&&!yardTest&&!startup&&!benchmark)showError(e.what());return 1;}
 }
 
