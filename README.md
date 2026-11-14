@@ -1,5 +1,9 @@
 # VaporLock
 
+## Donations
+
+[Donate to support VaporLock and my other GitHub projects](https://vaporunlocked.github.io/donations.github.io/).
+
 VaporLock is a Windows vision, tracking and annotation application with a C++20
 native engine and a Qt/Python interface. This is an unfinished community source
 snapshot of the 0.2.1 work, provided as-is. It is not a newly validated binary
