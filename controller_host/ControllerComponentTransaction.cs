@@ -43,6 +43,7 @@ internal interface IControllerComponentPlatform : IDisposable
     void Save(ControllerComponentRecord record);
     void RefuseForeignState(ControllerComponentRecord? owned);
     void ReconcileOwnedRuntime(ControllerComponentRecord owned, bool retireConfiguration);
+    void PreparePayloadTools();
     ControllerSignerProof PrepareSigner(ControllerComponentRecord record);
     ControllerPayloadProof BuildAndVerifyPayload(ControllerComponentRecord record);
     bool TrustPresent(string store, ControllerComponentRecord record);
@@ -80,6 +81,7 @@ internal sealed class ControllerComponentTransaction
             record.Phase = "repair"; platform.Save(record);
         }
         if (record?.Phase == "removed") record = null; // old identity is archived by the protected platform before replacement
+        if (record?.PayloadHashes.Count != 6) platform.PreparePayloadTools();
         if (record is null)
         {
             var id = Guid.NewGuid();

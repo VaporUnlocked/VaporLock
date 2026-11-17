@@ -180,6 +180,18 @@ class CloudResults(QWidget):
                  images=value['images'], confidence=f"{value['confidence']:.3g}")]
         lines.extend(f"{self.t(label)}  {value['metrics'][key]:.4g}"
                      for key, label in EVALUATION_METRICS.items() if value['metrics'][key] is not None)
+        from evaluation_slices import SLICE_LABELS
+        if value.get('slices'):
+            lines.extend(('', self.t('Recall by target size and visibility at box IoU 0.50'),
+                          self.t('Size is the shorter box edge scaled to a 640 px longest image edge.')))
+            for key, group in value['slices'].items():
+                count, matched = group['targets'], group['matched']
+                label = self.t(SLICE_LABELS[key])
+                detail = self.suite.center.tf('{matched}/{total} matched ({recall})',
+                    matched=matched, total=count, recall=f'{matched/count:.1%}') if count else self.t('No labeled targets')
+                if group['mean_iou'] is not None:
+                    detail += ' · ' + self.suite.center.tf('Mean box IoU {iou}', iou=f"{group['mean_iou']:.2f}")
+                lines.append(f'{label} · {detail}')
         self.summary.setText('\n'.join(lines))
 
     def choose_image(self):

@@ -11,6 +11,7 @@ internal sealed class WindowsControllerComponentPlatform : IControllerComponentP
     internal readonly ControllerProtectedStorage Storage;
     private readonly Microsoft.Win32.SafeHandles.SafeFileHandle operation;
     private ControllerSigningIdentity? identity;
+    private ControllerSigningTools? signingTools;
     private ControllerStagedPayload? staged;
     private readonly List<FileStream> payloadLeases = new();
     private ControllerComponentRecord? record;
@@ -56,6 +57,8 @@ internal sealed class WindowsControllerComponentPlatform : IControllerComponentP
     public void ReconcileOwnedRuntime(ControllerComponentRecord owned, bool retireConfiguration)
         => ControllerRuntimeRecovery.Reconcile(this, owned, retireConfiguration);
 
+    public void PreparePayloadTools() => signingTools = ControllerSigningTools.Find();
+
     public ControllerSignerProof PrepareSigner(ControllerComponentRecord value)
     {
         if (value.CertificateDer.Length == 0)
@@ -100,7 +103,8 @@ internal sealed class WindowsControllerComponentPlatform : IControllerComponentP
             HoldPayload(value);
             return new(value.PayloadDirectory, value.PayloadHashes);
         }
-        staged = new ControllerStagedPayload(Storage);
+        staged = new ControllerStagedPayload(Storage, signingTools
+            ?? throw new InvalidOperationException("Controller signing tools were not prepared."));
         return staged.Build(value, identity.Certificate, Save);
     }
 

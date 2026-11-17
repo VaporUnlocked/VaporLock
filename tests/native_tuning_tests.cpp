@@ -126,7 +126,7 @@ int main() {
             std::cout.rdbuf(previous);
             require(result == 0, "capability query attempted licensing or capture");
             require(rejected == 2, "capability query allowed extra operational arguments");
-            require(stream.str().find("{\"type\":\"capabilities\",\"protocol_version\":1,\"cuda_preprocess\":false}") != std::string::npos,
+            require(stream.str().find("{\"type\":\"capabilities\",\"protocol_version\":1,\"cuda_preprocess\":false,\"cuda_graph_replay\":false}") != std::string::npos,
                     "non-CUDA build advertised GPU preprocessing");
         }
         {
@@ -393,12 +393,33 @@ int main() {
         observeConfig.outputTransport = vaporlock::hardware::kKmboxNetTransport;
         observeConfig.controllerHostPipe = L"VaporLockController-test";
         observeConfig.controllerHostVirtualSlot = 0;
+        observeConfig.mouseHostToken = L"0123456789abcdef0123456789abcdef";
+        observeConfig.mouseHostPid = 125;
         applySessionSafety(observeConfig);
         require(!observeConfig.movementEnabled && !observeConfig.motionCompensationEnabled && !observeConfig.eventActionEnabled,
                 "Observe-only did not disable every output path");
         require(observeConfig.outputTransport == vaporlock::hardware::kMouseTransport
-                    && observeConfig.controllerHostPipe.empty() && observeConfig.controllerHostVirtualSlot == -1,
+                    && observeConfig.controllerHostPipe.empty() && observeConfig.controllerHostVirtualSlot == -1
+                    && observeConfig.mouseHostToken.empty() && observeConfig.mouseHostPid == 0,
                 "Observe-only still prepared an external output transport");
+        const vaporlock::mouse_host::Request relativeMouse{vaporlock::mouse_host::magic, 42, -125, 13, 100, 4};
+        require(vaporlock::mouse_host::validRequest(relativeMouse, 110, 3)
+                    && !vaporlock::mouse_host::validRequest(relativeMouse, 110, 4)
+                    && !vaporlock::mouse_host::validRequest(relativeMouse, 176, 0)
+                    && !vaporlock::mouse_host::validRequest(relativeMouse, 99, 0),
+                "Administrator mouse request accepted stale, future or replayed movement");
+        auto inputOnly = relativeMouse;
+        inputOnly.dx = inputOnly.dy = 0;
+        inputOnly.controls = vaporlock::mouse_host::packControls(VK_RBUTTON, VK_LSHIFT, VK_XBUTTON2);
+        require(vaporlock::mouse_host::validRequest(inputOnly, 110, 3),
+                "Administrator input request rejected configured controls");
+        inputOnly.dx = 2;
+        require(!vaporlock::mouse_host::validRequest(inputOnly, 110, 3),
+                "Administrator input request accepted a combined movement command");
+        inputOnly.dx = 0;
+        inputOnly.controls = vaporlock::mouse_host::packControls('A', VK_LSHIFT, VK_XBUTTON2);
+        require(!vaporlock::mouse_host::validRequest(inputOnly, 110, 3),
+                "Administrator input request allowed an unrelated key");
         require(applyLiveSetting(observeConfig, L"movement_enabled", L"true") && !observeConfig.movementEnabled,
                 "Live settings re-enabled movement in Observe-only");
         require(applyLiveSetting(observeConfig, L"motion_compensation_enabled", L"true") && !observeConfig.motionCompensationEnabled,
@@ -479,6 +500,17 @@ int main() {
                     && config.hardwareSerialPort == L"COM7" && config.kmboxNetAddress == L"192.168.1.44"
                     && config.kmboxNetDeviceCode == L"A1B2C3D4" && config.kmboxALibraryPath == L"C:\\Vendor\\KMBoxA.dll",
                 "Universal controller or hardware output settings were removed");
+        std::vector<vaporlock::privacy::Mask> privacyMasks;
+        require(vaporlock::privacy::parse(L"0 1 5000 10000", privacyMasks), "valid privacy mask rejected");
+        require(!vaporlock::privacy::parse(L"0 1 0 10000", privacyMasks), "zero-width privacy mask accepted");
+        require(!vaporlock::privacy::parse(L"0 1 5000 10000 trailing", privacyMasks), "invalid privacy mask suffix accepted");
+        std::vector<unsigned char> privacyPixels(3 * 2 * 4, 100);
+        vaporlock::privacy::redact(privacyPixels, 3, 2, privacyMasks);
+        const std::vector<unsigned char> expectedPrivacyPixels{
+            0,0,0,255, 0,0,0,255, 100,100,100,100,
+            0,0,0,255, 0,0,0,255, 100,100,100,100,
+        };
+        require(privacyPixels == expectedPrivacyPixels, "privacy mask did not round outward or altered unmasked pixels");
         runAimOutputTests();
         runCompensationOutputTests();
         runControllerPipeTests();

@@ -203,7 +203,9 @@ def refresh_status(center,data=None):
     if data is not None:center._crosshair_telemetry=(generation,dict(data))
     saved=getattr(center,'_crosshair_telemetry',None)
     data=saved[1] if saved and saved[0]==generation else None
-    if not center.settings.crosshair_enabled:
+    if center.settings.capture_source != 'desktop':
+        text='Manual video crop offset' if center.settings.aim_reference=='crosshair-offset' else 'Video frame centre'
+    elif not center.settings.crosshair_enabled:
         text='Off — manual crop-relative offset' if center.settings.aim_reference=='crosshair-offset' else 'Off — screen centre'
     elif not center.engine.session_running:text='Enabled — waiting for capture' if center.settings.crosshair_calibration else 'Calibration required — using screen centre'
     else:

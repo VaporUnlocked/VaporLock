@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(VaporLock
-    VERSION 2.0.0
+    VERSION 2.0.2
     DESCRIPTION "ONNX-based user-controlled aim assistance"
     LANGUAGES CXX)
 
@@ -77,15 +77,16 @@ if(BUILD_TESTING)
         target_include_directories(TuningTests-${edition} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_definitions(TuningTests-${edition} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_HAS_ONNXRUNTIME=0)
         target_link_libraries(TuningTests-${edition} PRIVATE bcrypt advapi32)
-        target_sources(TuningTests-${edition} PRIVATE app/HardwareOutput.cpp)
-        target_link_libraries(TuningTests-${edition} PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32)
+        target_sources(TuningTests-${edition} PRIVATE app/HardwareOutput.cpp app/WindowCapture.cpp)
+        target_link_libraries(TuningTests-${edition} PRIVATE runtimeobject)
+        target_link_libraries(TuningTests-${edition} PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 mfplat mf mfreadwrite mfuuid)
         add_test(NAME Tuning-${edition} COMMAND TuningTests-${edition})
     endforeach()
 
-    add_executable(PublicAccessTests tests/native_public_access_tests.cpp app/HardwareOutput.cpp)
+    add_executable(PublicAccessTests tests/native_public_access_tests.cpp app/HardwareOutput.cpp app/WindowCapture.cpp)
     target_include_directories(PublicAccessTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(PublicAccessTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_HAS_ONNXRUNTIME=0)
-    target_link_libraries(PublicAccessTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 bcrypt)
+    target_link_libraries(PublicAccessTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 mfplat mf mfreadwrite mfuuid bcrypt runtimeobject)
     add_test(NAME PublicAccess COMMAND PublicAccessTests)
     set_tests_properties(PublicAccess PROPERTIES TIMEOUT 20)
 
@@ -100,8 +101,10 @@ if(BUILD_TESTING)
     target_compile_definitions(FrameRenderingTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_HAS_ONNXRUNTIME=0)
     target_include_directories(FrameRenderingTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-    target_link_libraries(FrameRenderingTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32)
+    target_link_libraries(FrameRenderingTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 mfplat mf mfreadwrite mfuuid)
     target_link_libraries(FrameRenderingTests PRIVATE bcrypt advapi32)
+    target_sources(FrameRenderingTests PRIVATE app/WindowCapture.cpp)
+    target_link_libraries(FrameRenderingTests PRIVATE runtimeobject)
     add_test(NAME FrameRendering COMMAND FrameRenderingTests)
     set_tests_properties(FrameRendering PROPERTIES TIMEOUT 20)
 
@@ -111,19 +114,19 @@ if(BUILD_TESTING)
     add_test(NAME AsyncTelemetry COMMAND AsyncTelemetryTests)
     set_tests_properties(AsyncTelemetry PROPERTIES TIMEOUT 20)
 
-    add_executable(DatasetWriterTests tests/dataset_writer_tests.cpp app/HardwareOutput.cpp)
+    add_executable(DatasetWriterTests tests/dataset_writer_tests.cpp app/HardwareOutput.cpp app/WindowCapture.cpp)
     target_compile_definitions(DatasetWriterTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_HAS_ONNXRUNTIME=0)
     target_include_directories(DatasetWriterTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-    target_link_libraries(DatasetWriterTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32)
-    target_link_libraries(DatasetWriterTests PRIVATE bcrypt advapi32)
+    target_link_libraries(DatasetWriterTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 mfplat mf mfreadwrite mfuuid)
+    target_link_libraries(DatasetWriterTests PRIVATE bcrypt advapi32 runtimeobject)
     add_test(NAME DatasetWriter COMMAND DatasetWriterTests)
     set_tests_properties(DatasetWriter PROPERTIES TIMEOUT 20)
-    add_executable(DatasetWriterPremiumTests tests/dataset_writer_tests.cpp app/HardwareOutput.cpp)
+    add_executable(DatasetWriterPremiumTests tests/dataset_writer_tests.cpp app/HardwareOutput.cpp app/WindowCapture.cpp)
     target_include_directories(DatasetWriterPremiumTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(DatasetWriterPremiumTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_HAS_ONNXRUNTIME=0)
-    target_link_libraries(DatasetWriterPremiumTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32)
-    target_link_libraries(DatasetWriterPremiumTests PRIVATE bcrypt advapi32)
+    target_link_libraries(DatasetWriterPremiumTests PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 mfplat mf mfreadwrite mfuuid)
+    target_link_libraries(DatasetWriterPremiumTests PRIVATE bcrypt advapi32 runtimeobject)
     add_test(NAME DatasetWriterPremium COMMAND DatasetWriterPremiumTests)
     set_tests_properties(DatasetWriterPremium PROPERTIES TIMEOUT 20)
 endif()
@@ -159,6 +162,7 @@ endfunction()
 set(VAPORLOCK_SOURCES
     app/Win32VaporLock.cpp
     app/HardwareOutput.cpp
+    app/WindowCapture.cpp
     app/VaporLock.rc
 )
 
@@ -209,13 +213,20 @@ if(MSVC)
 endif()
 vaporlock_harden_windows_binary(VaporLockLauncher)
 
+add_executable(VaporLockMouseHost WIN32 app/MouseOutputHost.cpp app/VaporLock.rc)
+target_compile_definitions(VaporLockMouseHost PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_SUPPORTS_MOUSE_HOST=1)
+target_include_directories(VaporLockMouseHost PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(VaporLockMouseHost PRIVATE user32 advapi32 shell32)
+set_property(TARGET VaporLockMouseHost PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+vaporlock_harden_windows_binary(VaporLockMouseHost)
+
 function(vaporlock_common_target target)
     add_executable(${target} WIN32 ${VAPORLOCK_SOURCES})
     set_target_properties(${target} PROPERTIES COMPILE_PDB_NAME "${target}_compile")
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(${target} PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32)
-    target_link_libraries(${target} PRIVATE bcrypt advapi32)
+    target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN VAPORLOCK_SUPPORTS_MOUSE_HOST=1 VAPORLOCK_CAPTURE_CONTROLS=1)
+    target_link_libraries(${target} PRIVATE user32 gdi32 comdlg32 comctl32 shcore shell32 ole32 windowscodecs d3d11 dxgi ws2_32 mfplat mf mfreadwrite mfuuid)
+    target_link_libraries(${target} PRIVATE bcrypt advapi32 runtimeobject)
     if(MSVC)
         target_compile_options(${target} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:/W4>
@@ -269,6 +280,7 @@ if(ONNXRUNTIME_ROOT AND NOT VAPORLOCK_ORT_MISSING)
     endif()
     if(BUILD_TESTING)
         add_executable(InferenceMetadataTests tests/inference_metadata_tests.cpp)
+        target_compile_definitions(InferenceMetadataTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
         target_include_directories(InferenceMetadataTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${VAPORLOCK_ORT_INCLUDE}")
         target_link_libraries(InferenceMetadataTests PRIVATE "${VAPORLOCK_ORT_NATIVE}/onnxruntime.lib")
         add_custom_command(TARGET InferenceMetadataTests POST_BUILD

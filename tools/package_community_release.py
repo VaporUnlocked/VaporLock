@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -38,7 +39,55 @@ def copied(source, target):
         raise ValueError('Assembly copy mismatch')
 
 
-def inventory(root):
+CONTROLLER_BUILD = 'CONTROLLER_BUILD.json'
+CONTROLLER_REQUIRED = {
+    'VaporLockControllerHost.exe', 'VaporLockControllerHost.dll',
+    'VaporLockControllerHost.deps.json', 'VaporLockControllerHost.runtimeconfig.json',
+    'HIDMaestro.VaporLock.Integration.dll', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll',
+    'HIDMAESTRO-LICENSE.txt', 'HIDMAESTRO-THIRD-PARTY-NOTICES.txt',
+    'DOTNET-LICENSE.txt', 'DOTNET-THIRD-PARTY-NOTICES.txt',
+    'profiles/vapor-lock-xbox-one-windows.json',
+}
+
+
+def controller_files(root, version):
+    receipt = plain(root / CONTROLLER_BUILD)
+    if not receipt.is_file():
+        raise ValueError('Build the controller host with tools/build_controller_host.ps1 first.')
+    metadata = json.loads(receipt.read_text(encoding='utf-8'))
+    if metadata['schema_version'] != 1 or (version is not None and metadata['version'] != version):
+        raise ValueError('Controller host build version does not match the release.')
+    expected = {}
+    for row in metadata['files']:
+        name = row['path']
+        # All extra files in the self-contained .NET publish are runtime
+        # libraries, optional localized libraries and the .NET crash helper.
+        if name not in CONTROLLER_REQUIRED and name != 'createdump.exe' and not re.fullmatch(
+            r'(?:[a-z]{2,3}(?:-[A-Z]{2,4})?/)?[\w.-]+\.dll', name, flags=re.ASCII
+        ):
+            raise ValueError('Unexpected controller build member: ' + name)
+        if name.casefold() in expected:
+            raise ValueError('Duplicate controller build member: ' + name)
+        expected[name.casefold()] = (name, row['sha256'])
+    if not CONTROLLER_REQUIRED.issubset(name for name, _ in expected.values()):
+        raise ValueError('The controller build is incomplete.')
+    actual = set()
+    for path in root.rglob('*'):
+        plain(path)
+        if path.is_file():
+            actual.add(path.relative_to(root).as_posix())
+    if actual != {CONTROLLER_BUILD, *(name for name, _ in expected.values())}:
+        raise ValueError('Controller build contents differ from the build receipt.')
+    for name, checksum in expected.values():
+        if digest(root / name) != checksum:
+            raise ValueError('Controller build member failed hash verification: ' + name)
+    return sorted(actual)
+
+
+def inventory(root, *, version=None):
+    controller = root / 'app/controller-host'
+    if controller.exists():
+        controller_files(controller, version)
     rows = []
     for folder, dirs, files in os.walk(root, followlinks=False):
         plain(Path(folder))
@@ -50,7 +99,7 @@ def inventory(root):
             if relative in ('information/RELEASE_MANIFEST.json','information/RELEASE_CHECKSUMS.sha256'):
                 continue
             parts=Path(relative).parts
-            if parts[0].casefold() in ('models','profiles','server_runtime','license_service','discord_key_bot') or relative.startswith('app/controller-host/'):
+            if parts[0].casefold() in ('models','profiles','server_runtime','license_service','discord_key_bot'):
                 raise ValueError('Private or unsupported component in release inventory')
             rows.append({'path':relative,'bytes':path.stat().st_size,'sha256':digest(path)})
     return sorted(rows,key=lambda row:row['path'])
@@ -111,6 +160,8 @@ def main():
     parser.add_argument('--package',type=Path,required=True)
     parser.add_argument('--native',type=Path,required=True)
     parser.add_argument('--suite',type=Path,required=True)
+    parser.add_argument('--controller-host', type=Path,
+                        help='Verified output of build_controller_host.ps1 (default: build/controller-host if present)')
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--assemble-only',action='store_true')
     parser.add_argument('--archive-only',action='store_true')
@@ -121,9 +172,16 @@ def main():
         raise ValueError('Assembly requires a new build package')
     version=(root/'product_version.txt').read_text().strip()
     if not args.archive_only:
+        host = args.controller_host
+        if host is None and (root/'build/controller-host/CONTROLLER_BUILD.json').is_file():
+            host = root/'build/controller-host'
+        if host is not None:
+            host = plain(host)
+            for name in controller_files(host, version):
+                copied(host/name, package/'app/controller-host'/name)
         copied(args.native/'VaporLockLauncher.exe',package/'VaporLock.exe')
         for directory, names in (
-            ('',('VaporLock.exe','onnxruntime.dll','onnxruntime_providers_shared.dll')),
+            ('',('VaporLock.exe','VaporLockMouseHost.exe','onnxruntime.dll','onnxruntime_providers_shared.dll')),
             ('dml',('VaporLockDml.exe','onnxruntime.dll','onnxruntime_providers_shared.dll')),
             ('trt',('VaporLockTensorRt.exe','onnxruntime.dll','onnxruntime_providers_shared.dll','tensorrt_rtx_1_6.dll','tensorrt_onnxparser_rtx_1_6.dll'))):
             for name in names:
@@ -160,7 +218,7 @@ def main():
             'See information/docs/RELEASE_NOTES.md for setup, migration and GPU requirements.\n'
             'See information/LICENSE and information/THIRD_PARTY_NOTICES.md for terms.\n',
             encoding='utf-8')
-    rows=inventory(package)
+    rows=inventory(package, version=version)
     metadata={'schema_version':1,'version':version,'edition':'community','unsigned':True,
               'purpose':'local file integrity and optional reproducible dependency reuse; no activation or update gate','files':rows}
     information=package/'information';information.mkdir(exist_ok=True)

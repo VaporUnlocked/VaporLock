@@ -20,7 +20,8 @@ def _bootstrap():
 
 def emit(payload):
     from cloud_contract import MAX_JSON
-    raw = json.dumps(payload, allow_nan=False, separators=(',', ':')).encode('utf-8') + b'\n'
+    raw = json.dumps(payload, allow_nan=False, ensure_ascii=payload.get('type') != 'dataset_health_checked',
+                     separators=(',', ':')).encode('utf-8', errors='replace') + b'\n'
     if len(raw) > MAX_JSON:
         raise ValueError('Cloud result exceeds its record limit.')
     sys.stdout.buffer.write(raw); sys.stdout.buffer.flush()
@@ -94,6 +95,30 @@ def check_project(request):
         emit({'type': 'project_checked', 'counts': project.counts})
 
 
+def check_dataset_health(request):
+    from cloud_contract import CloudInputError, integer
+    from dataset_health import scan_cloud, scan_yolo
+
+    scanners = {'cloud': scan_cloud, 'yolo': scan_yolo}
+    kind, source = request.get('kind'), request.get('source')
+    if (set(request) != {'operation', 'source', 'kind', 'model_size'}
+            or type(kind) is not str or kind not in scanners
+            or type(source) is not str or not 1 <= len(source) <= 32000):
+        raise CloudInputError('Choose a supported dataset folder.')
+    size = integer(request['model_size'], 32, 4096, 'Model input size')
+
+    def progress(scanned, total):
+        emit(dict(type='dataset_health_progress', scanned=scanned, total=total))
+
+    try:
+        report = scanners[kind](source, size, progress)
+    except (OSError, ValueError) as error:
+        if isinstance(error, CloudInputError):
+            raise
+        raise CloudInputError('Could not read the selected dataset. Choose a local dataset folder.') from error
+    emit(dict(type='dataset_health_checked', report=report))
+
+
 def recipe_summary(values, checkpoint=None):
     summary={key:values[key] for key in ('epochs','batch_size','device','patience','input_size','channels','mask_size','architecture') if key in values}
     summary['completed_epochs']=checkpoint['state']['next_epoch'] if checkpoint else 0
@@ -155,7 +180,8 @@ def evaluate_model(request):
             inspect_model_stream(stream, os.fstat(stream.fileno()).st_size)
         enable_source('training')
         from cloudstudio.data import Project
-        from cloudstudio.evaluation import evaluate_with_predictor
+        from cloudstudio.evaluation import evaluate_with_predictor, match_detections
+        from evaluation_slices import EvaluationSlices
         from cloudstudio import training
         from cloud_training_input import training_preparation
 
@@ -164,12 +190,19 @@ def evaluate_model(request):
         if not records:
             raise CloudInputError('The selected split has no reviewed images.')
         runtime = inspection_runtime(selected, request['device'])
+        slices = EvaluationSlices()
+        pending_records = iter(records)
+
+        def predict(image):
+            result = runtime.predict(image, confidence=confidence, debug=True)
+            record = next(pending_records)
+            slices.add(record, match_detections(record['annotations'], result['detections']))
+            return result
+
         with training_preparation(training):
-            metrics = evaluate_with_predictor(bounded, records,
-                lambda image: runtime.predict(image, confidence=confidence, debug=True),
-                split=split, confidence=confidence)
-        emit({'type': 'evaluated', 'split': split, 'confidence': confidence,
-              'images': len(records), 'metrics': {key: metrics.get(key) for key in EVALUATION_METRICS}})
+            metrics = evaluate_with_predictor(bounded, records, predict, split=split, confidence=confidence)
+        emit({'type': 'evaluated', 'split': split, 'confidence': confidence, 'images': len(records),
+              'metrics': {key: metrics.get(key) for key in EVALUATION_METRICS}, 'slices': slices.results()})
 
 
 def inspection_runtime(path, device):
@@ -454,7 +487,7 @@ def main():
         request = read_request()
         operations = {'check_project': check_project, 'check_resume':check_resume,'check_model':check_model,
                       'train': train_model, 'inference': inference, 'evaluate': evaluate_model, 'inspect': inspect_image,
-                      'export': export_model}
+                      'export': export_model, 'dataset_health': check_dataset_health}
         operation = request.get('operation')
         if operation not in operations:
             raise ValueError('Unsupported .cloud worker operation.')

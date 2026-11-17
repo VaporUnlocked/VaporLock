@@ -306,7 +306,7 @@ def freeze_gui(output):
     plan={**plan,'sources':sources,'resourcesSHA256':resources_sha}
     (source/'product_build.py').write_text("EDITION='premium'\nPRODUCT_VERSION="+repr(plan['version'])+"\nCLOUD_ROLE='gui'\nCLOUD_STARTUP_SHA256="+repr(cloud['startup']['sha256'])+'\nVLUI_RESOURCE_MANIFEST_SHA256='+repr(plan['resourcesSHA256'])+'\n',encoding='utf8')
     data=[(output/'gui-resources/vlui','vlui'),(output/'gui-resources/ui_system','ui_system')]
-    for name in ('VaporLock.ico','VaporLock.png','Background.png','check-dark.svg','check-light.svg','arrow-up-dark.svg','arrow-down-dark.svg','arrow-up-light.svg','arrow-down-light.svg'):
+    for name in ('VaporLock.ico','VaporLock.png','Background.png','targeting-sample.png','check-dark.svg','check-light.svg','arrow-up-dark.svg','arrow-down-dark.svg','arrow-up-light.svg','arrow-down-light.svg'):
         origin=ROOT/'assets'/name
         if origin.is_file():data.append((origin,'assets'))
     data.append((ROOT/'Background.png','assets'))

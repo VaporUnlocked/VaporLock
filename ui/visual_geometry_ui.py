@@ -1,9 +1,13 @@
 """Visual editors for existing anchor and capture settings, without screen capture."""
-from PySide6.QtCore import Qt,QRectF,QPointF,Signal
-from PySide6.QtGui import QPainter,QPen,QColor,QPainterPath
+import math
+from pathlib import Path
+import sys
+
+from PySide6.QtCore import QEvent,Qt,QRectF,QPointF,Signal
+from PySide6.QtGui import QColor,QGuiApplication,QImage,QPainter,QPen
 from PySide6.QtWidgets import (QWidget,QDialog,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,
-    QComboBox,QDoubleSpinBox,QSpinBox,QDialogButtonBox)
-from batch4_geometry import anchor_point,anchor_offsets,ANCHOR_BASES,region_pixels,region_offsets,enumerate_displays
+    QComboBox,QSpinBox,QDialogButtonBox)
+from batch4_geometry import anchor_point,anchor_offsets,region_pixels,region_offsets,enumerate_displays
 from batch4_guard import editable,EditGuard
 
 
@@ -24,98 +28,161 @@ def dialog_base(center,title,name):
     return dialog,layout
 
 
-class AnchorCanvas(QWidget):
-    picked=Signal(float,float)
-    def __init__(self,parent=None):
-        super().__init__(parent);self.setMinimumSize(240,280)
-        self.setObjectName('anchorCanvas');self.mode='center';self.x=self.y=0.
-    def box(self):
-        # Display full native reachable domain: x=-.5..1.5, y=-1..2.
-        height=min((self.height()-28)/3,(self.width()-28)*.75)
-        width=height*.5
-        return QRectF((self.width()-width)/2,(self.height()-height)/2,width,height)
-    def set_anchor(self,mode,x,y):
-        anchor_point(mode,x,y);self.mode,self.x,self.y=mode,x,y;self.update()
-    def paintEvent(self,event):
-        p=QPainter(self);p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.fillRect(self.rect(),QColor('#161b22'));r=self.box()
-        p.setPen(QPen(QColor('#7a8792'),1,Qt.PenStyle.DashLine))
-        p.drawLine(QPointF(0,r.center().y()),QPointF(self.width(),r.center().y()))
-        p.drawLine(QPointF(r.center().x(),0),QPointF(r.center().x(),self.height()))
-        p.setPen(QPen(QColor('white'),1.5));p.setBrush(QColor('#080a0d'));p.drawRect(r)
-        # Original geometric silhouette; no third-party image or game artwork.
-        p.save();p.translate(r.topLeft());p.scale(r.width(),r.height())
-        p.setPen(Qt.PenStyle.NoPen);p.setBrush(QColor('white'))
-        p.drawEllipse(QRectF(.36,.04,.28,.14))
-        body=QPainterPath(QPointF(.31,.22))
-        for x,y in ((.69,.22),(.88,.48),(.75,.54),(.63,.36),(.64,.57),(.76,.95),(.59,.95),
-                    (.5,.65),(.41,.95),(.24,.95),(.36,.57),(.37,.36),(.25,.54),(.12,.48)):
-            body.lineTo(x,y)
-        body.closeSubpath();p.drawPath(body);p.restore()
-        x,y=anchor_point(self.mode,self.x,self.y);point=QPointF(r.x()+x*r.width(),r.y()+y*r.height())
-        p.setPen(QPen(QColor('black'),5));p.drawEllipse(point,7,7)
-        p.setPen(QPen(QColor('white'),2));p.drawEllipse(point,7,7)
-        p.drawLine(point+QPointF(-13,0),point+QPointF(13,0));p.drawLine(point+QPointF(0,-13),point+QPointF(0,13))
-        p.end()
-    def pick(self,event):
-        r=self.box();point=event.position()
-        self.picked.emit(*anchor_offsets(self.mode,(point.x()-r.x())/r.width(),(point.y()-r.y())/r.height()))
-    def mousePressEvent(self,event):
-        if event.button()==Qt.MouseButton.LeftButton:self.pick(event)
-    def mouseMoveEvent(self,event):
-        if event.buttons()&Qt.MouseButton.LeftButton:self.pick(event)
+class TargetingSample(QWidget):
+    """Show a sample detection using the capture frame's physical pixels."""
 
+    picked = Signal(float, float)
+    ZONES = (
+        ("retention_radius", "Retention", "#a29ad0"),
+        ("acquisition_radius", "Acquisition", "#80bcf2"),
+        ("near_radius", "Near", "#73d0c1"),
+        ("snap_radius", "Snap", "#b3ef88"),
+    )
+    SAMPLE_SIDE_PX = 246
+    SETTINGS_FIELDS = frozenset({
+        "anchor_mode", "anchor_x", "anchor_y", "monitor", "region_x", "region_y",
+        "region_width", "region_height", "fov_shape", "crosshair_enabled", "capture_source",
+        "aim_reference", "aim_reference_x", "aim_reference_y",
+        *(field for field, _, _ in ZONES),
+    })
 
-def open_anchor_editor(center):
-    if not editable(center):return
-    guard=EditGuard(center,stopped=True)
-    dialog,layout=dialog_base(center,'Visual anchor editor','anchorEditor')
-    layout.addWidget(label(center.t('Global anchor preview. Click or drag the marker. Offsets are fractions of box size; positive is right/down. Class-specific anchors override this global setting.')))
-    canvas=AnchorCanvas();canvas.setAccessibleName(center.t('Global anchor preview'));layout.addWidget(canvas,1)
-    form=QFormLayout();layout.addLayout(form)
-    mode=QComboBox();mode.setObjectName('anchorMode')
-    for title,key in (('Box center','center'),('Top edge','top'),('Bottom edge','bottom'),('Upper quarter','upper-quarter')):
-        mode.addItem(center.t(title),key)
-    mode.setCurrentIndex(mode.findData(center.settings.anchor_mode));form.addRow(center.t('Anchor mode'),mode)
-    controls=[];edited=set()
-    for title,key in (('Horizontal offset','anchor_x'),('Vertical offset','anchor_y')):
-        spin=QDoubleSpinBox();spin.setObjectName(key);spin.setDecimals(6);spin.setRange(-1,1)
-        spin.setSingleStep(.01);spin.setKeyboardTracking(False);spin.setValue(getattr(center.settings,key))
-        spin.setAccessibleName(center.t(title));form.addRow(center.t(title),spin);controls.append(spin)
-        spin.valueChanged.connect(lambda _value,name=key:edited.add(name))
-        spin.lineEdit().textEdited.connect(lambda _text,name=key:edited.add(name))
-        if spin.value()!=getattr(center.settings,key):
-            spin.setToolTip(center.tf('Saved exact value: {value}. Editing replaces it with the displayed precision.',value=repr(getattr(center.settings,key))))
-    if any(abs(guard.values[key])>1 for key in ('anchor_x','anchor_y')):
-        layout.addWidget(label(center.t('Saved offsets outside -1 to 1 are clamped by the engine. The preview shows that clamp; untouched saved values are preserved.')))
-    summary=label('');layout.addWidget(summary)
-    def refresh():
-        canvas.set_anchor(mode.currentData(),controls[0].value(),controls[1].value())
-        x,y=anchor_point(canvas.mode,canvas.x,canvas.y)
-        summary.setText(center.tf('Point from box top-left: X {x}%, Y {y}%. Outside-box positions are valid.',x=f'{100*x:g}',y=f'{100*y:g}'))
-    for spin in controls:spin.valueChanged.connect(refresh)
-    mode.currentIndexChanged.connect(refresh)
-    def picked(x,y):
-        edited.update(('anchor_x','anchor_y'))
-        controls[0].setValue(x);controls[1].setValue(y)
-    canvas.picked.connect(picked);refresh()
-    status=label('');status.setObjectName('editStatus');layout.addWidget(status)
-    buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Apply|QDialogButtonBox.StandardButton.Cancel);layout.addWidget(buttons)
-    def commit():
-        for spin in controls:spin.interpretText()
-        if not guard.current():
-            status.setText(center.t('Stop capture and close/reopen this editor if settings or displays changed.'));return
-        values={'anchor_mode':mode.currentData(),
-                'anchor_x':controls[0].value() if 'anchor_x' in edited else guard.values['anchor_x'],
-                'anchor_y':controls[1].value() if 'anchor_y' in edited else guard.values['anchor_y']}
-        try:anchor_point(values['anchor_mode'],values['anchor_x'],values['anchor_y'])
-        except (ValueError,TypeError,OverflowError):
-            status.setText(center.t('Invalid anchor. Choose a mode and finite offsets.'));return
-        # No event-loop yield between final guard and the stopped-session updates.
-        for key,value in values.items():center.change(key,value)
-        center.rebuild_pages();dialog.accept()
-    buttons.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(commit)
-    buttons.rejected.connect(dialog.reject);dialog.exec()
+    def __init__(self, settings, parent=None):
+        super().__init__(parent)
+        self.settings = settings
+        resource_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+        self.artwork = QImage(str(resource_root / "assets/targeting-sample.png"))
+        self.dragging = False
+        self.fit_capture = False
+        self.displays = ()
+        self.video_geometry = None
+        self.setObjectName("targetingSample")
+        self.setAccessibleName("Sample detection box, aim point and targeting zones")
+        self.setMinimumWidth(180)
+        self.setFixedHeight(328)
+        app = QGuiApplication.instance()
+        app.screenAdded.connect(self.refresh_displays)
+        app.screenRemoved.connect(self.refresh_displays)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.refresh_displays()
+
+    def refresh_displays(self):
+        try:
+            self.displays = enumerate_displays()
+        except OSError:
+            self.displays = ()
+        self.update()
+
+    def event(self, event):
+        handled = super().event(event)
+        if event.type() == QEvent.Type.DevicePixelRatioChange:
+            self.update()
+        return handled
+
+    def set_fit_capture(self, enabled):
+        self.fit_capture = enabled
+        self.update()
+
+    def set_video_geometry(self, telemetry=None):
+        geometry = None
+        if telemetry and telemetry.get("capture_backend") in ("window", "video-device", "video-file"):
+            width, height, x, y = (telemetry.get(key) for key in
+                                   ("capture_width", "capture_height", "reference_x", "reference_y"))
+            if (all(type(dimension) is int and dimension > 0 for dimension in (width, height))
+                    and all(type(value) in (int, float) and math.isfinite(value) for value in (x, y))):
+                geometry = (width, height, x, y)
+        if geometry != self.video_geometry:
+            self.video_geometry = geometry
+            self.update()
+
+    def geometry_for_sample(self):
+        settings = self.settings
+        width, height = max(1, settings.region_width), max(1, settings.region_height)
+        desktop = settings.capture_source == "desktop"
+        if not desktop:
+            if self.video_geometry:
+                width, height, reference_x, reference_y = self.video_geometry
+            else:
+                reference_x, reference_y = width / 2, height / 2
+        else:
+            display = next((display for display in self.displays if display.index == settings.monitor), None)
+            if display is None:
+                reference_x, reference_y = width / 2 - settings.region_x, height / 2 - settings.region_y
+            else:
+                left, top, width, height = region_pixels(display, settings.region_x, settings.region_y, width, height)
+                reference_x, reference_y = display.width / 2 - left, display.height / 2 - top
+        if settings.aim_reference == "crosshair-offset" and (not desktop or not settings.crosshair_enabled):
+            reference_x, reference_y = width / 2 + settings.aim_reference_x, height / 2 + settings.aim_reference_y
+
+        # Qt lays out in logical units. At actual size, each capture pixel
+        # occupies one physical display pixel, including on a scaled desktop.
+        scale = 1 / self.devicePixelRatioF()
+        if self.fit_capture:
+            scale = min(self.width() / width, self.height() / height)
+        frame = QRectF(0, 0, width * scale, height * scale)
+        frame.moveCenter(QRectF(self.rect()).center())
+        reference = self.point(frame, reference_x / width, reference_y / height)
+        side = min(self.SAMPLE_SIDE_PX, width, height) * scale
+        art = QRectF(0, 0, side, side)
+        art.moveCenter(frame.center())
+        # Bounds of the skeleton in the square image, with room for the box outline.
+        box = QRectF(self.point(art, 410 / 1254, 108 / 1254),
+                     self.point(art, 827 / 1254, 1192 / 1254))
+        return frame, art, box, reference, scale
+
+    @staticmethod
+    def point(box: QRectF, x: float, y: float) -> QPointF:
+        return QPointF(box.left() + x * box.width(), box.top() + y * box.height())
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        frame, art, box, reference, scale = self.geometry_for_sample()
+        painter.setClipRect(frame)
+        painter.drawImage(art, self.artwork)
+        painter.setPen(QPen(QColor("#80bcf2"), 1.7))
+        painter.drawRect(box)
+        painter.setPen(QPen(QColor("#d1dce8"), 1))
+        painter.drawLine(reference - QPointF(5, 0), reference + QPointF(5, 0))
+        painter.drawLine(reference - QPointF(0, 5), reference + QPointF(0, 5))
+        for field, _label, color in self.ZONES:
+            radius = getattr(self.settings, field) * scale
+            if radius <= 0:
+                continue
+            style = Qt.PenStyle.SolidLine if field == "snap_radius" else Qt.PenStyle.DashLine
+            painter.setPen(QPen(QColor(color), 1, style))
+            if self.settings.fov_shape == "rectangle":
+                painter.drawRect(QRectF(reference.x() - radius, reference.y() - radius, 2 * radius, 2 * radius))
+            else:
+                painter.drawEllipse(reference, radius, radius)
+        x, y = anchor_point(self.settings.anchor_mode, self.settings.anchor_x, self.settings.anchor_y)
+        marker = self.point(box, x, y)
+        dot = QPen(QColor("#b3ef88"), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        dot.setCosmetic(True)
+        painter.setPen(dot)
+        painter.drawPoint(marker)
+        painter.end()
+
+    def pick(self, position):
+        _, _, box, _, _ = self.geometry_for_sample()
+        x = max(0.0, min(1.0, (position.x() - box.x()) / box.width()))
+        y = max(0.0, min(1.0, (position.y() - box.y()) / box.height()))
+        self.picked.emit(*anchor_offsets(self.settings.anchor_mode, x, y))
+
+    def mousePressEvent(self, event):
+        _, _, box, _, _ = self.geometry_for_sample()
+        if event.button() == Qt.MouseButton.LeftButton and box.contains(event.position()):
+            self.dragging = True
+            self.pick(event.position())
+
+    def mouseMoveEvent(self, event):
+        if self.dragging and event.buttons() & Qt.MouseButton.LeftButton:
+            self.pick(event.position())
+
+    def mouseReleaseEvent(self, event):
+        self.dragging = False
 
 
 class RegionCanvas(QWidget):

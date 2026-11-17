@@ -387,6 +387,8 @@ class CloudWorkspace(QObject):
             from cloud_editor_import import append_capture
             left,top,width,height=region
             image=capture_desktop_pixels(display.left+left,display.top+top,width,height)
+            from capture_privacy import redact_image
+            image=redact_image(image,self.center.settings.capture_privacy_masks)
             result=append_capture(self.session.store,image,revision=self.session.revision,split=split,group=group)
             self.suite.checked=None
             self.session=AnnotationSession(self.session.store)
@@ -634,12 +636,37 @@ class CloudWorkspace(QObject):
         identity=self.target_choice.itemData(index)
         if identity:self.canvas.select_target(identity)
 
+    def edit_visibility(self):
+        from evaluation_slices import VISIBILITY
+
+        def edit():
+            if not self.session or not self.session.draft or not self.canvas.selection:
+                raise CloudInputError('Select a target before tagging visibility.')
+            session, identity = self.session, self.canvas.selection
+            current = session.target(identity).get('visibility', 'unlabeled')
+            keys = list(VISIBILITY)
+            labels = [self.center.t(VISIBILITY[key]) for key in keys]
+            text, accepted = QInputDialog.getItem(self.center, self.center.t('Target visibility'),
+                self.center.t('How much of the target is visible?'), labels, keys.index(current), False)
+            if accepted:
+                self.admit()
+                if self.session is not session or self.canvas.selection != identity:
+                    return
+                session.set_visibility(identity, keys[labels.index(text)])
+                self.refresh_document(reset=False)
+
+        self.action(edit)
+
     def refresh_target_choice(self,selected=None):
         if not hasattr(self,'target_choice'):return
         self.target_choice.blockSignals(True);self.target_choice.clear()
         if self.session and self.session.draft:
+            from evaluation_slices import VISIBILITY
             for i,a in enumerate(self.session.draft['annotations']):
-                self.target_choice.addItem(self.center.tf('Target {number} · {state}',number=i+1,state=self.center.t(self.target_state(a))),a['id'])
+                text = self.center.tf('Target {number} · {state}', number=i+1, state=self.center.t(self.target_state(a)))
+                if a.get('visibility') in VISIBILITY:
+                    text += ' · ' + self.center.t(VISIBILITY[a['visibility']])
+                self.target_choice.addItem(text, a['id'])
         self.target_choice.setCurrentIndex(max(0,self.target_choice.findData(selected or self.canvas.selection)))
         self.target_choice.blockSignals(False)
 
@@ -852,6 +879,28 @@ class CloudWorkspace(QObject):
         return True
 
     def check_project(self):self.suite.preflight()
+
+    def open_dataset_health(self):
+        if not self.prepare_analysis(self.open_dataset_health):
+            return
+        from cloud_recipe import resolve_recipe
+        from dataset_health_ui import DatasetHealthDialog
+        from vapor_lock_gui import resolve_product_path
+
+        settings = self.center.settings
+        try:
+            size = resolve_recipe(settings.cloud_recipe_preset, self.suite.draft_overrides())['input_size']
+        except CloudInputError as error:
+            self.show_error(str(error))
+            return
+        source = ''
+        if self.session:
+            source = self.session.store.root
+        elif settings.cloud_project:
+            source = resolve_product_path(settings.cloud_project)
+        dialog = DatasetHealthDialog(self.center, source, 'cloud', size)
+        dialog.exec()
+        dialog.deleteLater()
 
     def render(self):
         if not hasattr(self,'annotation_status'):return

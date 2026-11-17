@@ -22,6 +22,57 @@ def fixture():
     with tempfile.TemporaryDirectory(dir=parent) as name:yield Path(name)
 
 class PublicClientTests(unittest.TestCase):
+    def test_window_and_masks_reach_native_without_persisting_window_identity(self):
+        from dataclasses import asdict
+        from vapor_lock_gui import ControlCenter, EngineBridge, Settings
+
+        profile = asdict(Settings())
+        profile["capture_source"] = "window"
+        profile["capture_privacy_masks"] = [[0, 1500, 3000, 9000]]
+        settings = ControlCenter.prepare_profile_bytes(None, json.dumps(profile).encode())
+        settings._capture_window = "12345:6789"
+        arguments = EngineBridge.arguments_for(settings, "cpu", observe_only=True)
+        self.assertEqual(arguments[arguments.index("--capture-window") + 1], "12345:6789")
+        self.assertEqual(arguments[arguments.index("--privacy-masks") + 1], "0 1500 3000 9000")
+        self.assertNotIn("_capture_window", asdict(settings))
+        profile["capture_privacy_masks"] = [[0, 1500, 0, 9000]]
+        with self.assertRaises(ValueError):
+            ControlCenter.prepare_profile_bytes(None, json.dumps(profile).encode())
+
+    def test_runtime_repair_authenticates_files_before_replacing_any(self):
+        import zipfile
+        from runtime_repair import COMPONENTS, inspect_runtime, repair_runtime
+
+        with fixture() as root:
+            directory, names = COMPONENTS["DirectML"]
+            good = {f"{directory}/{name}": name.encode() for name in names}
+            manifest = root / "information/RELEASE_MANIFEST.json"
+            manifest.parent.mkdir()
+            manifest.write_text(json.dumps({
+                "schema_version": 1, "version": "2.0.2", "edition": "community",
+                "files": [{"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                          for name, data in good.items()],
+            }), encoding="utf-8")
+            (root / directory).mkdir(parents=True)
+            executable = root / directory / names[0]
+            executable.write_bytes(b"old DirectML")
+            untouched = root / "engine/VaporLock.exe"
+            untouched.write_bytes(b"CPU")
+            archive = root / "repair.zip"
+            with zipfile.ZipFile(archive, "w") as package:
+                for name, data in good.items():
+                    package.writestr("VaporLock/" + name, data if name != f"{directory}/{names[-1]}" else b"x" * len(data))
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                repair_runtime(root, "2.0.2", "DirectML", archive)
+            self.assertEqual(executable.read_bytes(), b"old DirectML")
+            self.assertFalse((root / directory / names[1]).exists())
+            with zipfile.ZipFile(archive, "w") as package:
+                for name, data in good.items():
+                    package.writestr("VaporLock/" + name, data)
+            self.assertEqual(repair_runtime(root, "2.0.2", "DirectML", archive), len(names))
+            self.assertEqual(set(inspect_runtime(root, "2.0.2", "DirectML").values()), {"Verified"})
+            self.assertEqual(untouched.read_bytes(), b"CPU")
+
     def test_community_heading_translations_include_uppercase_sections(self):
         from localization import translate_text
         headings=('Class priorities and anchors','Manual track lock','Motion compensation',
@@ -258,6 +309,33 @@ class PublicClientTests(unittest.TestCase):
             self.assertFalse(provider_ready(engine, 'cuda'))
             with self.assertRaisesRegex(RuntimeIntegrityError, 'lacks CUDA ONNX support'):
                 current_binding(temporary, require_cuda=True)
+
+    def test_stale_directml_is_rejected_before_administrator_mouse_launch(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import native_engine_layout as layout
+        import vapor_lock_gui as gui
+
+        with fixture() as temporary:
+            engine = temporary / "VaporLockDml.exe"
+            engine.write_bytes(b"fixture only")
+            with patch.object(layout, "_resource_word", return_value=2):
+                self.assertTrue(layout.supports_mouse_host(engine))
+            with patch.object(layout, "_resource_word", return_value=1):
+                self.assertFalse(layout.supports_mouse_host(engine))
+            bridge = SimpleNamespace(
+                intentional_stop=False, process=Mock(), _settings=gui.Settings(provider="dml"),
+                _providers=["dml"], _provider_index=0, _cloud_session=None, _mouse_host_session=object(),
+                launch_for=Mock(return_value=(engine, None)), message=Mock(), state_changed=Mock(),
+                startup_rejected=Mock(), _release_manual_lock_event=Mock(),
+                mouse_host_upgrade_message=gui.EngineBridge.mouse_host_upgrade_message,
+            )
+            bridge.process.state.return_value = gui.QProcess.ProcessState.NotRunning
+            with patch.object(layout, "_resource_word", return_value=None):
+                gui.EngineBridge._launch_provider(bridge)
+            bridge.process.start.assert_not_called()
+            bridge.state_changed.emit.assert_called_once_with("Stopped")
+            self.assertIn("BuildCommunity.ps1 -NativeDirectML", bridge.message.emit.call_args.args[0])
 
     def test_native_environment_excludes_inherited_dll_paths(self):
         from native_engine_layout import native_environment

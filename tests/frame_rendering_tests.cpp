@@ -22,6 +22,30 @@ static void referenceLine(std::vector<unsigned char>& pixels, int width, int hei
     }
 }
 
+static void verifyVideoCrop() {
+    // The native row width is 16 bytes and each source row has four bytes of padding.
+    std::array<unsigned char, 60> bottomUp{};
+    for (int y = 0; y < 3; ++y) for (int x = 0; x < 4; ++x) {
+        auto* pixel = bottomUp.data() + (2 - y) * 20 + x * 4;
+        pixel[0] = static_cast<unsigned char>(10 * y + x);
+        pixel[1] = static_cast<unsigned char>(40 + x);
+        pixel[2] = static_cast<unsigned char>(90 + y);
+    }
+    using namespace vaporlock::video;
+    Frame frame;
+    require(copyBgra(bottomUp.data(), bottomUp.size(), 40, -20, 4, 3, {1, 0, 2, 2, false}, frame),
+            "Video crop rejected a valid bottom-up padded frame");
+    require(frame.left == 2 && frame.top == 0 && frame.width == 2 && frame.height == 2
+                && frame.sourceWidth == 4 && frame.sourceHeight == 3, "Video crop geometry changed");
+    require(frame.bgra == std::vector<unsigned char>{2,42,90,255, 3,43,90,255, 12,42,91,255, 13,43,91,255},
+            "Video crop changed source pixels or scanline orientation");
+    require(!copyBgra(bottomUp.data(), 55, 40, -20, 4, 3, {0, 0, 4, 3, true}, frame),
+            "Video crop accepted a short source buffer");
+    require(copyBgra(bottomUp.data(), bottomUp.size(), 0, 20, 4, 3, {100, 100, 1, 1, true}, frame)
+                && frame.left == 0 && frame.top == 0 && frame.width == 4 && frame.height == 3,
+            "Full-frame video applied the saved desktop crop");
+}
+
 static void verifyLines() {
     int cases = 0;
     for (int x0 : {-50, -17, -1, 0, 1, 5, 12, 23, 24, 25, 40})
@@ -426,6 +450,7 @@ int main(int argc, char** argv) {
         }
     }
     verifyLines();
+    verifyVideoCrop();
     verifyCaptureLookahead();
     verifyPreviewQueue(false);
     verifyPreviewQueue(true);

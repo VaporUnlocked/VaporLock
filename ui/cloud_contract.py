@@ -286,7 +286,8 @@ def worker_event(value, operation):
         return True
     if operation == 'evaluate' and kind == 'evaluated':
         from cloud_results import EVALUATION_METRICS
-        if (set(value) != {'type', 'split', 'confidence', 'images', 'metrics'} or value['split'] not in ('val', 'test')
+        from evaluation_slices import SIZE_BANDS, SLICE_LABELS, VISIBILITY
+        if (set(value) != {'type', 'split', 'confidence', 'images', 'metrics', 'slices'} or value['split'] not in ('val', 'test')
                 or type(value['metrics']) is not dict or set(value['metrics']) != EVALUATION_METRICS.keys()):
             raise CloudInputError('Invalid .cloud evaluation result.')
         integer(value['images'], 1, MAX_IMAGES, 'Evaluation images')
@@ -294,6 +295,23 @@ def worker_event(value, operation):
         for name, metric in value['metrics'].items():
             if metric is not None:
                 finite(metric, 0, 256 if name == 'false_positives_per_frame' else 1, 'Evaluation metric')
+        slices = value['slices']
+        if type(slices) is not dict or slices.keys() != SLICE_LABELS.keys():
+            raise CloudInputError('Invalid evaluation target groups.')
+        for group in slices.values():
+            if type(group) is not dict or set(group) != {'targets', 'matched', 'mean_iou'}:
+                raise CloudInputError('Invalid evaluation target group.')
+            count = integer(group['targets'], 0, MAX_ANNOTATIONS, 'Group targets')
+            matched = integer(group['matched'], 0, count, 'Group matches')
+            if matched:
+                finite(group['mean_iou'], .5, 1, 'Mean matched box overlap')
+            elif group['mean_iou'] is not None:
+                raise CloudInputError('An empty evaluation group cannot have box overlap.')
+        for field in ('targets', 'matched'):
+            by_size = sum(slices[key][field] for key in SIZE_BANDS)
+            by_visibility = sum(slices[key][field] for key in VISIBILITY)
+            if by_size != by_visibility or by_size > MAX_ANNOTATIONS:
+                raise CloudInputError('Evaluation target group totals disagree.')
         return True
     if operation == 'inspect' and kind == 'image_inspected':
         if set(value) != {'type', 'width', 'height', 'device', 'primary_count', 'invalid_contours',
@@ -311,6 +329,16 @@ def worker_event(value, operation):
         if set(value) != {'type', 'output'} or type(value['output']) is not str or not 1 <= len(value['output']) <= 32000:
             raise CloudInputError('Invalid .cloud ONNX export result.')
         return True
+    if operation == 'dataset_health':
+        if kind == 'dataset_health_progress' and set(value) == {'type', 'scanned', 'total'}:
+            total = integer(value['total'], 0, MAX_IMAGES, 'Dataset size')
+            integer(value['scanned'], 0, total, 'Checked images')
+            return False
+        if kind == 'dataset_health_checked' and set(value) == {'type', 'report'}:
+            report = value['report']
+            if type(report) is str and 1 <= len(report.encode('utf-8', errors='replace')) <= 96 * 1024:
+                return True
+        raise CloudInputError('Invalid dataset health event.')
     if operation == 'check_project' and kind == 'project_checked':
         if set(value) != {'type', 'counts'}:
             raise CloudInputError('Invalid .cloud project-check result.')

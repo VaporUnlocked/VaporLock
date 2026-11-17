@@ -13,6 +13,96 @@ static Track timedSubject(int id, double x, AimTime time, double y = 290) {
 }
 
 static void runAimOutputTests() {
+    for (const int activationMode : {0, 1}) {
+        AppConfig config;
+        require(config.quickReleaseKey == VK_XBUTTON2, "Mouse 5 was not the quick-release default");
+        require(quickReleaseKeyFromName(L"none") == 0 && !quickReleaseKeyFromName(L"other"),
+                "quick-release binding accepted an unknown name or lost Disabled");
+        config.movementEnabled = true;
+        config.activationMode = activationMode;
+        config.deadzone = 0;
+        config.anchorSettleRadius = 0;
+        config.eventActionRequiresActivation = false;
+        config.motionCompensationEnabled = true;
+        config.motionCompensationActivationMode = 2;
+        AimInputs input;
+        long moved = 0;
+        bool eventsAuthorized = false;
+        bool neutralSent = false;
+        AimOutputScheduler scheduler(
+            [&](const AimReport& report, const AimInputs&, const AppConfig&, AimOutputStatus&) {
+                moved += report.dx;
+                neutralSent |= !report.active && !report.dx && !report.dy;
+                return true;
+            },
+            [&](const AppConfig&) { return input; },
+            [&](const AppConfig&, bool authorized, bool, AimTime, AimOutputStatus&) {
+                eventsAuthorized = authorized;
+            });
+        const auto generation = scheduler.configure(config);
+        scheduler.publish(timedSubject(1, 420, aimTime(0)), 640, 640, aimTime(0), generation);
+        scheduler.pollOnce(aimTime(0));
+        input.down = true;
+        scheduler.pollOnce(aimTime(.02));
+        require(scheduler.status().active && eventsAuthorized && moved > 0, "test failed to arm assistance");
+        const long before = moved;
+        neutralSent = false;
+        input.quickReleaseDown = true;
+        scheduler.pollOnce(aimTime(.021));
+        require(scheduler.status().reason == "quick-release-held" && !scheduler.status().active
+                    && !scheduler.status().authorized && !scheduler.status().compensationActive
+                    && !eventsAuthorized && neutralSent && moved == before,
+                "quick release left a synthetic output path active");
+        input.down = false;
+        scheduler.pollOnce(aimTime(.04));
+        input.down = true;
+        scheduler.pollOnce(aimTime(.06));
+        require(moved == before, "movement resumed while quick release was held");
+        input.quickReleaseDown = false;
+        scheduler.pollOnce(aimTime(.08));
+        require(scheduler.status().authorized && scheduler.status().active && moved > before,
+                "quick release did not resume the existing activation");
+    }
+
+    {
+        AppConfig config;
+        config.movementEnabled = true;
+        config.predictLost = true;
+        config.predictionLeadMs = 200;
+        config.deadzone = 0;
+        config.anchorSettleRadius = 0;
+        config.movementGain = .92;
+        config.movementSmoothing = .25;
+        config.outputRate = 120;
+        config.maxSpeed = 10000;
+        config.motionCompensationEnabled = true;
+        config.motionCompensationMode = 1;
+        config.motionCompensationActivationMode = 3;
+        bool held = true;
+        double x = 0, y = 0;
+        AimOutputScheduler output([&](const AimReport& report, const AimInputs&, const AppConfig&, AimOutputStatus&) {
+            x += report.dx; y += report.dy; return true;
+        }, [&](const AppConfig&) { AimInputs input; input.down = held; return input; });
+        const auto generation = output.configure(config);
+        // A real anchor 4.6 pixels right and 3.4 below the reference, with
+        // prediction and automatic correction both trying to drive past it.
+        auto observation = timedSubject(1, 294.6, aimTime(0), 293.4);
+        observation.vx = 350; observation.vy = 400; observation.motionConfidence = 1;
+        output.publish(observation, 640, 640, observation.lastUpdate, generation, {600, 600});
+        for (int frame = 0; frame < 16; ++frame) {
+            output.pollOnce(aimTime(frame / 120.0));
+            require(x >= 0 && x <= 4 && y >= 0 && y <= 3, "output crossed the last measured anchor");
+        }
+        require(x == 4 && y == 3, "tracking did not settle within one input unit");
+        observation = timedSubject(1, 290, aimTime(.2));
+        output.publish(observation, 640, 640, observation.lastUpdate, generation, {600, 600});
+        output.pollOnce(aimTime(.2));
+        require(x == 4 && y == 3 && !output.status().compensationActive,
+                "automatic compensation moved a centered target");
+        held = false;
+        output.pollOnce(aimTime(.22));
+        require(x > 4 && y > 3, "standalone automatic compensation was lost");
+    }
     {
         AppConfig c; c.movementEnabled = true; c.predictLost = false; c.deadzone = 0;
         c.anchorSettleRadius = 0; c.movementSmoothing = 0; c.maxStep = 10000;
@@ -174,6 +264,42 @@ static void runAimOutputTests() {
         held=false;s.pollOnce(aimTime(4.0));
         require(s.status().acceptedMotionEntries==0,"idle polling retained expired history");
         s.clear();require(s.status().acceptedMotionEntries==0,"clear retained a motion epoch");
+    }
+    for (const int transport : {vaporlock::hardware::kMouseTransport, vaporlock::hardware::kVirtualMouseTransport}) {
+        AppConfig config;
+        config.outputTransport = transport;
+        config.movementEnabled = true;
+        config.movementSmoothing = 0;
+        config.anchorSettleRadius = config.deadzone = 0;
+        config.outputRate = 1000;
+        config.outputMaxObservationAgeMs = 100;
+        int attempts = 0;
+        LONG recoveredDx = 0;
+        AimOutputScheduler scheduler(
+            [&](const AimReport& report, const AimInputs&, const AppConfig&, AimOutputStatus& status) {
+                if (!report.dx && !report.dy) return true;
+                if (++attempts == 1) {
+                    status.movementError = L"Synthetic mouse rejection";
+                    return false;
+                }
+                recoveredDx = report.dx;
+                return true;
+            }, [](const AppConfig&) { AimInputs input; input.down = true; return input; });
+        const auto generation = scheduler.configure(config);
+        scheduler.publish(timedSubject(1, 470, aimTime(.010)), 640, 640, aimTime(.010), generation);
+        scheduler.pollOnce(aimTime(.010));
+        require(attempts == 1 && scheduler.status().failed == 1 && scheduler.status().acceptedMotionEntries == 0,
+                "mouse rejection was not recorded without accepting the report");
+        scheduler.pollOnce(aimTime(.020));
+        require(attempts == 1 && !scheduler.status().active && scheduler.status().reason == "output-retry",
+                "mouse rejection did not back off");
+        scheduler.pollOnce(aimTime(.270));
+        require(attempts == 1 && !scheduler.status().movementError.empty(),
+                "retry used stale motion or forgot the rejection");
+        scheduler.publish(timedSubject(1, 170, aimTime(.280)), 640, 640, aimTime(.280), generation);
+        scheduler.pollOnce(aimTime(.280));
+        require(attempts == 2 && recoveredDx < 0 && scheduler.status().movementError.empty(),
+                "mouse retry did not use fresh movement or clear the failure on recovery");
     }
     // Hardware clipping must occur before quantization/history, using the same
     // report accepted by the recording sink, including the virtual mouse path.

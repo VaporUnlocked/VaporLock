@@ -5,6 +5,7 @@ struct AimInputs {
     bool down = false;
     bool compensationDown = false;
     ControllerSnapshot controller{};
+    bool quickReleaseDown = false;
 };
 
 struct AimReport {
@@ -15,6 +16,9 @@ struct AimReport {
 
 struct AimOutputStatus {
     bool authorized = false;
+    bool inputAvailable = false;
+    bool activationInputDown = false;
+    bool quickReleaseHeld = false;
     bool active = false;
     bool compensationActive = false;
     bool insideSnap = false;
@@ -28,6 +32,7 @@ struct AimOutputStatus {
     double observationAgeMs = -1.0;
     std::string reason = "idle";
     std::string eventReason = "disabled";
+    std::wstring movementError;
     std::wstring fatalError;
 };
 
@@ -37,9 +42,12 @@ public:
     using Sink = std::function<bool(const AimReport&, const AimInputs&, const AppConfig&, AimOutputStatus&)>;
     using Events = std::function<void(const AppConfig&, bool, bool, AimTime, AimOutputStatus&)>;
     using CollectionObserver = std::function<void(const AppConfig&, std::uint64_t, bool, bool)>;
+    using KeySampler = std::function<std::optional<vaporlock::mouse_host::InputState>(int, int, int)>;
 
-    explicit AimOutputScheduler(Sink sink, Sampler sampler = {}, Events events = {}, CollectionObserver collection = {})
-        : m_sink(std::move(sink)), m_sampler(std::move(sampler)), m_events(std::move(events)), m_collection(std::move(collection)) {}
+    explicit AimOutputScheduler(Sink sink, Sampler sampler = {}, Events events = {}, CollectionObserver collection = {},
+                                KeySampler keySampler = {})
+        : m_sink(std::move(sink)), m_sampler(std::move(sampler)), m_events(std::move(events)),
+          m_collection(std::move(collection)), m_keySampler(std::move(keySampler)) {}
     ~AimOutputScheduler() { stop(); if (m_stopEvent) CloseHandle(m_stopEvent); }
     AimOutputScheduler(const AimOutputScheduler&) = delete;
     AimOutputScheduler& operator=(const AimOutputScheduler&) = delete;
@@ -48,6 +56,10 @@ public:
         std::lock_guard lock(m_mutex);
         cancelLocked();
         m_controller.resetTrigger();
+        if (m_config.outputTransport != config.outputTransport) {
+            m_nextMovementRetry = {};
+            m_status.movementError.clear();
+        }
         m_config = config;
         m_config.frameReference = {};
         applySessionSafety(m_config);
@@ -233,18 +245,22 @@ public:
         if (realtime) now = AimClock::now();
         pruneHistoryLocked(now);
         m_lastInputs = input;
+        m_status.inputAvailable = input.valid;
+        m_status.activationInputDown = input.valid && input.down;
         m_status.controller = input.controller;
         if (!m_inputInitialized) {
             m_wasDown = input.down;
             m_compensationWasDown = input.compensationDown;
             m_inputInitialized = true;
         }
+        m_status.quickReleaseHeld = input.valid && !m_config.observeOnly
+            && m_config.quickReleaseKey != 0 && input.quickReleaseDown;
         if (!input.valid || !m_config.movementEnabled || m_config.observeOnly) m_toggle = false;
-        else if (m_config.activationMode == 1 && input.down && !m_wasDown) m_toggle = !m_toggle;
+        else if (!m_status.quickReleaseHeld && m_config.activationMode == 1 && input.down && !m_wasDown) m_toggle = !m_toggle;
         m_wasDown = input.down;
         const bool click = input.compensationDown && !m_compensationWasDown;
         m_compensationWasDown = input.compensationDown;
-        m_status.authorized = input.valid && !m_config.observeOnly
+        m_status.authorized = input.valid && !m_config.observeOnly && !m_status.quickReleaseHeld
             && (m_config.activationMode == 0 ? input.down : m_toggle);
         // If the bounded history discarded commands relevant to an unusually
         // old frame, abstain until a fully covered fresh observation arrives.
@@ -266,7 +282,14 @@ public:
             && now - m_lastPublished <= std::chrono::milliseconds(m_config.outputMaxObservationAgeMs);
         const bool tracking = m_config.movementEnabled && m_status.authorized && eligible;
         const bool automaticReady = leaseFresh && (eligible || m_config.motionCompensationMode != 0);
-        m_status.compensationActive = input.valid && !m_config.observeOnly && m_config.motionCompensationEnabled
+        // Automatic scene compensation can mistake our own view movement for
+        // drift. Give target assistance priority in automatic activation mode.
+        const bool automaticCompensation = leaseFresh && m_config.motionCompensationMode != 0;
+        const bool allowAutomaticCorrection = automaticCompensation
+            && (!tracking || m_config.motionCompensationActivationMode != 3);
+        m_status.compensationActive = input.valid && !m_config.observeOnly && !m_status.quickReleaseHeld
+            && m_config.motionCompensationEnabled
+            && (m_config.motionCompensationMode != 1 || allowAutomaticCorrection)
             && (m_config.motionCompensationActivationMode == 0 ? input.compensationDown
                 : m_config.motionCompensationActivationMode == 1 ? click
                 : m_config.motionCompensationActivationMode == 2 ? true : automaticReady);
@@ -276,7 +299,7 @@ public:
         m_status.insideSnap = eligible && anchorDistanceFromFrameCenter(
             targetAnchor(*m_target, m_config).first, targetAnchor(*m_target, m_config).second,
             m_width, m_height, m_config) <= std::max(0, m_config.snapRadius);
-        if (m_events) m_events(m_config, input.valid && !m_config.observeOnly
+        if (m_events) m_events(m_config, input.valid && !m_config.observeOnly && !m_status.quickReleaseHeld
             && (!m_config.eventActionRequiresActivation || m_status.authorized), m_status.insideSnap, now, m_status);
         // Fatal events can occur without a nonzero report (for example a closed
         // control-center pipe while centered). Retire authority and scheduling
@@ -284,6 +307,7 @@ public:
         if (!m_status.fatalError.empty()) { cancelLocked(); return; }
         m_status.active = tracking || m_status.compensationActive;
         m_status.reason = m_config.observeOnly ? "observe-only" : !input.valid ? "input-unavailable"
+            : m_status.quickReleaseHeld ? "quick-release-held"
             : !m_config.movementEnabled ? "movement-disabled" : !m_status.authorized ? "activation-not-authorized"
             : !m_target ? "no-target" : !historyCovered ? "movement-history-incomplete"
             : !eligible ? "target-stale-missing-or-uncertain" : "rate-limited";
@@ -299,6 +323,12 @@ public:
             m_lastActive = false;
             return;
         }
+        if (now < m_nextMovementRetry) {
+            m_status.active = false;
+            m_status.reason = "output-retry";
+            m_lastTick = now;
+            return;
+        }
         const double elapsed = m_lastTick == AimTime{} ? 1.0 / std::max(1, m_config.outputRate)
             : std::chrono::duration<double>(now - m_lastTick).count();
         const bool immediateCompensationClick = m_status.compensationActive && m_config.motionCompensationActivationMode == 1;
@@ -307,7 +337,7 @@ public:
         const double dt = std::clamp(elapsed, 0.0, 0.05);
         m_lastTick = now;
         m_lastActive = true;
-        double x = 0.0, y = 0.0;
+        double x = 0.0, y = 0.0, remainingX = 0.0, remainingY = 0.0;
         if (tracking) {
             auto [anchorX, anchorY] = checkZones ? predicted : predictedTargetAnchor(*m_target, m_config, now);
             const auto [refX, refY] = aimingReference(m_width, m_height, m_config);
@@ -320,8 +350,12 @@ public:
             double errorY = anchorY - refY - correctedY;
             const auto actual = rawTargetAnchor(*m_target, m_config, true);
             const double actualX = actual.first - refX - correctedX, actualY = actual.second - refY - correctedY;
-            if (std::hypot(actualX, actualY) <= std::max(static_cast<double>(m_config.deadzone), m_config.anchorSettleRadius)) {
-                m_filteredX = m_filteredY = m_remainderX = m_remainderY = 0;
+            remainingX = actualX * m_config.inputUnitsPerPixelX;
+            remainingY = actualY * m_config.inputUnitsPerPixelY;
+            const double distance = std::hypot(actualX, actualY);
+            const double tolerance = std::max(static_cast<double>(m_config.deadzone), m_config.anchorSettleRadius);
+            if (distance <= tolerance) {
+                resetTrackingFilterLocked();
                 m_status.reason = "inside-deadzone";
             } else {
                 if (m_config.responseCurve == 1) {
@@ -332,8 +366,9 @@ public:
                 const double retained = timeRetention(m_config.movementSmoothing, dt);
                 m_filteredX = retained * m_filteredX + (1 - retained) * errorX;
                 m_filteredY = retained * m_filteredY + (1 - retained) * errorY;
+                const double approach = std::clamp(distance / std::max(6.0, 2.0 * tolerance), 0.0, 1.0);
                 auto bounded = [&](double filtered, double error, double multiplier) {
-                    const double axisGain = m_config.movementGain * multiplier;
+                    const double axisGain = m_config.movementGain * multiplier * approach;
                     const double rate = -std::log1p(-std::clamp(axisGain, 0.0, 0.9999)) * kLegacyResponseHz
                         + std::max(0.0, axisGain - 1.0) * kLegacyResponseHz;
                     const double gain = m_config.outputTransport == vaporlock::hardware::kVirtualXboxTransport
@@ -343,13 +378,14 @@ public:
                 };
                 x = bounded(m_filteredX, errorX, m_config.assistanceX) * m_config.inputUnitsPerPixelX;
                 y = bounded(m_filteredY, errorY, m_config.assistanceY) * m_config.inputUnitsPerPixelY;
-                if (!m_config.predictLost || m_target->motionConfidence <= 0) {
-                    const auto measuredBound = [](double requested, double remaining) {
-                        return requested * remaining <= 0 ? 0.0 : std::copysign(std::min(std::abs(requested), std::abs(remaining)), requested);
-                    };
-                    x = measuredBound(x, actualX * m_config.inputUnitsPerPixelX);
-                    y = measuredBound(y, actualY * m_config.inputUnitsPerPixelY);
-                }
+                // Smoothing and prediction can shape the approach. The last
+                // real anchor bounds the movement actually sent on each axis.
+                const auto measuredBound = [](double requested, double remaining) {
+                    return requested * remaining <= 0 ? 0.0 :
+                        std::copysign(std::min(std::abs(requested), std::abs(remaining)), requested);
+                };
+                x = measuredBound(x, remainingX);
+                y = measuredBound(y, remainingY);
             }
         }
         double compensationX = 0, compensationY = 0;
@@ -360,7 +396,7 @@ public:
                 compensationX -= m_config.motionCompensationHorizontal * strength * m_config.inputUnitsPerPixelX;
                 compensationY -= m_config.motionCompensationVertical * strength * m_config.inputUnitsPerPixelY;
             }
-            if (m_config.motionCompensationMode != 0 && leaseFresh) {
+            if (allowAutomaticCorrection) {
                 compensationX += m_automatic.first * strength * m_config.inputUnitsPerPixelX;
                 compensationY += m_automatic.second * strength * m_config.inputUnitsPerPixelY;
             }
@@ -398,13 +434,26 @@ public:
             // that bound so the accepted-history record matches the wire report.
             const int stepLimit = vaporlock::hardware::usesHardwareTransport(m_config.outputTransport)
                 ? std::min(32767, m_config.maxStep) : m_config.maxStep;
-            report.dx = quantizeBlendedStep(x * signX, compensationX * signX, m_remainderX, m_compensationRemainderX, stepLimit);
-            report.dy = quantizeBlendedStep(y * signY, compensationY * signY, m_remainderY, m_compensationRemainderY, stepLimit);
+            const auto quantize = [stepLimit](double request, double compensation, double remaining,
+                                              double& trackingFraction, double& compensationFraction) {
+                const LONG step = quantizeBlendedStep(request, compensation, trackingFraction, compensationFraction, stepLimit);
+                if (step == 0 || compensation != 0.0 || std::abs(step) <= std::abs(remaining)) return step;
+                // A fraction carried from an earlier tick must not push the
+                // integer report across an anchor less than one unit away.
+                trackingFraction = 0;
+                return static_cast<LONG>(std::trunc(remaining));
+            };
+            report.dx = quantize(x * signX, compensationX * signX, remainingX * signX, m_remainderX, m_compensationRemainderX);
+            report.dy = quantize(y * signY, compensationY * signY, remainingY * signY, m_remainderY, m_compensationRemainderY);
         }
         if (report.dx || report.dy || m_config.outputTransport == vaporlock::hardware::kVirtualXboxTransport) {
             if (!submitLocked(report, input)) {
                 resetTrackingFilterLocked();
                 resetCompensationLocked();
+                if ((report.dx || report.dy) && !m_status.movementError.empty()) {
+                    m_status.active = false;
+                    m_nextMovementRetry = now + std::chrono::milliseconds(250);
+                }
                 if (!m_status.fatalError.empty()) cancelLocked();
             } else {
                 // A stick-to-pixels calibration is environment dependent; don't
@@ -423,6 +472,8 @@ private:
         AimInputs input;
         const HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
         input.valid = desktop != nullptr && GetForegroundWindow() != nullptr;
+        if (m_config.captureWindow && GetForegroundWindow() != m_config.captureWindow)
+            input.valid = false;
         if (desktop) {
             wchar_t inputName[256]{}, threadName[256]{};
             DWORD needed = 0;
@@ -433,24 +484,41 @@ private:
         }
         if (desktop) CloseDesktop(desktop);
         static constexpr std::array<int, 4> keys{VK_RBUTTON, VK_LSHIFT, VK_LCONTROL, VK_SPACE};
-        const bool key = (GetAsyncKeyState(keys[std::clamp(m_config.activationKey, 0, 3)]) & 0x8000) != 0;
+        const int activation = keys[std::clamp(m_config.activationKey, 0, 3)];
+        const int compensation = headlessKeyFromName(m_config.motionCompensationActivationKey);
+        const int quickRelease = m_config.quickReleaseKey;
+        vaporlock::mouse_host::InputState buttons{};
+        if (input.valid && m_keySampler) {
+            const auto sampled = m_keySampler(activation, compensation, quickRelease);
+            input.valid = sampled.has_value();
+            if (sampled) buttons = *sampled;
+        } else if (input.valid) {
+            const auto down = [](int key) { return key && (GetAsyncKeyState(key) & 0x8000) != 0; };
+            buttons = {down(activation), down(compensation), down(quickRelease)};
+        }
         const auto ignored = m_config.controllerHostVirtualSlot >= 0
             ? std::optional<DWORD>(m_config.controllerHostVirtualSlot) : std::nullopt;
         if (m_config.activationSource != 0 || m_config.outputTransport == vaporlock::hardware::kVirtualXboxTransport)
             input.controller = m_controller.sample(m_config.controllerSlot, m_config.controllerBinding, ignored,
                 m_config.controllerTriggerPress, m_config.controllerTriggerRelease, m_config.activationSource);
         input.down = m_config.activationSource == 1 ? input.controller.bindingDown
-            : m_config.activationSource == 2 ? key || input.controller.bindingDown : key;
+            : m_config.activationSource == 2 ? buttons.activation || input.controller.bindingDown : buttons.activation;
         if (m_config.activationSource == 1 && !input.controller.connected) input.valid = false;
         if (!input.valid) m_controller.resetTrigger();
-        input.compensationDown = (GetAsyncKeyState(headlessKeyFromName(m_config.motionCompensationActivationKey)) & 0x8000) != 0;
+        input.compensationDown = buttons.compensation;
+        input.quickReleaseDown = buttons.quickRelease;
         return input;
     }
     bool submitLocked(const AimReport& report, const AimInputs& input) {
         if (!m_sink) return false;
         const bool ok = m_sink(report, input, m_config, m_status);
         if (report.dx || report.dy || report.stickX || report.stickY) {
-            if (ok) { ++m_status.sent; m_status.reason = "output-accepted"; }
+            if (ok) {
+                ++m_status.sent;
+                m_status.reason = "output-accepted";
+                m_status.movementError.clear();
+                m_nextMovementRetry = {};
+            }
             else { ++m_status.failed; m_status.reason = "output-rejected"; }
         }
         return ok;
@@ -487,7 +555,8 @@ private:
         resetResponseLocked();
         resetCompensationLocked();
         m_toggle = false;
-        m_status.active = m_status.authorized = m_status.compensationActive = false;
+        m_status.active = m_status.authorized = m_status.compensationActive = m_status.quickReleaseHeld = false;
+        m_status.inputAvailable = m_status.activationInputDown = false;
         m_status.observationAgeMs = -1.0;
         m_status.reason = "cancelled";
         if (m_events) m_events(m_config, false, false, AimClock::now(), m_status);
@@ -515,6 +584,7 @@ private:
     CaptureFrameIdentity m_identity{};
     int m_width = 0, m_height = 0;
     AimTime m_lastPublished{}, m_lastTick{};
+    AimTime m_nextMovementRetry{};
     AimTime m_historyFloor{};
     double m_filteredX = 0, m_filteredY = 0, m_remainderX = 0, m_remainderY = 0;
     double m_compensationRemainderX = 0, m_compensationRemainderY = 0;
@@ -527,15 +597,22 @@ private:
     Sampler m_sampler;
     Events m_events;
     CollectionObserver m_collection;
+    KeySampler m_keySampler;
 };
 
-bool submitWindowsAim(const AimReport& report, const AimInputs&, const AppConfig&, AimOutputStatus&) {
+bool submitWindowsAim(const AimReport& report, const AimInputs&, const AppConfig&, AimOutputStatus& status) {
     if (!report.dx && !report.dy) return true;
     INPUT input{};
     input.type = INPUT_MOUSE;
     input.mi.dx = report.dx; input.mi.dy = report.dy;
     input.mi.dwFlags = MOUSEEVENTF_MOVE;
-    return SendInput(1, &input, sizeof(input)) == 1;
+    SetLastError(ERROR_SUCCESS);
+    if (SendInput(1, &input, sizeof(input)) == 1) return true;
+    const DWORD error = GetLastError();
+    status.movementError = L"Windows rejected mouse movement. Check focus and make sure the destination app and VaporLock run at the same privilege level.";
+    if (error != ERROR_SUCCESS)
+        status.movementError += L" Windows error " + std::to_wstring(error) + L".";
+    return false;
 }
 
 class LiveConfigPump {

@@ -139,6 +139,10 @@ def mount(owner,layout,train_mount):
     new_group.clicked.connect(owner.new_capture_group);owner.controls.append(new_group);project_flow.addWidget(new_group)
     owner.cancel_import=FittedActionButton(t('Cancel import'));owner.cancel_import.setProperty('missionIcon','stop')
     owner.cancel_import.clicked.connect(owner.cancel);project_flow.addWidget(owner.cancel_import)
+    health = FittedActionButton(t('Dataset health…'))
+    health.setProperty('missionIcon', 'pulse')
+    health.clicked.connect(owner.open_dataset_health)
+    project_flow.addWidget(health)
     project.addWidget(project_row)
     owner.project_path=WrappedPath();project.addWidget(owner.project_path)
     owner.project_summary=QLabel();owner.project_summary.setProperty('_vaporlock_i18n_skip',True)
@@ -195,6 +199,7 @@ def mount(owner,layout,train_mount):
     for name,callback,mutating,image_required,symbol in (
         ('Fit image',lambda:owner.canvas.fit(),False,False,'expand'),
         ('Regenerate mask',owner.regenerate,True,True,'refresh'),
+        ('Target visibility…',owner.edit_visibility,True,True,'tag'),
         ('Delete target',owner.delete_target,True,True,'trash'),
         ('No targets',owner.mark_negative,True,True,'exclude'),
         ('Move image group…',owner.move_image_group,True,True,'folder'),

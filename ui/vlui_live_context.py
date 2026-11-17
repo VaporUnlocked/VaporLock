@@ -80,7 +80,7 @@ def validated_native_settings(settings, field_specs):
     for name, kind in field_specs:
         value = settings[name]
         expected = {'str': str, 'bool': bool, 'int': int, 'float': float,
-                    'list[dict]': list, 'list[int]': list, 'dict': dict}[kind]
+                    'list[dict]': list, 'list[int]': list, 'list[list[int]]': list, 'dict': dict}[kind]
         if kind == 'float':
             require(type(value) in (float, int))
             require(type(value) is not int or abs(value) <= MAX_SEQUENCE)
@@ -114,6 +114,8 @@ def validated_native_settings(settings, field_specs):
     validate_batch3(settings)
     from exclusion_zones import validate_zones
     validate_zones(settings.get('exclusion_zones', []))
+    from capture_privacy import validate_masks
+    validate_masks(settings.get('capture_privacy_masks', []))
     validated_capture_settings(settings)
     from collection_limits import validate_limits
     validate_limits(settings)

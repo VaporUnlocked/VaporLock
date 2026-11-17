@@ -1,7 +1,10 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text.Json;
 using HIDMaestro;
@@ -50,7 +53,7 @@ internal static class Program
         }
 
         if (options.SelfTest)
-            return SelfTest(options.Profile);
+            return await SelfTestAsync(options.Profile);
 
         if (string.IsNullOrWhiteSpace(options.StatusFile))
         {
@@ -72,24 +75,34 @@ internal static class Program
         finally { sessionStatus?.Dispose(); sessionStatus = null; }
     }
 
-    private static int SelfTest(string profileId)
+    private static async Task<int> SelfTestAsync(string profileId)
     {
         try
         {
             VerifySessionPipeSecurity();
             VerifyVerticalAxisConvention();
-            if (!CompatibleProfiles.Contains(profileId)) throw new ArgumentException("Unsupported controller profile.");
+            await VerifyFrameReaderAsync();
+            foreach (var resource in ControllerResources.Files)
+            {
+                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource.Name)
+                    ?? throw new InvalidDataException($"Missing controller resource {resource.FileName}.");
+                if (stream.Length != resource.Bytes || Convert.ToHexStringLower(SHA256.HashData(stream)) != resource.SHA256)
+                    throw new InvalidDataException($"Controller resource integrity check failed for {resource.FileName}.");
+            }
+            foreach (var id in CompatibleProfiles)
+                VerifyNeutralFrame(VaporLockIntegration.EmbeddedProfile(id));
             var profile = VaporLockIntegration.EmbeddedProfile(profileId);
-            VerifyNeutralFrame(profile);
             Console.WriteLine(JsonSerializer.Serialize(new
             {
                 state = "self-test",
-                message = "Verified the requested embedded controller profile without a driver context.",
+                message = "Verified controller profiles, driver resources and frame handling without a driver context.",
                 profile = profile.Id,
                 device_name = profile.Name,
                 compatible = true,
                 pipe_access = "current-user",
                 protocol_version = ControllerFrameReader.Version,
+                profiles_verified = CompatibleProfiles.Count,
+                driver_resources_verified = ControllerResources.Files.Length,
                 neutralization = "verified",
             }));
             return 0;
@@ -99,6 +112,33 @@ internal static class Program
             Console.Error.WriteLine(FriendlyError(error));
             return 1;
         }
+    }
+
+    private static async Task VerifyFrameReaderAsync()
+    {
+        var bytes = new byte[ControllerFrameReader.FrameSize];
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, ControllerFrameReader.Magic);
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(4), ControllerFrameReader.Version);
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(6), 0x1000);
+        using var input = new MemoryStream(bytes);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(24), ControllerFrameReader.CurrentTick());
+        var submitted = new List<ControllerFrame>();
+        var neutralized = 0;
+        await ControllerFrameReader.ConsumeAsync(input, submitted.Add, () => neutralized++, CancellationToken.None);
+        if (submitted.Count != 1 || submitted[0].Buttons != 0x1000 || neutralized != 1)
+            throw new InvalidDataException("Controller stream failed to forward the frame and release input at EOF.");
+
+        bytes[4] = 0;
+        input.Position = 0;
+        try
+        {
+            await ControllerFrameReader.ConsumeAsync(input, submitted.Add, () => neutralized++, CancellationToken.None);
+        }
+        catch (InvalidDataException) when (submitted.Count == 1 && neutralized == 2)
+        {
+            return;
+        }
+        throw new InvalidDataException("Controller stream accepted an incompatible frame.");
     }
 
     private static async Task<int> RunAsync(Options options)
@@ -492,7 +532,8 @@ internal static class Program
                 throw new ArgumentException("--pipe is required for a controller-host session.");
             if ((installOnly ? 1 : 0) + (uninstall ? 1 : 0) + (selfTest ? 1 : 0) > 1 || trustConsent != installOnly)
                 throw new ArgumentException("Choose one operation; installation requires explicit --machine-trust-consent.");
-            if (!CompatibleProfiles.Contains(profile)) throw new ArgumentException("Unsupported controller profile.");
+            if (!CompatibleProfiles.TryGetValue(profile, out var compatibleProfile))
+                throw new ArgumentException("Unsupported controller profile.");
             if (!selfTest && !installOnly && !uninstall && (!System.Text.RegularExpressions.Regex.IsMatch(pipe!, @"\AVaporLockController-[0-9a-f]{32}\z")
                 || Path.GetFileName(stop) != "session-" + pipe![20..] + ".stop"
                 || !Path.GetDirectoryName(Path.GetFullPath(stop!))!.Equals(Path.GetDirectoryName(Path.GetFullPath(status!)), StringComparison.OrdinalIgnoreCase)))
@@ -500,7 +541,7 @@ internal static class Program
             return new Options
             {
                 PipeName = pipe,
-                Profile = profile,
+                Profile = compatibleProfile,
                 StatusFile = status,
                 StopFile = stop,
                 InstallOnly = installOnly,

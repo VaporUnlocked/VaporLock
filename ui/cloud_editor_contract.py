@@ -56,6 +56,10 @@ def annotation(value, width, height, *, complete):
     if type(value) is not dict:
         raise CloudInputError('Invalid annotation.')
     identifier(value.get('id'), 'Annotation identity')
+    if 'visibility' in value:
+        from evaluation_slices import VISIBILITY
+        if type(value['visibility']) is not str or value['visibility'] not in VISIBILITY:
+            raise CloudInputError('Invalid target visibility.')
     if type(value.get('class_id')) is not int or value['class_id'] != 0:
         raise CloudInputError('This .cloud suite uses class0/player.')
     box = value.get('box')

@@ -50,8 +50,9 @@ def protected_directory(path):
 
 
 class ProjectLease:
-    def __init__(self, selected):
+    def __init__(self, selected, *, check_split_readiness=True):
         self.selected = selected
+        self.check_split_readiness = check_split_readiness
         self.stack = ExitStack(); self.held_dirs = set(); self.held_files = set()
         self._directory_handles = {}
         self.root = None; self.manifest = None; self.counts = None
@@ -244,10 +245,11 @@ class ProjectLease:
                     mask_pixels += width * height
                 if mask_pixels > 2_000_000_000:
                     raise CloudInputError('Project aggregate mask workload exceeds its supported limit.')
-        if not counts['train'] or not counts['val']:
-            raise CloudInputError('At least one reviewed training image and a separate reviewed validation image are required.')
-        if any(len(splits) > 1 for splits in groups.values()):
-            raise CloudInputError('A capture/session group occurs in multiple splits. Separate train and validation recordings.')
+        if self.check_split_readiness:
+            if not counts['train'] or not counts['val']:
+                raise CloudInputError('At least one reviewed training image and a separate reviewed validation image are required.')
+            if any(len(splits) > 1 for splits in groups.values()):
+                raise CloudInputError('A capture/session group occurs in multiple splits. Separate train and validation recordings.')
         return counts
 
     def check_image_headers(self):

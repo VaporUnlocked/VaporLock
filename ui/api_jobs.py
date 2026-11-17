@@ -3,7 +3,7 @@ from dataclasses import asdict
 import hashlib,json,re,secrets,time
 from PySide6.QtCore import QProcess,QTimer,Qt
 from PySide6.QtWidgets import QMessageBox
-from batch4_guard import editable
+from batch4_guard import editable, workspace_available
 
 KINDS=('annotation','training')
 ACTIVE={'awaiting-confirmation','starting','running','cancelling'}
@@ -18,7 +18,7 @@ def fingerprint(center):
 
 
 def admission(center,capability):
-    return _idle_admission(center)
+    return _idle_admission(center, read_only=capability == 'dataset-health')
 
 
 def cloud_admission(center):
@@ -32,8 +32,9 @@ def cloud_admission(center):
     return _idle_admission(center)
 
 
-def _idle_admission(center):
-    if not editable(center,stopped=True):return False
+def _idle_admission(center, *, read_only=False):
+    available = workspace_available if read_only else editable
+    if not available(center,stopped=True):return False
     if center.cloud_background_busy():return False
     for name in ('_dataset_worker','_training_worker','_cloud_training_job','_cloud_model_check_job'):
         process=getattr(center,name,None)

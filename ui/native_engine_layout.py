@@ -8,6 +8,8 @@ import os
 
 _ONNX_STUB_MESSAGE = 'ONNX Runtime was not found when Vapor Lock was built.'.encode('utf-16-le')
 _CAPABILITY_RESOURCE = 201
+_MOUSE_HOST_PROTOCOL_RESOURCE = 202
+_MOUSE_HOST_PROTOCOL = 2
 _RT_RCDATA = 10
 _ONNX_SUPPORT = 1
 _CUDA_SUPPORT = 2
@@ -34,7 +36,7 @@ def _plain(path):
     return all(not part.is_symlink() and not (getattr(part.lstat(),'st_file_attributes',0)&0x400)
                for part in (path,*path.parents) if part.exists())
 
-def _resource_flags(path):
+def _resource_word(path, resource_id):
     if os.name != 'nt':
         return None
     kernel = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -55,7 +57,7 @@ def _resource_flags(path):
     if not image:
         return None
     try:
-        resource = kernel.FindResourceW(image, _CAPABILITY_RESOURCE, _RT_RCDATA)
+        resource = kernel.FindResourceW(image, resource_id, _RT_RCDATA)
         if resource and kernel.SizeofResource(image, resource) == 2:
             data = kernel.LoadResource(image, resource)
             address = kernel.LockResource(data) if data else None
@@ -68,7 +70,7 @@ def _resource_flags(path):
 
 @lru_cache(maxsize=64)
 def _engine_flags(path, _size, _mtime, _ctime):
-    flags = _resource_flags(path)
+    flags = _resource_word(path, _CAPABILITY_RESOURCE)
     if flags is not None:
         return flags
     # Older builds have no resource. Their synthetic-only detector contains
@@ -114,6 +116,20 @@ def supports_lossless_preview(path):
 
 def supports_shared_preview(path):
     return _has_flag(path, _SHARED_PREVIEW_SUPPORT)
+
+
+def supports_mouse_host(path):
+    try:
+        return path.is_file() and _plain(path) and _resource_word(path, _MOUSE_HOST_PROTOCOL_RESOURCE) == _MOUSE_HOST_PROTOCOL
+    except OSError:
+        return False
+
+
+def supports_capture_controls(path):
+    try:
+        return path.is_file() and _plain(path) and _resource_word(path, 203) == 1
+    except OSError:
+        return False
 
 
 def provider_ready(path, provider, *, require_model=False):

@@ -28,7 +28,7 @@ class EventQueue:
 
     def put(self, payload, size, terminal):
         with self._lock:
-            if payload.get('type') == 'progress':
+            if payload.get('type') in ('progress', 'dataset_health_progress'):
                 if size > 128 * 1024:
                     raise CloudInputError('Cloud progress record exceeds its byte budget.')
                 self._progress = (payload, size)
@@ -256,7 +256,8 @@ class OwnedChild:
             raise CloudInputError('Cloud worker is unavailable or its command exceeds the limit.')
         if self._operation is None:
             operation = payload.get('operation')
-            if operation not in ('train', 'check_project', 'check_resume', 'check_model', 'inference', 'evaluate', 'inspect', 'export'):
+            if operation not in ('train', 'check_project', 'check_resume', 'check_model', 'inference',
+                                 'evaluate', 'inspect', 'export', 'dataset_health'):
                 raise CloudInputError('Invalid initial Cloud operation.')
             self._operation = operation
             if operation in ('train', 'export'):

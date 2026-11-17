@@ -22,7 +22,7 @@ def jobs(center):
     capture=(process_identity(getattr(c.engine,'process',None)),getattr(c.engine,'_launch_generation',None),
         getattr(c,'_start_intent_generation',0),id(getattr(c,'_pending_controller_start',None)))
     active=bool(c.engine.active or c._policy_start_pending or c._pending_controller_start is not None or c.xbox_compatible_bridge.preparing)
-    result=[('capture','Capture',active,capture,text('readiness_detail'),'selection',c.stop_capture)]
+    result=[('capture','Capture',active,capture,text('readiness_detail'),'capture',c.stop_capture)]
     probes=tuple(getattr(c,'_model_probes',()))
     selection=getattr(c,'_model_selection',None)
     token=(getattr(c,'_probe_revision',0),probes,selection,getattr(selection,'_generation',None))

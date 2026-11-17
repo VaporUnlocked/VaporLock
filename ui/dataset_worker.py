@@ -889,6 +889,10 @@ def command_parser():
     assist.add_argument('--image-sha256',required=True)
     assist.add_argument('--request-id',required=True)
     add_annotation_arguments(assist)
+    priority = commands.add_parser('review-queue')
+    priority.add_argument('--dataset', required=True)
+    priority.add_argument('--compare-model')
+    add_annotation_arguments(priority)
     annotate = commands.add_parser('annotate')
     annotate.add_argument('--dataset', required=True)
     add_annotation_arguments(annotate)
@@ -919,12 +923,19 @@ def command_parser():
 def main() -> int:
     from worker_process_tree import own_process_tree
     args = command_parser().parse_args()
-    own_process_tree(memory_limit=2*1024**3 if args.command=='assist' else 0)
+    own_process_tree(memory_limit=2*1024**3 if args.command in ('assist', 'review-queue') else 0)
     lower_priority()
     try:
         if args.command=='assist':
             from assist_worker import run
             return run(args)
+        if args.command == 'review-queue':
+            from dataset_review_priority import run_review_analysis
+            if not .01 <= args.confidence <= .99 or not .01 <= args.nms_iou <= .99:
+                raise ValueError('Invalid review analysis settings.')
+            with dataset_lock(Path(args.dataset)):
+                recover_annotations(Path(args.dataset))
+                return run_review_analysis(args)
         if args.command in ('annotate','platform-preview'):
             variation_options(args)
             if args.command=='platform-preview' and args.batch_size!=1: raise ValueError('Cloud annotation batch size must be 1.')

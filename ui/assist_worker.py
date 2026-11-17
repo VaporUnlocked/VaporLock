@@ -6,7 +6,7 @@ from PIL import Image
 from assist_geometry import validate,MAX_CANDIDATES,MAX_VERTICES
 
 
-def predict(session,image,args):
+def predict(session,image,args, *, box_only=False):
     from dataset_worker import input_image,decode,parse_names,instance_polygons
     from annotation_batch import batch_plan,run_pass
     inputs=session.get_inputs()
@@ -16,7 +16,8 @@ def predict(session,image,args):
     h,w=(shape[2],shape[3]) if nchw else (shape[1],shape[2])
     w=w if type(w) is int else 640;h=h if type(h) is int else 640
     if not 1<=w<=2048 or not 1<=h<=2048:raise ValueError('Assist model input exceeds 2048 pixels.')
-    batch_plan(shape,1,w,h)
+    fixed_size = shape[0] if box_only and type(shape[0]) is int else 1
+    batch_plan(shape,fixed_size,w,h)
     tensor,sx,sy,px,py,sw,sh=input_image(image,w,h,nchw,meta.type)
     declared=session.get_outputs()
     if not 1<=len(declared)<=2:raise ValueError('Unsupported number of model outputs.')
@@ -24,7 +25,7 @@ def predict(session,image,args):
         known=[v for v in output.shape if type(v) is int]
         if len(output.shape)>4 or any(v<=0 or v>65536 for v in known) or np.prod(known,dtype=object)*8>32*1024**2:
             raise ValueError('Declared model output exceeds the assistance limit.')
-    outputs=run_pass(session,meta.name,[tensor],1)[0]
+    outputs=run_pass(session,meta.name,[tensor],fixed_size)[0]
     if len(outputs)>2 or sum(o.nbytes for o in outputs)>32*1024**2:raise ValueError('Assist output exceeds supported size.')
     detection=outputs[0]
     if detection.ndim not in (2,3) or max(detection.shape)>65536:raise ValueError('Unsupported detection output.')
@@ -48,6 +49,10 @@ def predict(session,image,args):
     items=decode(detection,names,args.confidence,args.nms_iou,sx,sy,px,py,sw,sh,w,h,channels,fmt,units,candidate_limit=512,stats=stats)
     items.sort(key=lambda a:(-a.score,a.class_id,a.box))
     truncated=stats.get('omitted',0)+max(0,len(items)-MAX_CANDIDATES);items=items[:MAX_CANDIDATES]
+    if box_only:
+        return dict(candidates=[dict(class_id=a.class_id, confidence=a.score,
+            box=[a.box[0]/sw, a.box[1]/sh, (a.box[2]-a.box[0])/sw, (a.box[3]-a.box[1])/sh])
+            for a in items], truncated=truncated)
     if prototype is not None:instance_polygons(items,prototype,sx,sy,px,py,sw,sh,w,h,strict=True)
     candidates=[];skipped=0;vertices=0
     for a in items:

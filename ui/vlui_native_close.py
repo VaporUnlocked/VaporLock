@@ -56,6 +56,8 @@ class NativeCloseOwner:
             return False
         if center.engine.active or center.xbox_compatible_bridge.preparing or not center.xbox_compatible_bridge.safely_stopped():
             return False
+        if center.relative_mouse_elevation.busy:
+            return False
         if center._policy_start_pending or center._pending_controller_start is not None or center.acceleration.active:
             return False
         for name in ('_benchmark_process', '_validation_process', '_training_worker', '_dataset_worker', '_cloud_training_job', '_cloud_model_check_job','_cloud_annotation_job'):

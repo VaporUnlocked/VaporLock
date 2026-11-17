@@ -4,9 +4,15 @@ from dataclasses import asdict
 
 def editable(center, action='setNumericSetting', *, stopped=False):
     owner=getattr(center,'_live_owner',None)
-    if (getattr(center,'_tuning_locked',False) or getattr(center,'_native_closing',False)
-            or False or getattr(center,'_profile_transition_pending',False)
-            or (owner is not None and (owner._transition is not None or not owner.authorize(action)))):
+    if getattr(center,'_tuning_locked',False) or (owner is not None and not owner.authorize(action)):
+        return False
+    return workspace_available(center, stopped=stopped)
+
+
+def workspace_available(center, *, stopped=False):
+    owner=getattr(center,'_live_owner',None)
+    if (getattr(center,'_native_closing',False) or getattr(center,'_profile_transition_pending',False)
+            or (owner is not None and owner._transition is not None)):
         return False
     if stopped and (center.engine.active or center._policy_start_pending
             or center.xbox_compatible_bridge.preparing or center._pending_controller_start is not None

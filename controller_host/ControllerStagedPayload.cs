@@ -10,21 +10,22 @@ using Microsoft.Win32.SafeHandles;
 
 namespace VaporLockControllerHost;
 
-// Only fixed embedded tools/resources can enter this component-owned stage.
-// No SDK extraction, user-supplied signing path, PFX or automatically selected CN.
+// Driver inputs are embedded and pinned. Signing tools come from the installed
+// Windows kits and run against a separately secured payload directory.
 internal sealed class ControllerStagedPayload : IDisposable
 {
     private readonly ControllerProtectedStorage storage;
     private readonly List<FileStream> held = new();
     private readonly Dictionary<string, FileStream> resources = new(StringComparer.OrdinalIgnoreCase);
-    private readonly string tools;
-    internal ControllerStagedPayload(ControllerProtectedStorage owner)
+    private readonly ControllerSigningTools signingTools;
+    internal ControllerStagedPayload(ControllerProtectedStorage owner, ControllerSigningTools signingTools)
     {
         storage = owner;
-        tools = storage.CreateChild("tools-95c6d3ec0d41cd7b");
+        this.signingTools = signingTools;
+        var inputs = storage.CreateChild("driver-inputs-95c6d3ec0d41cd7b");
         foreach (var resource in ControllerResources.Files)
         {
-            var target = Path.Combine(tools, resource.FileName);
+            var target = Path.Combine(inputs, resource.FileName);
             if (!File.Exists(target))
             {
                 using var source = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource.Name)
@@ -42,9 +43,9 @@ internal sealed class ControllerStagedPayload : IDisposable
             }
             catch { lease.Dispose(); throw; }
         }
-        if (!new HashSet<string>(Directory.EnumerateFiles(tools).Select(Path.GetFileName)!, StringComparer.OrdinalIgnoreCase)
-                .SetEquals(ControllerResources.Files.Select(value => value.FileName)) || Directory.EnumerateDirectories(tools).Any())
-            throw new IOException("Unlisted controller signing-tool content was found.");
+        if (!new HashSet<string>(Directory.EnumerateFiles(inputs).Select(Path.GetFileName)!, StringComparer.OrdinalIgnoreCase)
+                .SetEquals(ControllerResources.Files.Select(value => value.FileName)) || Directory.EnumerateDirectories(inputs).Any())
+            throw new IOException("Unlisted controller driver input was found.");
     }
 
     internal ControllerPayloadProof Build(ControllerComponentRecord record, X509Certificate2 signer,
@@ -74,10 +75,10 @@ internal sealed class ControllerStagedPayload : IDisposable
         // Signtool uses exactly our My-store identity. My association/DER/key
         // policy is verified by the platform before this method is called.
         foreach (var name in new[] { "HIDMaestro.dll", "HMXInput.dll" })
-            Run("signtool.exe", directory, "sign", "/fd", "SHA256", "/sm", "/s", "My", "/sha1", signer.Thumbprint, Path.Combine(directory, name));
-        Run("Inf2Cat.exe", directory, "/driver:" + directory, "/os:10_X64");
+            Run(signingTools.SignTool, directory, "sign", "/fd", "SHA256", "/sm", "/s", "My", "/sha1", signer.Thumbprint, Path.Combine(directory, name));
+        Run(signingTools.Inf2Cat, directory, "/driver:" + directory, "/os:10_X64");
         foreach (var name in new[] { "hidmaestro.cat", "hidmaestro_xusb.cat" })
-            Run("signtool.exe", directory, "sign", "/fd", "SHA256", "/sm", "/s", "My", "/sha1", signer.Thumbprint, Path.Combine(directory, name));
+            Run(signingTools.SignTool, directory, "sign", "/fd", "SHA256", "/sm", "/s", "My", "/sha1", signer.Thumbprint, Path.Combine(directory, name));
         var payload = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
         try
         {
@@ -101,12 +102,10 @@ internal sealed class ControllerStagedPayload : IDisposable
         finally { foreach (var input in payload.Values) input.Dispose(); }
     }
 
-    private void Run(string tool, string working, params string[] arguments)
+    private static void Run(string executable, string working, params string[] arguments)
     {
-        var source = resources[tool];
-        var identity = ControllerResources.Files.Single(value => value.FileName.Equals(tool, StringComparison.OrdinalIgnoreCase));
-        if (Digest(source) != identity.SHA256) throw new CryptographicException("Controller tool identity changed.");
-        var start = new ProcessStartInfo(Path.Combine(tools, tool)) { WorkingDirectory = working, UseShellExecute = false,
+        var tool = Path.GetFileName(executable);
+        var start = new ProcessStartInfo(executable) { WorkingDirectory = working, UseShellExecute = false,
             CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         start.Environment.Clear();

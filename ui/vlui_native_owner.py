@@ -44,7 +44,8 @@ def _canonical_native_palette(palette):
 
 
 def _native_only_setting(name):
-    return name.startswith('cloud_') or name in {'preview_lossless', 'require_native_pixels'}
+    return name.startswith('cloud_') or name in {'preview_lossless', 'require_native_pixels', 'quick_release_key',
+        'capture_source', 'capture_privacy_masks', 'video_device', 'video_file', 'video_full_frame'}
 
 
 class NativeLiveOwner(QObject):

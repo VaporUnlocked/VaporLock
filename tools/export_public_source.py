@@ -34,7 +34,7 @@ ASSET_DIRS = frozenset({"assets", "guides"})
 TOOLS = frozenset({"export_public_source.py", "build_public_client.py",
     "build_community_bundle.py", "package_community_release.py",
     "refresh_public_manifests.py", "build_settings_guides.py", "build_controller_host.ps1",
-    "fetch_sam_weights.py"})
+    "restore_controller_resources.cs", "fetch_sam_weights.py"})
 # These are the active client resources, not whole historical handoff branches.
 # Index entries are checked against this set; an edited index cannot broaden it.
 UI_RUNTIME_FILES = frozenset("ui_system/runtime/" + name for name in (
@@ -130,7 +130,7 @@ LIMITATIONS = [
     "No personal models, profiles, datasets, customer records, credentials or service configuration are exported.",
     "The one explicitly named controller compatibility JSON is authored component source, not a saved user profile.",
     "No website, administrator suite, bot, licensing service, updater or hosted distribution infrastructure is exported.",
-    "Controller embedded resource-*.bin and generated dependency DLLs are excluded; obtain lawful dependencies before building that optional component.",
+    "Controller build dependencies are fetched and SHA-verified by tools/build_controller_host.ps1. Generated resources and DLLs are excluded.",
     "The original Ghost-MW2019.glb asset is excluded; the community Aim Testing Suite uses its separately licensed SWAT builtin and original procedural view geometry.",
     "Third-party licenses retain their own terms; the project license cannot impose extra restrictions on separately licensed components.",
     "Pattern scanning is an additional safeguard, not proof that all possible secrets or licensing conflicts are absent. Review the generated inventory before publication.",

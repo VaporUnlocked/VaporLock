@@ -10,16 +10,19 @@
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(HIDMaestroDependencyRoot)' == ''">
+    <HIDMaestroDependencyRoot>$(MSBuildThisFileDirectory)..\..\build\controller-host-deps</HIDMaestroDependencyRoot>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="src\**\*.cs" />
     <EmbeddedResource Include="..\profiles\vapor-lock-xbox-one-windows.json">
       <LogicalName>HIDMaestro.Profiles.vaporlock\vapor-lock-xbox-one-windows.json</LogicalName>
     </EmbeddedResource>
     <Reference Include="Microsoft.Windows.SDK.NET">
-      <HintPath>..\..\build\controller-host-deps\Microsoft.Windows.SDK.NET.dll</HintPath>
+      <HintPath>$(HIDMaestroDependencyRoot)\Microsoft.Windows.SDK.NET.dll</HintPath>
     </Reference>
     <Reference Include="WinRT.Runtime">
-      <HintPath>..\..\build\controller-host-deps\WinRT.Runtime.dll</HintPath>
+      <HintPath>$(HIDMaestroDependencyRoot)\WinRT.Runtime.dll</HintPath>
     </Reference>
   </ItemGroup>
   <!-- Generated from the pinned original assembly's metadata, never its SDK

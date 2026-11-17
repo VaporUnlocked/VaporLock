@@ -1,15 +1,11 @@
 # VaporLock
 
-## Donations
-
-[Donate to support VaporLock and my other GitHub projects](https://vaporunlocked.github.io/donations.github.io/).
-
 VaporLock is a Windows vision, tracking and annotation application with a C++20
-native engine and a Qt/Python interface. VaporLock 2.0.0 Community includes local
+native engine and a Qt/Python interface. VaporLock 2.0.2 Community includes local
 capture and inference, a dedicated .cloud Studio, and VaporLock Proving Grounds.
 The Community client runs without a VaporLock account or key.
 
-[Release notes and download guide](docs/RELEASE_NOTES.md)
+[Release notes and download guide](docs/RELEASE_NOTES.md) · [Donate](https://vaporunlocked.github.io/donations.github.io/)
 
 Use only in lawful, authorized environments. Movement output changes input;
 follow the rules of your environment. No ban avoidance, invisibility, model
@@ -125,15 +121,20 @@ and SHA-256, and never loads the downloaded checkpoint.
 The refresh command regenerates local safety inventories. No original publisher key or
 historical official-build authorization is required for your changes.
 
-## Optional components and known build gaps
+## Optional components
 
-The Xbox-compatible controller integration retains normal Windows signing,
-consent, trust verification and owned removal safeguards. Its source references
-external HIDMaestro and Windows tooling resources. Those binaries are excluded
-from this source export; the existing dependency fetch script does not reproduce
-every embedded resource. The controller component is not a turnkey clean-source
-build until those inputs are supplied under their upstream licenses. Do not
-disable Windows protections or claim an install succeeded when resources are absent.
+From a source checkout, run `.\tools\build_controller_host.ps1` to build the
+Xbox One/Series-compatible controller host. The script verifies the pinned
+HIDMaestro package, restores the bridge resources, and runs the driver-free
+self-test. VaporLock finds the host in `build/controller-host`, and the release
+packager includes a verified build from that location when present.
+
+For first-time controller setup or a repair that needs to regenerate the driver
+packages, install a matching [Windows SDK and Windows Driver Kit](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk)
+in the default location. Then open **Movement > Transport**, select the
+Xbox One-compatible bridge, and choose **Install controller component**.
+Setup uses SignTool and Inf2Cat from the installed kits and asks for consent
+before adding the local controller signing certificate to the machine trust stores.
 
 VaporLock Proving Grounds source is included in `aim-testing-suite`. Build it
 with that folder's `build.ps1`, then open **Proving Grounds** in the Control

@@ -24,6 +24,10 @@
 #include "app/FrameRate.h"
 #include "app/CloudCapturePacing.h"
 #include "app/CaptureRecovery.h"
+#include "app/VideoInput.h"
+#include "app/WindowCapture.h"
+#include "app/CapturePrivacy.h"
+#include "app/MouseOutputHost.h"
 #include "app/ControllerTrigger.h"
 #include "app/CudaDevice.h"
 
@@ -255,6 +259,12 @@ struct AppConfig {
     // Monitor is one-based. Zero means the virtual desktop and uses the GDI
     // compatibility path; physical monitors use DXGI Desktop Duplication.
     int captureMonitor = 1;
+    std::wstring videoDevice, videoFile;
+    HWND captureWindow = nullptr;
+    DWORD captureWindowPid = 0;
+    std::vector<vaporlock::privacy::Mask> capturePrivacyMasks;
+    bool videoFullFrame = true;
+    bool hasVideoSource() const { return captureWindow || !videoDevice.empty() || !videoFile.empty(); }
     CaptureRegion captureRegion{};
     int captureFps = 30;
     int inferenceFps = 30;
@@ -312,6 +322,7 @@ struct AppConfig {
     bool movementEnabled = false;
     int activationMode = 0;
     int activationKey = 0;
+    int quickReleaseKey = VK_XBUTTON2;
     // Keyboard, controller, or either input can authorize movement output.
     int activationSource = 0;
     // Zero chooses the first connected XInput controller; one through four
@@ -371,6 +382,8 @@ struct AppConfig {
     // Mouse output is the portable default. The virtual Xbox route creates a
     // distinct device and never writes to a customer's physical controller.
     int outputTransport = vaporlock::hardware::kMouseTransport;
+    std::wstring mouseHostToken;
+    DWORD mouseHostPid = 0;
     // The primary-slot bridge mirrors a physical controller into Vapor Lock's
     // virtual controller after the user deliberately gives that virtual device
     // XInput slot 0. It is opt-in because slot order is controlled by Windows.
@@ -501,6 +514,8 @@ void applySessionSafety(AppConfig& config) {
     // network endpoint, or virtual controller merely because the profile
     // selected one for a future Control session.
     config.outputTransport = vaporlock::hardware::kMouseTransport;
+    config.mouseHostToken.clear();
+    config.mouseHostPid = 0;
     config.controllerHostPipe.clear();
     config.controllerHostVirtualSlot = -1;
 }
@@ -985,6 +1000,7 @@ public:
         CaptureFrameIdentity identity{};
         AimTime observed{}, acquired{};
         int frameWidth = 1, frameHeight = 1, frameLeft = 0, frameTop = 0;
+        int sourceWidth = 0, sourceHeight = 0;
         bool fresh = false, attempted = false;
         int sourceBackend = 0;
         const char* recovery = "none";
@@ -997,6 +1013,8 @@ public:
         int height() const { return frameHeight; }
         int left() const { return frameLeft; }
         int top() const { return frameTop; }
+        int videoWidth() const { return sourceWidth; }
+        int videoHeight() const { return sourceHeight; }
         bool freshFrame() const { return fresh; }
         bool hasCommittedFrame() const { return observed != AimTime{} && !pixels.empty(); }
         AimTime observedAt() const { return observed; }
@@ -1005,7 +1023,16 @@ public:
         CaptureFrameIdentity frameIdentity(std::uint64_t revision) const {
             return {identity.session, identity.sourceGeneration, identity.frameId, revision};
         }
-        const char* backend() const { return sourceBackend == 1 ? "dxgi" : sourceBackend == 2 ? "gdi" : "none"; }
+        const char* backend() const {
+            switch (sourceBackend) {
+            case 1: return "dxgi";
+            case 2: return "gdi";
+            case 3: return "video-device";
+            case 4: return "video-file";
+            case 5: return "window";
+            default: return "none";
+            }
+        }
         const char* recoveryReason() const { return recovery; }
         std::uint64_t recoveryProbes() const { return probes; }
         std::uint64_t recoveryTransitions() const { return transitions; }
@@ -1094,6 +1121,8 @@ public:
     int height() const { return m_height; }
     int left() const { return m_left; }
     int top() const { return m_top; }
+    int videoWidth() const { return 0; }
+    int videoHeight() const { return 0; }
     bool freshFrame() const { return m_frameUpdated; }
     bool hasCommittedFrame() const { return m_observedAt != AimTime{} && !m_bgra.empty(); }
     const char* backend() const { return m_committedBackend == 1 ? "dxgi" : m_committedBackend == 2 ? "gdi" : "none"; }
@@ -3464,6 +3493,15 @@ int headlessKeyFromName(const std::wstring& value) {
     return VK_RBUTTON;
 }
 
+std::optional<int> quickReleaseKeyFromName(const std::wstring& name) {
+    if (name == L"none") return 0;
+    if (name == L"mouse4") return VK_XBUTTON1;
+    if (name == L"mouse5") return VK_XBUTTON2;
+    if (name == L"middle" || name == L"shift" || name == L"control" || name == L"space")
+        return headlessKeyFromName(name);
+    return std::nullopt;
+}
+
 struct XInputGamepad {
     WORD buttons = 0;
     BYTE leftTrigger = 0;
@@ -3762,6 +3800,12 @@ bool applyLiveSetting(AppConfig& config, const std::wstring& field, const std::w
         const int key = headlessKeyFromName(value);
         config.activationKey = key == VK_LSHIFT ? 1 : key == VK_LCONTROL ? 2 : key == VK_SPACE ? 3 : 0;
         return value == L"right" || value == L"shift" || value == L"control" || value == L"space";
+    }
+    if (field == L"quick_release_key") {
+        const auto key = quickReleaseKeyFromName(value);
+        if (!key) return false;
+        config.quickReleaseKey = *key;
+        return true;
     }
     if (field == L"activation_source") {
         config.activationSource = value == L"controller" ? 1 : value == L"either" ? 2 : 0;
@@ -4200,6 +4244,20 @@ private:
 template<class Capture>
 void updateFrameReference(AppConfig& config, const Capture& capture,
                           vaporlock::crosshair::Matcher& matcher, std::uint64_t generation) {
+    if (config.hasVideoSource()) {
+        matcher.reset();
+        const int width = capture.width(), height = capture.height();
+        auto reference = vaporlock::crosshair::screenReference(0, 0, capture.videoWidth(), capture.videoHeight(),
+            capture.left(), capture.top(), width, height);
+        if (config.aimReference == 1) {
+            reference.x = width * .5 + config.aimReferenceX;
+            reference.y = height * .5 + config.aimReferenceY;
+            reference.inside = reference.x >= 0 && reference.y >= 0 && reference.x < width && reference.y < height;
+        }
+        reference.status = reference.inside ? "video-reference" : "outside-capture";
+        config.frameReference = reference;
+        return;
+    }
     int sx=GetSystemMetrics(SM_XVIRTUALSCREEN),sy=GetSystemMetrics(SM_YVIRTUALSCREEN);
     int sw=GetSystemMetrics(SM_CXVIRTUALSCREEN),sh=GetSystemMetrics(SM_CYVIRTUALSCREEN);
     if(config.captureMonitor>0) {
@@ -4231,6 +4289,23 @@ void updateFrameReference(AppConfig& config, const Capture& capture,
 #include "app/PreviewWorker.h"
 
 int runHeadless(int argc, wchar_t* argv[]) {
+    if (argc == 3 && std::wstring_view(argv[1]) == L"--headless" && std::wstring_view(argv[2]) == L"--list-video-devices") {
+        std::vector<vaporlock::video::Device> devices;
+        if (!vaporlock::video::listDevices(devices)) {
+            std::cout << R"({"type":"error","message":"Windows video device enumeration failed."})" << std::endl;
+            return 1;
+        }
+        std::cout << R"({"type":"video-devices","devices":[)";
+        bool first = true;
+        for (const auto& device : devices) {
+            if (!first) std::cout << ',';
+            first = false;
+            std::cout << R"({"id":")" << wideToUtf8(jsonEscape(device.id))
+                      << R"(","name":")" << wideToUtf8(jsonEscape(device.name)) << R"("})";
+        }
+        std::cout << "]}" << std::endl;
+        return 0;
+    }
     // Exact read-only query, with no model/runtime initialization, capture,
     // input request. Extra arguments never reach this path.
     if (argc == 3 && std::wstring_view(argv[1]) == L"--headless" && std::wstring_view(argv[2]) == L"--capabilities") {
@@ -4285,6 +4360,49 @@ int runHeadless(int argc, wchar_t* argv[]) {
                 std::cout << "{\"type\":\"error\",\"message\":\"Invalid aim setting.\"}" << std::endl;
                 return 2;
             }
+            continue;
+        }
+        if (argument == L"--quick-release-key") {
+            const auto key = quickReleaseKeyFromName(next());
+            if (!key) {
+                std::cout << "{\"type\":\"error\",\"message\":\"Unsupported quick-release key\"}" << std::endl;
+                return 2;
+            }
+            config.quickReleaseKey = *key;
+            continue;
+        }
+        if (argument == L"--privacy-masks") {
+            if (!vaporlock::privacy::parse(next(), config.capturePrivacyMasks)) {
+                std::cout << R"({"type":"error","message":"Invalid capture privacy mask."})" << std::endl;
+                return 2;
+            }
+            continue;
+        }
+        if (argument == L"--capture-window") {
+            std::wistringstream target(next());
+            std::uintptr_t handle = 0;
+            wchar_t separator = 0;
+            if (config.hasVideoSource() || !(target >> handle >> separator >> config.captureWindowPid)
+                || separator != L':' || !handle || !config.captureWindowPid || !(target >> std::ws).eof()) {
+                std::cout << R"({"type":"error","message":"Choose a valid capture window."})" << std::endl;
+                return 2;
+            }
+            config.captureWindow = reinterpret_cast<HWND>(handle);
+            continue;
+        }
+        if (argument == L"--video-device" || argument == L"--video-file") {
+            const auto selected = next();
+            const std::size_t limit = argument == L"--video-device" ? 2048 : 32000;
+            if (selected.empty() || selected.size() > limit || config.hasVideoSource()) {
+                std::cout << R"({"type":"error","message":"Choose exactly one valid video source."})" << std::endl;
+                return 2;
+            }
+            if (argument == L"--video-device") config.videoDevice = selected;
+            else config.videoFile = selected;
+            continue;
+        }
+        if (argument == L"--crop-video") {
+            config.videoFullFrame = false;
             continue;
         }
         // Keep this separate from the long compatibility parser below. MSVC
@@ -4342,6 +4460,26 @@ int runHeadless(int argc, wchar_t* argv[]) {
         }
         if (argument == L"--motion-compensation-auto-max-rate") {
             config.motionCompensationAutoMaxRate = std::clamp(wcstod(next().c_str(), nullptr), 0.001, 1000000.0);
+            continue;
+        }
+        if (argument == L"--mouse-host-token") {
+            config.mouseHostToken = next();
+            if (!vaporlock::mouse_host::validToken(config.mouseHostToken)) {
+                std::cout << R"({"type":"output-error","message":"Invalid administrator mouse session token."})" << std::endl;
+                return 2;
+            }
+            continue;
+        }
+        if (argument == L"--mouse-host-pid") {
+            const auto value = next();
+            wchar_t* end = nullptr;
+            errno = 0;
+            config.mouseHostPid = wcstoul(value.c_str(), &end, 10);
+            if (value.empty() || !end || *end || value.front() < L'1' || value.front() > L'9'
+                || errno == ERANGE || !config.mouseHostPid) {
+                std::cout << R"({"type":"output-error","message":"Invalid administrator mouse process identity."})" << std::endl;
+                return 2;
+            }
             continue;
         }
         // Collection options form a separate early-handled group. Keeping
@@ -4601,6 +4739,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
 
     if (!vaporlock::validTriggerThresholds(config.controllerTriggerPress, config.controllerTriggerRelease)) return 2;
 
+    if (!config.videoFile.empty()) config.observeOnly = true;
     applySessionSafety(config);
 
     if (config.requireNativePixels && !config.cloudPipe.empty()) {
@@ -4624,7 +4763,9 @@ int runHeadless(int argc, wchar_t* argv[]) {
             return 0;
         }
         try {
-            detector.validateNativeInput(config.captureRegion.width, config.captureRegion.height, config);
+            // External video dimensions are verified against the actual decoded frame.
+            if (!config.hasVideoSource())
+                detector.validateNativeInput(config.captureRegion.width, config.captureRegion.height, config);
         } catch (const std::exception& exception) {
             std::cout << "{\"type\":\"error\",\"message\":\""
                       << wideToUtf8(jsonEscape(narrowToWide(exception.what()))) << "\"}" << std::endl;
@@ -4640,6 +4781,17 @@ int runHeadless(int argc, wchar_t* argv[]) {
     const bool usingVirtualXbox = config.outputTransport == vaporlock::hardware::kVirtualXboxTransport;
     const bool usingHardwareOutput = vaporlock::hardware::usesHardwareTransport(config.outputTransport);
     const bool usingControllerHost = usingVirtualXbox && !config.controllerHostPipe.empty();
+    const bool usingMouseHost = !config.mouseHostToken.empty() || config.mouseHostPid != 0;
+    std::optional<vaporlock::mouse_host::Client> mouseHost;
+    if (usingMouseHost) {
+        mouseHost.emplace();
+        if (config.outputTransport != vaporlock::hardware::kMouseTransport ||
+            !mouseHost->connect(config.mouseHostToken, config.mouseHostPid)) {
+            std::cout << R"({"type":"output-error","message":"Administrator mouse output is unavailable. Stop the session and prepare it again under Movement > Transport."})" << std::endl;
+            return 1;
+        }
+        std::cout << R"({"type":"output","transport":"mouse","message":"Administrator relative mouse output connected."})" << std::endl;
+    }
     if (usingVirtualXbox && !usingControllerHost) {
         std::cout << "{\"type\":\"output-error\",\"message\":\"Prepare the local Xbox One-compatible controller bridge from the control center before starting this output transport.\"}" << std::endl;
         return 1;
@@ -4677,6 +4829,22 @@ int runHeadless(int argc, wchar_t* argv[]) {
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     DesktopCapture desktopCapture;
     DesktopCapture::Frame capture;
+    std::optional<vaporlock::video::Input> video;
+    std::optional<vaporlock::video::WindowInput> window;
+    vaporlock::video::Frame videoFrame;
+    if (config.captureWindow) {
+        window.emplace();
+        if (!window->open(config.captureWindow, config.captureWindowPid)) {
+            std::cout << R"({"type":"error","message":"Windows could not capture the selected window. Choose an open window with graphics capture support."})" << std::endl;
+            return 1;
+        }
+    } else if (config.hasVideoSource()) {
+        video.emplace();
+        if (!video->open(config.videoDevice, config.videoFile, config.captureFps)) {
+            std::cout << R"({"type":"error","message":"Could not open the video source. Check that the device is available or that Windows can decode the file."})" << std::endl;
+            return 1;
+        }
+    }
     IoUTracker tracker;
     TargetSelector selector;
     MotionCompensationState motionCompensation;
@@ -4745,8 +4913,27 @@ int runHeadless(int argc, wchar_t* argv[]) {
             if (usingHardwareOutput && (report.dx || report.dy)) {
                 std::wstring error;
                 const bool ok = hardwareOutput->sendRelativeMovement(report.dx, report.dy, error);
-                if (!ok) status.fatalError = error.empty() ? L"The hardware transport rejected output." : error;
+                if (!ok) {
+                    if (settings.outputTransport == vaporlock::hardware::kVirtualMouseTransport)
+                        status.movementError = std::move(error);
+                    else
+                        status.fatalError = error.empty() ? L"The hardware transport rejected output." : std::move(error);
+                }
                 return ok;
+            }
+            if (mouseHost && (report.dx || report.dy)) {
+                vaporlock::mouse_host::Reply reply{};
+                if (!mouseHost->send(report.dx, report.dy, reply)) {
+                    status.fatalError = L"Administrator mouse output disconnected. Prepare it again under Movement > Transport.";
+                    return false;
+                }
+                if (reply.accepted) return true;
+                status.movementError = reply.error == ERROR_RETRY
+                    ? L"Mouse output paused because the foreground window or input desktop changed."
+                    : L"Windows rejected administrator mouse movement.";
+                if (reply.error && reply.error != ERROR_RETRY)
+                    status.movementError += L" Windows error " + std::to_wstring(reply.error) + L".";
+                return false;
             }
             return usingHardwareOutput ? true : submitWindowsAim(report, input, settings, status);
         }, {},
@@ -4754,6 +4941,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
             if (telemetry.failed()) {
                 authorized = insideSnap = false;
                 status.fatalError = L"The control center connection was closed.";
+            }
+            if (mouseHost && !mouseHost->connected()) {
+                authorized = insideSnap = false;
+                status.fatalError = L"Administrator mouse output disconnected. Prepare it again under Movement > Transport.";
             }
             const auto result = eventAction.update(settings, authorized, insideSnap, now);
             status.eventHolding = eventAction.held();
@@ -4766,7 +4957,9 @@ int runHeadless(int argc, wchar_t* argv[]) {
         },
         [&](const AppConfig& current, std::uint64_t revision, bool authorized, bool nativeRunning) {
             datasetWriter.observeOutput(current, revision, authorized, nativeRunning && !telemetry.failed());
-        });
+        }, mouseHost ? AimOutputScheduler::KeySampler([&](int activation, int compensation, int quickRelease) {
+            return mouseHost->sample(activation, compensation, quickRelease);
+        }) : AimOutputScheduler::KeySampler{});
     LiveConfigPump liveConfig(config, output, [&](std::uint64_t epoch) {
         telemetry.publish(Telemetry::Kind::Control,
             "{\"type\":\"setting-rejected\",\"control_epoch\":" + std::to_string(epoch)
@@ -4785,7 +4978,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         }, &sharedPreview);
     const bool cloudCapturePaced = !config.cloudPipe.empty();
     std::optional<DesktopCaptureWorker> captureWorker;
-    if (!cloudCapturePaced && !config.modelPath.empty())
+    if (!video && !window && !cloudCapturePaced && !config.modelPath.empty())
         captureWorker.emplace([&](std::uint64_t revision) {
             return telemetry.failed() || !liveConfig.current(revision);
         }, [&](CaptureFrameIdentity identity) {
@@ -4843,9 +5036,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const auto outputGeneration = liveConfig.read(config);
         if(trackingGeneration==outputGeneration)config.frameReference=previousReference;
         const bool desktopModelCapture = captureWorker && config.captureMonitor > 0;
-        const bool freshCapturePaced = cloudCapturePaced || desktopModelCapture;
-        auto frameDeadline = freshCapturePaced ? frameStarted : frameSchedule.begin(frameStarted,config.captureFps);
-        if (cloudCapturePaced && cloudCaptureSchedule.hasFresh()) {
+        const bool freshCapturePaced = (!window && cloudCapturePaced) || desktopModelCapture;
+        auto frameDeadline = freshCapturePaced || config.hasVideoSource()
+            ? frameStarted : frameSchedule.begin(frameStarted, config.captureFps);
+        if (!video && !window && cloudCapturePaced && cloudCaptureSchedule.hasFresh()) {
             if (!waitForCaptureRate(cloudCaptureSchedule.next(config.captureFps))) continue;
             if(!liveConfig.current(outputGeneration))continue;
         }
@@ -4861,7 +5055,41 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const DesktopCaptureWorker::Request captureRequest{config.captureMonitor, config.captureRegion,
             config.captureFps, outputGeneration};
         capture.fresh = capture.attempted = false;
-        if (captureWorker) {
+        if (video || window) {
+            const auto& region = config.captureRegion;
+            using Result = vaporlock::video::Input::Result;
+            const vaporlock::video::Crop crop{region.xOffset, region.yOffset, region.width, region.height,
+                                               config.videoFullFrame};
+            const auto result = window ? window->poll(crop, videoFrame) : video->poll(crop, config.captureFps, videoFrame);
+            if (result == Result::Finished)
+                return fail(window ? R"({"type":"notice","message":"The selected window closed. Capture stopped."})"
+                                   : R"({"type":"notice","message":"Video playback finished."})", 0);
+            if (result == Result::Failed)
+                return fail(R"({"type":"error","message":"Video input stopped or returned an unsupported frame."})", 1);
+            if (result == Result::Ready) {
+                const auto geometry = std::tie(videoFrame.left, videoFrame.top, videoFrame.width, videoFrame.height,
+                                               videoFrame.sourceWidth, videoFrame.sourceHeight);
+                if (geometry != std::tie(capture.frameLeft, capture.frameTop, capture.frameWidth, capture.frameHeight,
+                                         capture.sourceWidth, capture.sourceHeight)) ++capture.identity.sourceGeneration;
+                capture.identity.session = 1;
+                ++capture.identity.frameId;
+                capture.identity.configRevision = outputGeneration;
+                capture.frameWidth = videoFrame.width;
+                capture.frameHeight = videoFrame.height;
+                capture.frameLeft = videoFrame.left;
+                capture.frameTop = videoFrame.top;
+                capture.sourceWidth = videoFrame.sourceWidth;
+                capture.sourceHeight = videoFrame.sourceHeight;
+                capture.sourceBackend = window ? 5 : config.videoFile.empty() ? 3 : 4;
+                capture.observed = videoFrame.observed;
+                capture.acquired = AimClock::now();
+                capture.captureMs = std::chrono::duration<double, std::milli>(capture.acquired - captureStarted).count();
+                capture.capturedAt = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                capture.fresh = true;
+                capture.pixels.swap(videoFrame.bgra);
+            }
+        } else if (captureWorker) {
             captureWorker->submit(captureRequest);
             const auto result = captureWorker->take(capture, outputGeneration, std::chrono::milliseconds(8), &captureProgress);
             captureOk = result != DesktopCaptureWorker::Result::Failed;
@@ -4872,11 +5100,13 @@ int runHeadless(int argc, wchar_t* argv[]) {
             desktopCapture.takeFrame(capture, outputGeneration);
         }
         const auto afterCapture = AimClock::now();
-        if (cloudCapturePaced && capture.freshFrame() && !cloudCaptureSchedule.commit(capture.acquired, config.captureFps))
+        if (!video && !window && cloudCapturePaced && capture.freshFrame() && !cloudCaptureSchedule.commit(capture.acquired, config.captureFps))
             return fail("{\"type\":\"error\",\"message\":\"Capture violated its fresh-frame rate boundary.\"}",1);
-        if ((freshCapturePaced || captureWorker) && captureCancelled()) {++retiredCaptureAttempts;continue;}
+        if ((video || window || freshCapturePaced || captureWorker) && captureCancelled()) {++retiredCaptureAttempts;continue;}
         if (rateViolation) return fail("{\"type\":\"error\",\"message\":\"Capture violated its fresh-frame rate boundary.\"}", 1);
         if(!captureOk)return fail("{\"type\":\"error\",\"message\":\"Desktop capture failed\"}",1);
+        if (capture.freshFrame() && !config.capturePrivacyMasks.empty())
+            vaporlock::privacy::redact(capture.pixels, capture.width(), capture.height(), config.capturePrivacyMasks);
         if (timingReady && capture.attempted) pipelineTiming.captureAcquire.record(capture.acquireMs);
         const auto sourceIdentity = capture.frameIdentity(outputGeneration);
         const bool sourceChanged = capture.freshFrame() && (trackingSource != sourceIdentity.sourceGeneration
@@ -4918,7 +5148,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         }
         if (capture.freshFrame()) datasetWriter.observeSource(capture.frameIdentity(outputGeneration));
         if (capture.freshFrame()) ++freshCaptures;
-        else if (!captureWorker) ++noFreshFramePolls;
+        else if (!captureWorker && !video && !window) ++noFreshFramePolls;
         const bool needsController = config.activationSource != 0
                                       || (config.manualTargetLockEnabled && config.manualLockSource != 0)
                                       || (usingVirtualXbox && config.virtualControllerMode == 1);
@@ -4940,7 +5170,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
         if ((manualLockDown && !manualLockWasDown) || manualLockRequested) selector.toggleManualLock();
         manualLockWasDown = manualLockDown;
         const bool inferenceEligible = capture.hasCommittedFrame()
-            && (capture.freshFrame() || config.modelPath.empty());
+            && (capture.freshFrame() || (!config.hasVideoSource() && config.modelPath.empty()));
         const auto decision = inferenceCadence.evaluate(afterCapture, inferenceEligible,
             config.captureFps, config.inferenceFps, config.frameSkip, true);
         using InferenceDecision = vaporlock::InferenceCadence::Decision;
@@ -5047,7 +5277,8 @@ int runHeadless(int argc, wchar_t* argv[]) {
         const bool outputActive = outputStatus.active;
         const bool compensationActive = outputStatus.compensationActive;
         const bool targetInsideSnap = outputStatus.insideSnap;
-        const bool eventActionActivationAuthorized = !config.eventActionRequiresActivation || activationAuthorized;
+        const bool eventActionActivationAuthorized = !outputStatus.quickReleaseHeld
+            && (!config.eventActionRequiresActivation || activationAuthorized);
         const char* outputReason = outputStatus.reason.c_str();
         const char* eventActionReason = outputStatus.eventReason.c_str();
 
@@ -5112,6 +5343,7 @@ int runHeadless(int argc, wchar_t* argv[]) {
                        << ",\"controller_connected\":" << (controller.connected ? "true" : "false")
                        << ",\"physical_controller_slot\":" << (controller.connected ? static_cast<int>(controller.slot + 1) : 0)
                        << ",\"output_transport\":\"" << wideToUtf8(vaporlock::hardware::transportWireName(config.outputTransport)) << "\""
+                       << ",\"mouse_elevated\":" << (usingMouseHost ? "true" : "false")
                        << ",\"virtual_controller_ready\":" << (virtualControllerReady ? "true" : "false")
                        << ",\"virtual_controller_slot\":" << virtualControllerSlot
                        << ",\"virtual_controller_mode\":\"" << (config.virtualControllerMode == 1 ? "slot0-proxy" : "separate") << "\""
@@ -5120,7 +5352,10 @@ int runHeadless(int argc, wchar_t* argv[]) {
                        << ",\"observe_only\":" << (config.observeOnly ? "true" : "false")
                        << ",\"output_active\":" << (outputActive ? "true" : "false")
                        << ",\"activation_authorized\":" << (activationAuthorized ? "true" : "false")
+                       << ",\"input_available\":" << (outputStatus.inputAvailable ? "true" : "false")
+                       << ",\"activation_input_down\":" << (outputStatus.activationInputDown ? "true" : "false")
                        << ",\"output_reason\":\"" << outputReason << "\""
+                       << ",\"movement_error\":\"" << wideToUtf8(jsonEscape(outputStatus.movementError)) << "\""
                        << ",\"motion_compensation_enabled\":" << (config.motionCompensationEnabled ? "true" : "false")
                        << ",\"motion_compensation_active\":" << (compensationActive ? "true" : "false")
                        << ",\"motion_compensation_mode\":\"" << (config.motionCompensationMode == 1 ? "automatic" : config.motionCompensationMode == 2 ? "combined" : "preset") << "\""
@@ -5205,6 +5440,13 @@ int runHeadless(int argc, wchar_t* argv[]) {
             pipelineTiming.postTrackingWork.record(
                 std::chrono::duration<double, std::milli>(AimClock::now() - previousCompletion).count());
 
+        if (video || window) {
+            if (window && capture.freshFrame())
+                waitForCaptureRate(frameSchedule.begin(frameStarted, config.captureFps));
+            if (!capture.freshFrame())
+                frameWait.until(AimClock::now()+std::chrono::milliseconds(2),liveConfig.changedEvent(),[&]{return telemetry.failed();});
+            continue;
+        }
         if (desktopModelCapture) continue;
         if (cloudCapturePaced) {
             // Keep waiting for the next desktop image without spending another

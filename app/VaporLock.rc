@@ -11,3 +11,12 @@ IDI_VAPORLOCK_ICON ICON "..\\assets\\VaporLock.ico"
 #else
 201 RCDATA { 12 }
 #endif
+
+// Mouse host protocol version shared by the native engines and the helper.
+#if defined(VAPORLOCK_SUPPORTS_MOUSE_HOST) && VAPORLOCK_SUPPORTS_MOUSE_HOST
+202 RCDATA { 2 }
+#endif
+
+#if defined(VAPORLOCK_CAPTURE_CONTROLS) && VAPORLOCK_CAPTURE_CONTROLS
+203 RCDATA { 1 }
+#endif

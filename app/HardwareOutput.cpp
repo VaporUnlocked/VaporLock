@@ -176,8 +176,33 @@ struct HardwareMovementOutput::Impl {
     using VirtualMouseCreate = void*(__cdecl*)();
     using VirtualMouseDestroy = void(__cdecl*)(void*);
     using VirtualMouseSend = int(__cdecl*)(void*, int, const InterceptionMouseStroke*, unsigned int);
+    VirtualMouseCreate virtualMouseCreate = nullptr;
     VirtualMouseDestroy virtualMouseDestroy = nullptr;
     VirtualMouseSend virtualMouseSend = nullptr;
+
+    void releaseVirtualMouse() noexcept {
+        if (virtualMouseContext) virtualMouseDestroy(virtualMouseContext);
+        virtualMouseContext = nullptr;
+        virtualMouseDevice = 0;
+    }
+
+    bool bindVirtualMouse(std::wstring& error) {
+        virtualMouseContext = virtualMouseCreate();
+        if (!virtualMouseContext) {
+            error = L"Windows could not open the virtual mouse input context. Check the driver and restart Windows after installation.";
+            return false;
+        }
+        const InterceptionMouseStroke probe{};
+        for (int device = 11; device <= 20; ++device) {
+            if (virtualMouseSend(virtualMouseContext, device, &probe, 1) == 1) {
+                virtualMouseDevice = device;
+                return true;
+            }
+        }
+        releaseVirtualMouse();
+        error = L"No mouse responded through the virtual mouse driver. Reconnect the mouse and check that the driver is active.";
+        return false;
+    }
 };
 
 bool parseTransport(const std::wstring& value, int& transport) {
@@ -268,8 +293,8 @@ bool HardwareMovementOutput::prepare(int transport, const HardwareOutputConfig& 
 
     if (transport == kVirtualMouseTransport) {
         const std::wstring libraryPath = trim(config.virtualMouseLibraryPath);
-        if (libraryPath.empty()) {
-            error = L"The bundled virtual mouse component is unavailable in this Vapor Lock copy.";
+        if (libraryPath.empty() || GetFileAttributesW(libraryPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            error = L"The virtual mouse library (interception.dll) is missing from this VaporLock copy.";
             return false;
         }
         state->virtualMouseLibrary = LoadLibraryExW(libraryPath.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
@@ -278,31 +303,16 @@ bool HardwareMovementOutput::prepare(int transport, const HardwareOutputConfig& 
             error = L"Windows could not load the virtual mouse component.";
             return false;
         }
-        const auto create = reinterpret_cast<Impl::VirtualMouseCreate>(resolveExport(state->virtualMouseLibrary, "interception_create_context", ""));
+        state->virtualMouseCreate = reinterpret_cast<Impl::VirtualMouseCreate>(resolveExport(state->virtualMouseLibrary, "interception_create_context", ""));
         state->virtualMouseDestroy = reinterpret_cast<Impl::VirtualMouseDestroy>(resolveExport(state->virtualMouseLibrary, "interception_destroy_context", ""));
         state->virtualMouseSend = reinterpret_cast<Impl::VirtualMouseSend>(resolveExport(state->virtualMouseLibrary, "interception_send", ""));
-        if (!create || !state->virtualMouseDestroy || !state->virtualMouseSend) {
+        if (!state->virtualMouseCreate || !state->virtualMouseDestroy || !state->virtualMouseSend) {
             FreeLibrary(state->virtualMouseLibrary);
             error = L"The bundled virtual mouse component has an incompatible API.";
             return false;
         }
-        state->virtualMouseContext = create();
-        if (!state->virtualMouseContext) {
+        if (!state->bindVirtualMouse(error)) {
             FreeLibrary(state->virtualMouseLibrary);
-            error = L"Windows could not create the virtual mouse input context.";
-            return false;
-        }
-        const InterceptionMouseStroke probe{};
-        for (int device = 11; device <= 20; ++device) {
-            if (state->virtualMouseSend(state->virtualMouseContext, device, &probe, 1) == 1) {
-                state->virtualMouseDevice = device;
-                break;
-            }
-        }
-        if (!state->virtualMouseDevice) {
-            state->virtualMouseDestroy(state->virtualMouseContext);
-            FreeLibrary(state->virtualMouseLibrary);
-            error = L"The virtual mouse driver is not active. Install it from Movement, then restart Windows before using this transport.";
             return false;
         }
         m_impl = std::move(state);
@@ -467,9 +477,13 @@ bool HardwareMovementOutput::sendRelativeMovement(int x, int y, std::wstring& er
         return true;
     }
     if (m_impl->transport == kVirtualMouseTransport) {
+        if (!m_impl->virtualMouseContext && !m_impl->bindVirtualMouse(error)) return false;
         const auto stroke = virtualMouseMove(x, y);
         if (m_impl->virtualMouseSend(m_impl->virtualMouseContext, m_impl->virtualMouseDevice, &stroke, 1) != 1) {
-            error = L"The virtual mouse driver rejected the movement command.";
+            // A detached mouse can leave an unusable driver context. Open a
+            // fresh one on the next scheduled movement and discard this report.
+            m_impl->releaseVirtualMouse();
+            error = L"The virtual mouse driver rejected movement. VaporLock will try to reconnect when there is fresh movement.";
             return false;
         }
         return true;
@@ -491,7 +505,7 @@ void HardwareMovementOutput::close() noexcept {
     if (m_impl->socket != INVALID_SOCKET) closesocket(m_impl->socket);
     if (m_impl->winsockStarted) WSACleanup();
     if (m_impl->kmboxALibrary) FreeLibrary(m_impl->kmboxALibrary);
-    if (m_impl->virtualMouseDestroy && m_impl->virtualMouseContext) m_impl->virtualMouseDestroy(m_impl->virtualMouseContext);
+    m_impl->releaseVirtualMouse();
     if (m_impl->virtualMouseLibrary) FreeLibrary(m_impl->virtualMouseLibrary);
     m_impl.reset();
 }

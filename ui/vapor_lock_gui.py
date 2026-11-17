@@ -22,6 +22,7 @@ import uuid
 from statistics import median
 from functools import wraps
 from vlui_native_injection import native_injection, require_native_effect, writable_native_path
+from relative_mouse_elevation import MouseHostSession, RelativeMouseElevation
 from vlui_native_typography import scaled_native_stylesheet
 from batch1_controls import TuningLock, PreciseSpinBox, WrappedStatusLabel, tuning_guard
 from controller_thresholds import validate_thresholds
@@ -141,7 +142,10 @@ COMPONENT_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen",
 # Public releases keep launchable support executables out of the product root.
 # The frozen control center lives in ``app`` while profiles, engines, and user
 # assets remain one level above it.
-ROOT = COMPONENT_ROOT.parent if getattr(sys, "frozen", False) and (COMPONENT_ROOT.parent / "engine").is_dir() else COMPONENT_ROOT
+ROOT = COMPONENT_ROOT
+if getattr(sys, "frozen", False) and ((COMPONENT_ROOT.parent / "engine").is_dir()
+                                     or (COMPONENT_ROOT.parent / "information/RELEASE_MANIFEST.json").is_file()):
+    ROOT = COMPONENT_ROOT.parent
 if (COMPONENT_ROOT.parent / 'information/alpha-manifest.json').is_file():
     ROOT = COMPONENT_ROOT.parent
 _READ_ONLY_PRODUCT_ROOT = ROOT
@@ -600,6 +604,11 @@ class Settings:
     resize_mode: str = "letterbox"
     require_native_pixels: bool = False
     monitor: int = 1
+    capture_source: str = "desktop"
+    capture_privacy_masks: list[list[int]] = field(default_factory=list)
+    video_device: str = ""
+    video_file: str = ""
+    video_full_frame: bool = True
     region_x: int = DEFAULT_CAPTURE_REGION[0]
     region_y: int = DEFAULT_CAPTURE_REGION[1]
     region_width: int = DEFAULT_CAPTURE_REGION[2]
@@ -654,6 +663,7 @@ class Settings:
     movement_enabled: bool = False
     activation_mode: str = "hold"
     activation_key: str = "right"
+    quick_release_key: str = "mouse5"
     activation_source: str = "keyboard"
     controller_slot: int = 0
     controller_binding: str = "right_trigger"
@@ -851,6 +861,8 @@ class Settings:
         validate_crosshair(vars(self))
         from exclusion_zones import validate_zones
         self.exclusion_zones = validate_zones(self.exclusion_zones)
+        from capture_privacy import validate_masks
+        self.capture_privacy_masks = validate_masks(self.capture_privacy_masks)
         # Legacy frame durations have a fixed 60 Hz compatibility baseline.
         for duration, frames in (("track_retention_ms", "max_missed"),
                                  ("lost_target_timeout_ms", "lost_target_timeout"),
@@ -869,10 +881,12 @@ SETTING_ENUMS = {
     "model_output_format": ("auto", "yolo-class", "yolo-objectness", "end-to-end"),
     "model_coordinate_units": ("auto", "pixels", "normalized"),
     "strategy": (0, 1, 2, 3, 4),
+    "capture_source": ("desktop", "window", "device", "file"),
     "fov_shape": ("circle", "rectangle"),
     "anchor_mode": ("center", "top", "bottom", "upper-quarter"),
     "activation_mode": ("hold", "toggle"),
     "activation_source": ("keyboard", "controller", "either"),
+    "quick_release_key": ("mouse5", "mouse4", "middle", "shift", "control", "space", "none"),
     "manual_lock_source": ("keyboard", "controller", "either"),
     "event_action_mode": ("click", "hold"),
     "event_action_button": ("left", "right", "middle"),
@@ -1254,7 +1268,9 @@ class RangeControl(QWidget):
 
 
 class PreviewCanvas(QLabel):
-    """A fixed viewport for one debug frame; frame pixels never affect page layout."""
+    """Draw live or native-pixel snapshots without changing source pixels."""
+
+    frame_size_changed = Signal(QSize)
 
     def __init__(self, *, native_pixels: bool = False) -> None:
         super().__init__("Start capture to receive the live annotated preview")
@@ -1263,7 +1279,6 @@ class PreviewCanvas(QLabel):
         self._native_pixels = native_pixels
         self.setObjectName("previewSurface")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setMinimumHeight(230)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
 
@@ -1310,14 +1325,47 @@ class PreviewCanvas(QLabel):
     def set_frame(self, frame: QImage) -> None:
         if frame.isNull() and self._frame.isNull():
             return
+        size_changed = frame.size() != self._frame.size()
         self._frame = frame
-        if self._native_pixels:
+        if self._native_pixels and size_changed:
             self._size_to_pixels()
+        elif size_changed:
+            self.frame_size_changed.emit(frame.size())
         self.update()
 
     def save_snapshot(self, path: Path) -> bool:
         """Write the most recent annotated native preview without resizing it."""
         return not self._frame.isNull() and self._frame.save(str(path), "PNG")
+
+
+class FittedPreview(QWidget):
+    """Reserve only the height needed by the frame at the current panel width."""
+
+    def __init__(self):
+        super().__init__()
+        self.canvas = PreviewCanvas()
+        self.canvas.setObjectName("policyPreviewSurface")
+        self.canvas.setParent(self)
+        self.canvas.frame_size_changed.connect(self.fit_frame)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.fit_frame()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.fit_frame()
+
+    def fit_frame(self, *_):
+        width = max(1, self.contentsRect().width())
+        frame = self.canvas._frame.size()
+        if frame.isEmpty():
+            size = QSize(min(width, 440), 132)
+        else:
+            max_height = max(132, self.screen().availableGeometry().height() * 3 // 5)
+            size = frame.scaled(QSize(width, max_height), Qt.AspectRatioMode.KeepAspectRatio)
+            size = QSize(max(1, size.width()), max(1, size.height()))
+        if self.height() != size.height():
+            self.setFixedHeight(size.height())
+        self.canvas.setGeometry((width - size.width()) // 2, 0, size.width(), size.height())
 
 
 class DatasetReviewQueueDelegate(QStyledItemDelegate):
@@ -2305,6 +2353,7 @@ class XboxCompatibleBridgeManager(QObject):
         candidates = (
             COMPONENT_ROOT / "controller-host" / "VaporLockControllerHost.exe",
             ROOT / "app" / "controller-host" / "VaporLockControllerHost.exe",
+            ROOT / "build" / "controller-host" / "VaporLockControllerHost.exe",
             ROOT / "controller_host" / "bin" / "Release" / "net10.0-windows10.0.26100.0" / "win-x64" / "VaporLockControllerHost.exe",
         )
         return next((candidate for candidate in candidates if candidate.is_file()), None)
@@ -2544,7 +2593,7 @@ class EngineBridge(QObject):
         "strategy", "acquisition_radius", "near_radius", "snap_radius", "retention_radius", "fov_shape", "switching", "lock_persistence_ms",
         "lost_target_timeout", "minimum_track_age", "anchor_mode", "anchor_x", "anchor_y", "class_policies",
         "watchlist", "occlusion_handling", "occlusion_grace_frames", "occlusion_reacquire_radius",
-        "movement_enabled", "activation_mode", "activation_key", "activation_source", "controller_slot",
+        "movement_enabled", "activation_mode", "activation_key", "activation_source", "quick_release_key", "controller_slot",
         "controller_binding", "gain", "max_step", "deadzone", "movement_smoothing", "output_rate",
         "motion_compensation_enabled", "motion_compensation_mode", "motion_compensation_vertical",
         "motion_compensation_activation_mode", "motion_compensation_activation_key",
@@ -2614,6 +2663,7 @@ class EngineBridge(QObject):
         self._manual_lock_event_name = ""
         self._manual_lock_event_handle: wintypes.HANDLE | None = None
         self._controller_host_session: ControllerHostSession | None = None
+        self._mouse_host_session: MouseHostSession | None = None
         self._observe_only = False
         self._cloud_session = None
         self.startup_rejected.connect(lambda: self._cloud_session.stop() if self._cloud_session else None)
@@ -2638,11 +2688,23 @@ class EngineBridge(QObject):
 
     @property
     def overlay_metadata_active(self) -> bool:
-        return bool(self.active and self._settings and self._settings.desktop_overlay_enabled and not False)
+        return bool(self.active and self._settings and self._settings.capture_source == "desktop"
+                    and self._settings.desktop_overlay_enabled)
 
     @staticmethod
     def provider_label(provider: str) -> str:
         return {"auto": "Automatic", "cpu": "CPU", "cuda": "CUDA", "dml": "DirectML", "trt": "TensorRT RTX"}.get(provider, provider)
+
+    @staticmethod
+    def mouse_host_upgrade_message(provider: str) -> str:
+        provider_label = EngineBridge.provider_label(provider)
+        if getattr(sys, "frozen", False):
+            action = f"Extract a fresh VaporLock {PRODUCT_VERSION} package and try again."
+        elif provider == "dml":
+            action = "Rebuild it with BuildCommunity.ps1 -NativeDirectML and try again."
+        else:
+            action = f"Rebuild the native engines for VaporLock {PRODUCT_VERSION} and try again."
+        return f"The {provider_label} engine needs an update for administrator mouse output. {action}"
 
     @staticmethod
     def process_environment(provider: str) -> QProcessEnvironment:
@@ -2857,6 +2919,7 @@ class EngineBridge(QObject):
         settings: Settings,
         controller_host_session: ControllerHostSession | None = None,
         observe_only: bool = False,
+        mouse_host_session: MouseHostSession | None = None,
     ) -> None:
         if self.active:
             return
@@ -2886,6 +2949,7 @@ class EngineBridge(QObject):
                 self.startup_rejected.emit()
                 return
         self._settings = Settings(**asdict(settings))
+        self._settings._capture_window = getattr(settings, "_capture_window", "")
         self._observe_only = bool(observe_only)
         self._providers = self.candidate_providers(self._settings)
         self._provider_index = 0
@@ -2895,6 +2959,7 @@ class EngineBridge(QObject):
         self._fatal_error = False
         self._fallback_pending = False
         self._controller_host_session = controller_host_session
+        self._mouse_host_session = mouse_host_session if not observe_only and settings.output_transport == "mouse" else None
         self._prepare_manual_lock_event(self._settings)
         if self._settings.model_path and Path(self._settings.model_path).suffix.lower() == '.cloud':
             provider = 'dml' if self._settings.provider == 'auto' else self._settings.provider
@@ -2929,6 +2994,7 @@ class EngineBridge(QObject):
         from batch6_settings import device_for
         from cpu_placement import wire as cpu_wire
         from exclusion_zones import zones_wire
+        from capture_privacy import wire as privacy_wire
         validated_capture_settings(asdict(settings))
         from collection_limits import validate_limits
         validate_limits(asdict(settings))
@@ -2969,6 +3035,7 @@ class EngineBridge(QObject):
             "--class-policies", policies_wire(settings.class_policies),
             "--exclusion-zones", zones_wire(settings.exclusion_zones),
             "--activation-mode", settings.activation_mode, "--activation-key", settings.activation_key,
+            "--quick-release-key", settings.quick_release_key,
             "--activation-source", settings.activation_source, "--controller-slot", str(controller_slot),
             "--controller-binding", settings.controller_binding,
             "--controller-trigger-press", str(settings.controller_trigger_press),
@@ -3009,8 +3076,24 @@ class EngineBridge(QObject):
             "--dataset-max-images", str(settings.dataset_max_images), "--dataset-max-mib", str(settings.dataset_max_mib),
             "--segmentation-mask-limit", str(settings.segmentation_mask_limit), "--segmentation-mask-threshold", str(settings.segmentation_mask_threshold),
         ]
-        if settings.crosshair_enabled:args.append("--crosshair-enabled")
-        if calibration_wire:args.extend(("--crosshair-template",calibration_wire))
+        if settings.capture_privacy_masks:
+            args += ["--privacy-masks", privacy_wire(settings.capture_privacy_masks)]
+        if settings.capture_source == "device":
+            args.extend(("--video-device", settings.video_device))
+        elif settings.capture_source == "file":
+            args.extend(("--video-file", str(resolve_product_path(settings.video_file))))
+        elif settings.capture_source == "window":
+            target = getattr(settings, "_capture_window", "")
+            if not target:
+                raise ValueError("Choose an open window before starting capture.")
+            args += ["--capture-window", target]
+        if settings.capture_source != "desktop" and not settings.video_full_frame:
+            args.append("--crop-video")
+        if settings.capture_source == "desktop":
+            if settings.crosshair_enabled:
+                args.append("--crosshair-enabled")
+            if calibration_wire:
+                args.extend(("--crosshair-template", calibration_wire))
         args.append("--predict-lost" if settings.predict_lost else "--no-predict-lost")
         for field in AIM_NATIVE_SETTINGS:
             value = getattr(settings, field)
@@ -3066,15 +3149,17 @@ class EngineBridge(QObject):
         if self.intentional_stop or self.process.state() != QProcess.ProcessState.NotRunning or self._settings is None:
             return
         self._fallback_pending = False
-        if self._settings.crosshair_enabled:
+        if self._settings.capture_source == "desktop" and self._settings.crosshair_enabled:
             from crosshair_ui import exclude_windows
             if not exclude_windows():
                 self.message.emit("Crosshair detection requires capture exclusion for VaporLock windows. Turn it off to use screen centre.")
                 self.state_changed.emit("Stopped");self._release_manual_lock_event();self.startup_rejected.emit();return
+        from native_engine_layout import supports_capture_controls, supports_lossless_preview, supports_mouse_host, supports_shared_preview
         while self._provider_index < len(self._providers):
             provider = self._providers[self._provider_index]
             needs_onnx = bool(self._settings.model_path) and self._cloud_session is None
-            executable, environment = self.launch_for('cpu' if self._cloud_session else provider, require_model=needs_onnx)
+            native_provider = "cpu" if self._cloud_session else provider
+            executable, environment = self.launch_for(native_provider, require_model=needs_onnx)
             if executable is None:
                 missing = f"The bundled {self.provider_label(provider)} engine is unavailable."
                 if not getattr(sys, "frozen", False) and provider == "cpu" and needs_onnx:
@@ -3090,10 +3175,22 @@ class EngineBridge(QObject):
                 self.message.emit(f"{missing} Trying the next compatible provider.")
                 self._provider_index += 1
                 continue
+            if ((self._settings.capture_source == "window" or self._settings.capture_privacy_masks)
+                    and not supports_capture_controls(executable)):
+                self.message.emit(f"The {self.provider_label(native_provider)} engine needs an update for window capture or privacy masks. Open Model Library → Runtime repair.")
+                self.state_changed.emit("Stopped")
+                self._release_manual_lock_event()
+                self.startup_rejected.emit()
+                return
+            if self._mouse_host_session is not None and not supports_mouse_host(executable):
+                self.message.emit(self.mouse_host_upgrade_message(native_provider))
+                self.state_changed.emit("Stopped")
+                self._release_manual_lock_event()
+                self.startup_rejected.emit()
+                return
             self._reset_output_stream()
             self._active_provider = provider
             self._has_telemetry = False
-            from native_engine_layout import supports_lossless_preview, supports_shared_preview
             self._preview_lossless_supported = supports_lossless_preview(executable)
             self._last_error = ""
             self.state_changed.emit(f"Starting {self.provider_label(provider)} engine")
@@ -3116,6 +3213,9 @@ class EngineBridge(QObject):
                 return
             if self._cloud_session and self._cloud_session.ready:
                 arguments += ['--cloud-pipe', self._cloud_session.pipe, '--cloud-worker-pid', str(self._cloud_session.ready['pid'])]
+            if self._mouse_host_session is not None:
+                arguments += ["--mouse-host-token", self._mouse_host_session.token,
+                              "--mouse-host-pid", str(self._mouse_host_session.pid)]
             if not self._preview_lossless_supported and "--preview-lossless" in arguments:
                 arguments.remove("--preview-lossless")
                 if self._settings.preview_enabled:
@@ -3655,6 +3755,8 @@ class ControlCenter(QMainWindow):
         self.acceleration = services.acceleration(self) if services is not None else AccelerationManager(self)
         self.controller_bridge = services.controller(self) if services is not None else ControllerBridgeManager(self)
         self.xbox_compatible_bridge = services.xbox(self) if services is not None else XboxCompatibleBridgeManager(self)
+        self.relative_mouse_elevation = RelativeMouseElevation(self)
+        self.relative_mouse_elevation.changed.connect(self.relative_mouse_elevation_changed)
         self.desktop_overlay = services.overlay(self) if services is not None else DesktopOverlay()
         self._last_preview_frame = QImage()
         self._last_preview_format = ""
@@ -3863,10 +3965,6 @@ class ControlCenter(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, "command_bar"):
             self.update_header_density()
-        self.update_overview_grid()
-        if hasattr(self, "policy_reason_scroll"):
-            self.size_policy_reason()
-        self.update_targeting_layout()
         self.update_telemetry_layout()
 
     def queue_telemetry_layout(self) -> None:
@@ -3918,45 +4016,6 @@ class ControlCenter(QMainWindow):
         overflow = self.telemetry_strip.minimumSizeHint().width() > available
         self.telemetry_scroll.setFixedHeight(height + (self.telemetry_scroll.horizontalScrollBar().sizeHint().height() if overflow else 0))
 
-    def update_targeting_layout(self) -> None:
-        if not hasattr(self, "policy_deck_layout"):
-            return
-        scale = float(getattr(self._live_owner, '_scale', '1'))
-        stacked = self.stack.width() < round(1000 * scale)
-        rules_active=(getattr(self,'current_page','')=='selection' and hasattr(self,'targeting_tabs')
-                      and self.targeting_tabs.currentIndex()==self.targeting_tabs.index_of('Class rules'))
-        self.policy_deck_layout.setDirection(QHBoxLayout.Direction.TopToBottom if stacked else QHBoxLayout.Direction.LeftToRight)
-        self.policy_inspector.setMinimumWidth(0 if stacked else round(320 * scale))
-        self.policy_inspector.setMaximumWidth(16777215)
-        self.policy_inspector.setMinimumHeight(round((260 if rules_active else 440) * scale) if stacked else 0)
-        if hasattr(self,'policy_preview_view'):
-            self.policy_preview_view.setMinimumHeight(round((150 if rules_active and stacked else 230)*scale))
-            self._shared_preview_shell.setMaximumHeight(round(230*scale) if rules_active and stacked else 16777215)
-        main=self.policy_deck_layout.itemAt(0).widget()
-        main_width=max(0,main.contentsRect().width()-40)
-        headline_needed=sum(self.policy_headline_layout.itemAt(i).minimumSize().width()
-                            for i in range(self.policy_headline_layout.count()))+self.policy_headline_layout.spacing()
-        headline_stacked=stacked and (not rules_active or main_width<headline_needed)
-        self.policy_headline_layout.setDirection(QHBoxLayout.Direction.TopToBottom if headline_stacked else QHBoxLayout.Direction.LeftToRight)
-        radii_needed=sum(card.minimumSizeHint().width() for card in self.policy_radius_cards)+3*self.policy_radii_layout.horizontalSpacing()
-        columns = 2 if stacked and (not rules_active or main_width<radii_needed) else 4
-        if getattr(self, '_policy_metric_columns', None) != columns:
-            for card in self.policy_radius_cards:
-                self.policy_radii_layout.removeWidget(card)
-            for index, card in enumerate(self.policy_radius_cards):
-                self.policy_radii_layout.addWidget(card, index // columns, index % columns)
-            for column in range(4):
-                self.policy_radii_layout.setColumnStretch(column, 1 if column < columns else 0)
-            self._policy_metric_columns = columns
-
-    def size_policy_reason(self) -> None:
-        width=max(200,self.policy_reason_scroll.viewport().width())
-        self.policy_text.setMinimumHeight(0)
-        self.policy_text.setMaximumHeight(16777215)
-        height=max(self.policy_text.heightForWidth(width),self.policy_text.fontMetrics().boundingRect(QRect(0,0,width,100000),int(Qt.TextFlag.TextWordWrap),self.policy_text.text()).height())+2*self.policy_text.fontMetrics().lineSpacing()+8
-        self.policy_text.setFixedHeight(max(20,height))
-        self.policy_reason_scroll.setFixedHeight(min(150,max(30,height+6)))
-
     def update_header_density(self) -> None:
         compact = self.width() < 1160
         self.save_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly if compact else Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
@@ -3970,11 +4029,6 @@ class ControlCenter(QMainWindow):
         coordinator = getattr(self, '_live_coordinator', None)
         if coordinator is not None:
             coordinator._size_command_row()
-
-    def update_overview_grid(self) -> None:
-        if hasattr(self, "_monitoring_preview_viewport"):
-            width = self._monitoring_columns.left.width()
-            self._monitoring_preview_viewport.setMinimumHeight(max(270, min(420, width * 9 // 16)))
 
     def make_navigation_deck(self) -> QWidget:
         from mission_layout import ActionFlow, ActionRow
@@ -4068,6 +4122,13 @@ class ControlCenter(QMainWindow):
         footer_layout.setContentsMargins(0, 0, 14, 4)
         footer_layout.setSpacing(8)
         footer_layout.addWidget(scroll, 1)
+        self.donation_link = QLabel('<a style="color:#7dbcf5" href="https://vaporunlocked.github.io/donations.github.io/">Donate</a>')
+        self.donation_link.setObjectName("hudLabel")
+        self.donation_link.setProperty("_vaporlock_i18n_skip", True)
+        self.donation_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        self.donation_link.setOpenExternalLinks(_NATIVE_INJECTION is None)
+        self.donation_link.setEnabled(_NATIVE_INJECTION is None)
+        footer_layout.addWidget(self.donation_link, 0, Qt.AlignmentFlag.AlignBottom)
 
         self.language_choice = QComboBox()
         self.language_choice.setObjectName("languageChoice")
@@ -4384,12 +4445,10 @@ class ControlCenter(QMainWindow):
                 content.layout().setContentsMargins(*margins)
         for tabs in self.findChildren(SecondarySettingsTabs):
             tabs.refresh_geometry()
-        self.update_targeting_layout()
         coordinator = getattr(self, '_live_coordinator', None)
         if coordinator is not None:
             coordinator.refresh_theme()
             coordinator._size_command_row()
-        self.update_targeting_layout()
 
         self.update_telemetry_layout()
         self.update_header_density()
@@ -4639,7 +4698,8 @@ class ControlCenter(QMainWindow):
         self.pages = {
             "games": games_page(self),
             "overview": self.overview_page(), "model": self.model_page(),
-            "detection": self.detection_page(), "selection": self.selection_page(), "output": self.output_page(),
+            "capture": self.capture_page(), "detection": self.detection_page(),
+            "selection": self.selection_page(), "output": self.output_page(),
             "dataset": self.dataset_page(),
             "cloud": self.cloud_studio_page(),
             "profiles": self.profiles_page(), "shortcuts": self.shortcuts_page(), "automation": self.automation_page(), "diagnostics": self.diagnostics_page(),
@@ -4667,11 +4727,6 @@ class ControlCenter(QMainWindow):
         log_text = self.log_view.toPlainText() if hasattr(self, "log_view") else ""
         frame = self._last_preview_frame if not self._last_preview_frame.isNull() else (self.preview_view._frame if hasattr(self, "preview_view") else QImage())
         tab_indices = {key: [tabs.currentIndex() for tabs in page.findChildren(SecondarySettingsTabs)] for key, page in self.pages.items()}
-        inspector_index = self.targeting_inspector_stack.currentIndex()
-        inspector_scrolls = [
-            self.targeting_inspector_stack.widget(index).verticalScrollBar().value()
-            for index in range(self.targeting_inspector_stack.count())
-        ]
         scrolls = {key: page.verticalScrollBar().value() for key, page in self.pages.items() if isinstance(page, QScrollArea)}
         if self._benchmark_active or self._validation_active:
             self._benchmark_active = False
@@ -4690,10 +4745,6 @@ class ControlCenter(QMainWindow):
         self.capture_interface_copy()
         self.apply_interface_language()
         self.show_page(route)
-        self.set_targeting_inspector_tab(inspector_index)
-        for index, value in enumerate(inspector_scrolls):
-            scroll = self.targeting_inspector_stack.widget(index)
-            QTimer.singleShot(0, lambda scroll=scroll, value=value: scroll.verticalScrollBar().setValue(value))
         self.log_view.setPlainText(log_text)
         self._refresh_monitoring_activity()
         for attribute in ("preview_view", "policy_preview_view"):
@@ -4717,11 +4768,7 @@ class ControlCenter(QMainWindow):
 
         preview_card = TaskCard("Live preview", "display")
         preview_card.setObjectName("monitoringPreview")
-        self._monitoring_preview_viewport = QWidget()
-        self._monitoring_preview_viewport.setMinimumHeight(300)
-        self._overview_preview_slot = QVBoxLayout(self._monitoring_preview_viewport)
-        self._overview_preview_slot.setContentsMargins(0, 0, 0, 0)
-        preview_card.body.addWidget(self._monitoring_preview_viewport, 1)
+        self._overview_preview_slot = preview_card.body
         overview_columns.left_layout.addWidget(preview_card)
 
         activity_card = TaskCard("Session activity", "pulse")
@@ -4908,13 +4955,25 @@ class ControlCenter(QMainWindow):
             ))
 
     def capture_page(self) -> QWidget:
-        page, layout = self.new_page("Capture", "Set a physical display and its centered capture region for the next native session.")
-        self._build_capture_controls(layout)
+        page, layout = self.new_page("Capture", "Choose the display, capture region, frame rate, and preview.")
+        tabs = self.settings_tabs(layout, "Source & rate", "Performance", "Preview", "Annotations", "Desktop overlay",
+                                  minimum_height=500, owner_attribute="capture_tabs")
+        self._build_capture_controls(tabs["Source & rate"])
+        self._build_capture_performance(tabs["Performance"])
+        self._capture_preview_layout = tabs["Preview"]
+        self._build_live_preview()
+        self._capture_preview_layout.addWidget(self._shared_preview_shell)
+        from capture_privacy import open_editor
+        masks = QPushButton("Edit privacy masks…")
+        masks.clicked.connect(lambda: open_editor(self))
+        self.setting(tabs["Preview"], "Capture privacy masks", "Cover selected areas before the frame reaches previews, inference, or capture storage.", masks)
+        self._build_preview_controls(tabs["Preview"], tabs["Annotations"], tabs["Desktop overlay"])
         return page
 
     def _build_capture_controls(self, layout: QVBoxLayout) -> None:
-        """Build the single capture configuration surface used by Targeting."""
         self.section(layout, "Source")
+        from video_input_ui import CaptureSourceControls
+        source = self.capture_input = CaptureSourceControls(self, layout)
         monitor = QComboBox()
         monitor.addItem("Virtual desktop (compatibility capture)", 0)
         for index, screen in enumerate(QGuiApplication.screens(), start=1):
@@ -4922,99 +4981,63 @@ class ControlCenter(QMainWindow):
             monitor.addItem(f"Monitor {index} · {screen.name()} ({size.width()} x {size.height()})", index)
         monitor.setCurrentIndex(max(0, monitor.findData(self.settings.monitor)))
         monitor.currentIndexChanged.connect(lambda index: self.change("monitor", int(monitor.itemData(index))))
-        self.setting(layout, "Capture display", "A physical monitor uses native DXGI Desktop Duplication. Virtual desktop is available as a compatibility path.", monitor)
+        self.setting(source.desktop_layout, "Capture display", "A physical monitor uses native DXGI Desktop Duplication. Virtual desktop is available as a compatibility path.", monitor)
         region = QLineEdit(f"{self.settings.region_x}, {self.settings.region_y}, {self.settings.region_width}, {self.settings.region_height}")
         region.setPlaceholderText("0, 0, 640, 640")
         region.editingFinished.connect(lambda: self.apply_region(region))
-        self.setting(layout, "Centered capture region", "x offset, y offset, width, height. 0, 0, 640, 640 captures a centered 640 x 640 frame. Negative offsets move left/up; positive offsets move right/down.", region)
+        self.setting(source.crop_layout, "Centered capture region", "x offset, y offset, width, height. 0, 0, 640, 640 captures a centered 640 x 640 frame. Negative offsets move left/up; positive offsets move right/down.", region)
+        from visual_geometry_ui import open_region_editor
+        picker = QPushButton("Pick capture region…")
+        picker.setObjectName("openRegionEditor")
+        picker.clicked.connect(lambda: open_region_editor(self))
+        source.desktop_picker = self._tuning_lock.wrap(picker)
+        source.crop_layout.addWidget(source.desktop_picker, alignment=Qt.AlignmentFlag.AlignLeft)
+        source.sync()
         self.section(layout, "Rate")
         self.setting(layout, "Capture rate", "Slider values top out at 120 fps; type a higher value when your source and hardware support it.", self.range("capture_fps", 1, 120, 0, " fps"))
         self.setting(layout, "Inference rate", "Slider values top out at 120 fps; type a higher value when your model can sustain it.", self.range("inference_fps", 1, 120, 0, " fps"))
         self.setting(layout, "Frame skip", "Additional captured frames skipped before an inference pass.", self.range("frame_skip", 0, 60))
+        layout.addStretch(1)
+
+    def _build_capture_performance(self, layout: QVBoxLayout) -> None:
         self.section(layout, "ONNX Runtime")
         self.setting(layout, "Intra-operation threads", "0 lets ONNX Runtime choose automatically. A positive value caps work inside each model operation.", self.range("ort_intra_op_threads", 0, 64))
         self.setting(layout, "Inter-operation threads", "0 lets ONNX Runtime choose automatically. A positive value caps parallel model graph work.", self.range("ort_inter_op_threads", 0, 32))
         self.setting(layout, "CUDA Graph replay", "Reduces launch overhead on compatible CUDA models. Changes take effect on the next start.", self.cuda_graph_control("Enable CUDA Graph replay"))
-        cuda_preprocess = self.cuda_preprocess_control("Use GPU preprocessing")
+        cuda_preprocess = self.cuda_preprocess_control("CUDA preprocessing")
         self.setting(layout, "GPU preprocessing", "Requires a compatible CUDA or TensorRT RTX engine and a float NCHW model. Other models use CPU preprocessing.", cuda_preprocess)
         self.refresh_cuda_preprocess_controls()
         layout.addStretch(1)
 
-    def _build_capture_inspector(self, layout: QVBoxLayout) -> None:
-        """Build capture controls sized for the Targeting right inspector."""
-        def card(title: str) -> QVBoxLayout:
-            panel = QFrame()
-            panel.setObjectName("policyInspectorCard")
-            panel_layout = QVBoxLayout(panel)
-            panel_layout.setContentsMargins(4, 11, 4, 14)
-            panel_layout.setSpacing(7)
-            heading = QLabel(title)
-            heading.setObjectName("policyCardTitle")
-            panel_layout.addWidget(heading)
-            layout.addWidget(panel)
-            return panel_layout
-
-        def labeled_control(parent: QVBoxLayout, title: str, control: QWidget, detail: str) -> None:
-            label = QLabel(title)
-            label.setObjectName("policyControlLabel")
-            label.setToolTip(detail)
-            control.setToolTip(detail)
-            heading = QHBoxLayout()
-            heading.addWidget(label)
-            add_guide_button(self, heading, title, control)
-            heading.addStretch(1)
-            parent.addLayout(heading)
-            parent.addWidget(self._tuning_lock.wrap(control))
-
-        def compact_range(
-            parent: QVBoxLayout,
-            title: str,
-            field: str,
-            low: float,
-            high: float,
-            decimals: int = 0,
-            suffix: str = "",
-            detail: str = "",
-        ) -> None:
-            control = self.range(field, low, high, decimals, suffix)
-            control.setObjectName("policyInspectorRange")
-            control.pass_slider_wheel_to_parent()
-            labeled_control(parent, title, control, detail or title)
-
-        source = card("SOURCE")
-        monitor = QComboBox()
-        monitor.addItem("Virtual desktop (compatibility capture)", 0)
-        for index, screen in enumerate(QGuiApplication.screens(), start=1):
-            size = screen.size()
-            monitor.addItem(f"Monitor {index} · {screen.name()} ({size.width()} x {size.height()})", index)
-        monitor.setCurrentIndex(max(0, monitor.findData(self.settings.monitor)))
-        monitor.currentIndexChanged.connect(lambda index: self.change("monitor", int(monitor.itemData(index))))
-        labeled_control(source, "Capture display", monitor, "Select the display used by the native capture engine.")
-        region = QLineEdit(f"{self.settings.region_x}, {self.settings.region_y}, {self.settings.region_width}, {self.settings.region_height}")
-        region.setPlaceholderText("0, 0, 640, 640")
-        region.editingFinished.connect(lambda: self.apply_region(region))
-        labeled_control(source, "Centered region", region, "x offset, y offset, width, height.")
-        from visual_geometry_ui import open_region_editor
-        picker = QPushButton("Pixel capture region…")
-        picker.setObjectName('openRegionEditor')
-        picker.clicked.connect(lambda: open_region_editor(self))
-        source.addWidget(self._tuning_lock.wrap(picker))
-
-        rate = card("RATE")
-        compact_range(rate, "Capture rate", "capture_fps", 1, 120, 0, " fps",
-                      "Slider values top out at 120 fps; type a higher value when your source and hardware support it.")
-        compact_range(rate, "Inference rate", "inference_fps", 1, 120, 0, " fps",
-                      "Slider values top out at 120 fps; type a higher value when your model can sustain it.")
-        compact_range(rate, "Frame skip", "frame_skip", 0, 60)
-
-        runtime = card("RUNTIME")
-        compact_range(runtime, "Intra-operation threads", "ort_intra_op_threads", 0, 64)
-        compact_range(runtime, "Inter-operation threads", "ort_inter_op_threads", 0, 32)
-        runtime.addWidget(self._tuning_lock.wrap(self.cuda_graph_control("CUDA Graph replay")))
-        cuda_preprocess = self.cuda_preprocess_control("CUDA preprocessing")
-        runtime.addWidget(cuda_preprocess)
-        self.refresh_cuda_preprocess_controls()
-        layout.addStretch(1)
+    def _build_live_preview(self) -> None:
+        preview_shell = QFrame()
+        self._shared_preview_shell=preview_shell
+        preview_layout = QVBoxLayout(preview_shell)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(0)
+        fitted_preview = FittedPreview()
+        self.policy_preview_view = fitted_preview.canvas
+        preview_layout.addWidget(fitted_preview)
+        preview_footer = QFrame()
+        preview_footer.setObjectName("policyPreviewFooter")
+        footer_layout = QHBoxLayout(preview_footer)
+        footer_layout.setContentsMargins(12, 8, 12, 8)
+        footer_layout.setSpacing(10)
+        preview_caption = QLabel("Live annotated preview")
+        self.policy_preview_caption = preview_caption
+        preview_caption.setObjectName("policyPreviewCaption")
+        preview_caption.setWordWrap(True)
+        self.policy_preview_status = QLabel("Waiting for capture")
+        self.policy_preview_status.setObjectName("policyPreviewStatus")
+        self.preview_native_button = QPushButton("View at 100%")
+        self.preview_native_button.setToolTip("Open a snapshot at one screen pixel per image pixel.")
+        self.preview_native_button.setEnabled(not self._last_preview_frame.isNull())
+        self.preview_native_button.clicked.connect(self.open_native_preview)
+        footer_layout.addWidget(preview_caption)
+        footer_layout.addStretch(1)
+        footer_layout.addWidget(self.policy_preview_status)
+        footer_layout.addWidget(self.preview_native_button)
+        preview_layout.addWidget(preview_footer)
 
     def cuda_preprocess_control(self, title: str) -> QCheckBox:
         control = QCheckBox("GPU preprocessing" if title == "CUDA preprocessing" else title)
@@ -5179,6 +5202,9 @@ class ControlCenter(QMainWindow):
         self.acceleration_detail.setWordWrap(True)
         self.setting(layout, "Inference provider", "Automatic prefers DirectML. ONNX can fall back to CPU; .cloud uses the chosen provider without silent fallback. .cloud supports CPU, DirectML and CUDA; TensorRT is ONNX-only.", provider_control)
         layout.addWidget(self.acceleration_detail)
+        repair = QPushButton("Runtime repair…")
+        repair.clicked.connect(self.open_runtime_repair)
+        self.setting(layout, "Native engine files", "Check or restore the files used by the selected inference engine.", repair)
         from mission_layout import TaskDetails
         execution_details=TaskDetails('CPU / GPU placement')
         layout.addWidget(execution_details)
@@ -5331,300 +5357,72 @@ class ControlCenter(QMainWindow):
                 tabs.setCurrentIndex(tabs.index_of('Class rules'));break
 
     def selection_page(self) -> QWidget:
-        self._mission_target_routes_ready=False
-        subtitle = "Choose how a track is acquired, held through short gaps, and compared against a challenger."
-        page, layout = self.new_page("Targeting", subtitle)
-        deck = QFrame()
-        deck.setObjectName("policyCommandDeck")
-        deck_layout = QHBoxLayout(deck)
-        self.policy_deck_layout = deck_layout
-        deck_layout.setContentsMargins(0, 0, 0, 0)
-        deck_layout.setSpacing(0)
+        page, layout = self.new_page("Targeting", "Choose the aim point inside a detection box and decide which targets to follow.")
+        from mission_layout import TaskCard, TaskColumns
+        from visual_geometry_ui import TargetingSample
+        columns = TaskColumns(proportions=(7, 3))
+        layout.addWidget(columns, 1)
+        sample_card = TaskCard("Sample target", "tag")
+        columns.right_layout.addWidget(sample_card)
+        columns.right_layout.addStretch(1)
+        self.targeting_sample = TargetingSample(self.settings)
+        sample_card.body.addWidget(self.targeting_sample)
+        zone_legend = QHBoxLayout()
+        for _, label, color in reversed(TargetingSample.ZONES):
+            item = QLabel(f'<span style="color:{color}">●</span> {self.t(label)}')
+            item.setObjectName("detail")
+            zone_legend.addWidget(item)
+        zone_legend.addStretch(1)
+        sample_card.body.addLayout(zone_legend)
+        fit_capture = QCheckBox("Fit whole capture")
+        fit_capture.setToolTip("Turn off to view targeting zones at actual size, one screen pixel per capture pixel.")
+        fit_capture.toggled.connect(self.targeting_sample.set_fit_capture)
+        sample_card.body.addWidget(fit_capture)
+        sample_hint = QLabel("Actual size shows the center of the capture. Click or drag inside the box to set the default aim point.")
+        sample_hint.setObjectName("detail")
+        sample_hint.setWordWrap(True)
+        sample_card.body.addWidget(sample_hint)
 
-        main_surface = QFrame()
-        main_surface.setObjectName("policyMainSurface")
-        main_layout = QVBoxLayout(main_surface)
-        main_layout.setContentsMargins(20, 17, 20, 17)
-        main_layout.setSpacing(10)
-        deck_layout.addWidget(main_surface, 52)
-        self._target_preview_layout=main_layout
-
-        headline = QHBoxLayout()
-        self.policy_headline_layout = headline
-        headline.setSpacing(9)
-        title_copy = QVBoxLayout()
-        title_copy.setSpacing(2)
-        active_workspace = QLabel("ACTIVE WORKSPACE")
-        active_workspace.setObjectName("pageKicker")
-        active_workspace.hide()
-        title_copy.addWidget(active_workspace)
-        policy_title = QLabel("Live preview")
-        policy_title.setObjectName("policyWorkspaceTitle")
-        title_copy.addWidget(policy_title)
-        policy_detail = QLabel("Selection, retention, and anchor response remain visible beside the live preview.")
-        policy_detail.setObjectName("policyWorkspaceSubtitle")
-        policy_detail.setWordWrap(True)
-        policy_detail.hide()
-        title_copy.addWidget(policy_detail)
-        headline.addLayout(title_copy, 1)
-
-        def live_metric(title: str, detail: str, accent: str = "blue") -> tuple[QFrame, QLabel]:
-            card = QFrame()
-            card.setObjectName("policyTopMetric")
-            if accent != "blue":
-                card.setProperty("accent", accent)
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(10, 8, 12, 8)
-            card_layout.setSpacing(1)
-            value = QLabel("--")
-            value.setObjectName("policyTrackMetric" if title == "ACTIVE TRACK" else "policyConfidenceMetric")
-            caption = QLabel(detail)
-            caption.setObjectName("policyMetricDetail")
-            card_layout.addWidget(value)
-            card_layout.addWidget(caption)
-            card.setToolTip(title.title())
-            return card, value
-
-        track_card, self.policy_live_track = live_metric("ACTIVE TRACK", "Active track")
-        confidence_card, self.policy_live_confidence = live_metric("CONFIDENCE", "Confidence", "pink")
-        live_metrics = QWidget()
-        live_metrics_layout = QHBoxLayout(live_metrics)
-        live_metrics_layout.setContentsMargins(0, 0, 0, 0)
-        live_metrics_layout.addWidget(track_card)
-        live_metrics_layout.addWidget(confidence_card)
-        headline.addWidget(live_metrics)
-        main_layout.addLayout(headline)
-
-        preview_shell = QFrame()
-        self._shared_preview_shell=preview_shell
-        preview_shell.setObjectName("settingsCard")
-        preview_layout = QVBoxLayout(preview_shell)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(0)
-        self.policy_preview_view = PreviewCanvas()
-        self.policy_preview_view.setObjectName("policyPreviewSurface")
-        self.policy_preview_view.setMinimumHeight(230)
-        preview_layout.addWidget(self.policy_preview_view)
-        preview_footer = QFrame()
-        preview_footer.setObjectName("policyPreviewFooter")
-        footer_layout = QHBoxLayout(preview_footer)
-        footer_layout.setContentsMargins(12, 8, 12, 8)
-        footer_layout.setSpacing(10)
-        preview_caption = QLabel("Live annotated preview")
-        self.policy_preview_caption = preview_caption
-        preview_caption.setObjectName("policyPreviewCaption")
-        preview_caption.setWordWrap(True)
-        self.policy_preview_status = QLabel("Waiting for capture")
-        self.policy_preview_status.setObjectName("policyPreviewStatus")
-        self.preview_native_button = QPushButton("View at 100%")
-        self.preview_native_button.setToolTip("Open a snapshot at one screen pixel per image pixel.")
-        self.preview_native_button.setEnabled(not self._last_preview_frame.isNull())
-        self.preview_native_button.clicked.connect(self.open_native_preview)
-        footer_layout.addWidget(preview_caption)
-        footer_layout.addStretch(1)
-        footer_layout.addWidget(self.policy_preview_status)
-        footer_layout.addWidget(self.preview_native_button)
-        preview_layout.addWidget(preview_footer)
-        main_layout.addWidget(preview_shell)
-
-        radii = QGridLayout()
-        self.policy_radii_layout = radii
-        self.policy_radius_cards = []
-        self._policy_metric_columns = None
-        radii.setSpacing(8)
-
-        def radius_metric(caption: str, field: str) -> QLabel:
-            card = QFrame()
-            card.setObjectName("metricCard")
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(12, 10, 12, 10)
-            card_layout.setSpacing(2)
-            caption_label = QLabel(caption)
-            caption_label.setObjectName("policyMetricCaption")
-            value = QLabel()
-            value.setObjectName("policyMetricValue")
-            card_layout.addWidget(caption_label)
-            card_layout.addWidget(value)
-            self.policy_radius_cards.append(card)
-            radii.addWidget(card, 0, len(self.policy_radius_cards) - 1)
-            return value
-
-        self.policy_acquisition_metric = radius_metric("ACQUISITION", "acquisition_radius")
-        self.policy_near_metric = radius_metric("NEAR RADIUS", "near_radius")
-        self.policy_snap_metric = radius_metric("SNAP RADIUS", "snap_radius")
-        self.policy_retention_metric = radius_metric("RETENTION", "retention_radius")
-        main_layout.addLayout(radii)
-
-        inspector = QFrame()
-        self.policy_inspector = inspector
-        inspector.setObjectName("policyInspector")
-        inspector_layout = QVBoxLayout(inspector)
-        inspector_layout.setContentsMargins(15, 14, 15, 14)
-        inspector_layout.setSpacing(10)
-        deck_layout.addWidget(inspector,48)
-
-        inspector_tabs = QHBoxLayout()
-        inspector_tabs.setContentsMargins(0, 0, 0, 0)
-        inspector_tabs.setSpacing(2)
-        self.targeting_inspector_buttons: list[QPushButton] = []
-        for tab_index, title in ((1, "Controls"), (2, "Tuning")):
-            button = QPushButton(title)
-            button.setObjectName("secondaryTabButton")
-            button.setCheckable(True)
-            button.clicked.connect(lambda _checked=False, index=tab_index: self.set_targeting_inspector_tab(index))
-            self.targeting_inspector_buttons.append(button)
-            inspector_tabs.addWidget(button, 1)
-        inspector_layout.addLayout(inspector_tabs)
-        from mission_layout import CurrentPageStack
-        self.targeting_inspector_stack = CurrentPageStack()
-        inspector_layout.addWidget(self.targeting_inspector_stack, 1)
-
-        def inspector_page() -> tuple[QScrollArea, QVBoxLayout]:
-            from mission_layout import InventoryScroll
-            scroll = InventoryScroll()
-            scroll.setObjectName("settingsTabScroll")
-            scroll.setFrameShape(QFrame.Shape.NoFrame)
-            scroll.setWidgetResizable(True)
-            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            content = QWidget()
-            content.setObjectName("settingsTabContent")
-            page_layout = QVBoxLayout(content)
-            page_layout.setContentsMargins(0, 4, 0, 0)
-            page_layout.setSpacing(10)
-            scroll.setWidget(content)
-            self.targeting_inspector_stack.addWidget(scroll)
-            return scroll, page_layout
-
-        _capture_scroll, capture_inspector = inspector_page()
-        self._build_capture_inspector(capture_inspector)
-        _policy_scroll, policy_inspector = inspector_page()
-        inspector_head = QHBoxLayout()
-        inspector_title = QLabel("Policy controls")
-        inspector_title.setObjectName("policyInspectorTitle")
-        reset = QPushButton("Reset")
-        reset.setObjectName("policyReset")
-        reset.clicked.connect(self.reset_target_policy)
-        inspector_head.addWidget(inspector_title)
-        inspector_head.addStretch(1)
-        inspector_head.addWidget(reset)
-        policy_inspector.addLayout(inspector_head)
-
-        def inspector_card(title: str) -> QVBoxLayout:
-            card = QFrame()
-            card.setObjectName("policyInspectorCard")
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(4, 11, 4, 14)
-            card_layout.setSpacing(7)
-            heading = QLabel(title)
-            heading.setObjectName("policyCardTitle")
-            card_layout.addWidget(heading)
-            policy_inspector.addWidget(card)
-            return card_layout
-
-        strategy_card = inspector_card("STRATEGY")
-        strategy = QComboBox()
-        for text in ('Closest to frame center', 'Highest detection confidence', 'Largest visible object', 'Smallest visible object', 'Lowest movement'):
-            strategy.addItem(text)
-        strategy.setCurrentIndex(self.settings.strategy)
-        strategy.currentIndexChanged.connect(lambda index: self.change('strategy', index))
-        strategy_card.addWidget(self._tuning_lock.wrap(strategy))
-
-        anchor_card = inspector_card("ANCHOR")
+        tabs = self.settings_tabs(columns.left_layout, "Aim point", "Target selection", "Tracking", "Class rules", "Manual lock",
+                                  minimum_height=460, owner_attribute="targeting_tabs")
+        aim_point = tabs["Aim point"]
+        self.section(aim_point, "Aim point in detection box")
         anchor = QComboBox()
-        for title, value in (("Box center", "center"), ("Top edge", "top"), ("Bottom edge", "bottom"), ("Upper quarter", "upper-quarter")):
+        for title, value in (("Box center", "center"), ("Top edge", "top"),
+                             ("Bottom edge", "bottom"), ("Upper quarter", "upper-quarter")):
             anchor.addItem(title, value)
         anchor.setCurrentIndex(max(0, anchor.findData(self.settings.anchor_mode)))
         anchor.currentIndexChanged.connect(lambda index: self.change("anchor_mode", str(anchor.itemData(index))))
-        self._discrete_registry.register('discrete.anchor_mode.1', 'anchor_mode', anchor)
-        anchor_card.addWidget(self._tuning_lock.wrap(anchor))
+        self._discrete_registry.register("discrete.anchor_mode.1", "anchor_mode", anchor)
+        self.setting(aim_point, "Aim point preset", "Choose where inside the detection box to aim. Class rules can specify a different point for individual classes.", anchor)
+        horizontal = self.range("anchor_x", -1.0, 1.0, 2)
+        vertical = self.range("anchor_y", -1.0, 1.0, 2)
+        self.setting(aim_point, "Horizontal aim point offset", "Move the point left or right as a fraction of the box width.", horizontal)
+        self.setting(aim_point, "Vertical aim point offset", "Move the point up or down relative to the chosen preset.", vertical)
 
-        def compact_range(title: str, field: str, low: float, high: float, decimals: int = 0, suffix: str = "") -> RangeControl:
-            row = QFrame()
-            row.setObjectName("policyQuickRow")
-            row_layout = QVBoxLayout(row)
-            row_layout.setContentsMargins(0, 1, 0, 0)
-            row_layout.setSpacing(3)
-            line = QHBoxLayout()
-            label = QLabel(title)
-            label.setObjectName("policyControlLabel")
-            value = QLabel()
-            value.setObjectName("policyControlValue")
-            line.addWidget(label)
-            line.addStretch(1)
-            line.addWidget(value)
-            control = self.range(field, low, high, decimals, suffix)
-            control.setObjectName("policyInspectorRange")
-            control.pass_slider_wheel_to_parent()
-            control.changed.connect(lambda number, target=value, unit=suffix: target.setText(f"{number:g}{unit}"))
-            value.setText(f"{float(getattr(self.settings, field)):g}{suffix}")
-            add_guide_button(self, line, title, control)
-            row_layout.addLayout(line)
-            row_layout.addWidget(self._tuning_lock.wrap(control))
-            anchor_card.addWidget(row)
-            return control
+        def pick_aim_point(x: float, y: float) -> None:
+            from batch4_guard import editable
+            if not editable(self):
+                return
+            self.change("anchor_x", round(x, 2))
+            self.change("anchor_y", round(y, 2))
+            horizontal.set_value(self.settings.anchor_x)
+            vertical.set_value(self.settings.anchor_y)
 
-        self.policy_anchor_x_control = compact_range("Horizontal offset", "anchor_x", -1.0, 1.0, 2)
-        self.policy_anchor_y_control = compact_range("Vertical offset", "anchor_y", -1.0, 1.0, 2)
-        from visual_geometry_ui import open_anchor_editor
-        editor = QPushButton("Visual anchor editor…")
-        editor.setObjectName('openAnchorEditor')
-        editor.clicked.connect(lambda: open_anchor_editor(self))
-        anchor_card.addWidget(self._tuning_lock.wrap(editor))
+        self.targeting_sample.picked.connect(pick_aim_point)
+        aim_point.addStretch(1)
 
-        lock_card = inspector_card("LOCK BEHAVIOR")
-        occlusion = QCheckBox("Occlusion recovery")
-        occlusion.setChecked(self.settings.occlusion_handling)
-        occlusion.toggled.connect(lambda state: self.change("occlusion_handling", state))
-        self._discrete_registry.register('discrete.occlusion_handling.1', 'occlusion_handling', occlusion)
-        lock_card.addWidget(self._tuning_lock.wrap(occlusion))
-        switching_row = QFrame()
-        switching_layout = QVBoxLayout(switching_row)
-        switching_layout.setContentsMargins(0, 0, 0, 0)
-        switching_layout.setSpacing(3)
-        switching_label = QHBoxLayout()
-        switching_title = QLabel("Switch tolerance")
-        switching_title.setObjectName("policyControlLabel")
-        self.policy_switching_value = QLabel(f"{self.settings.switching:g}")
-        self.policy_switching_value.setObjectName("policyControlValue")
-        switching_label.addWidget(switching_title)
-        switching_label.addStretch(1)
-        switching_label.addWidget(self.policy_switching_value)
-        self.policy_switching_control = self.range("switching", 0.0, 0.95, 2)
-        self.policy_switching_control.setObjectName("policyInspectorRange")
-        self.policy_switching_control.pass_slider_wheel_to_parent()
-        self.policy_switching_control.changed.connect(lambda value: self.policy_switching_value.setText(f"{value:g}"))
-        add_guide_button(self, switching_label, "Switch tolerance", self.policy_switching_control)
-        switching_layout.addLayout(switching_label)
-        switching_layout.addWidget(self._tuning_lock.wrap(self.policy_switching_control))
-        lock_card.addWidget(switching_row)
-        _tuning_scroll, tuning_inspector = inspector_page()
-        self._build_tuning_inspector(tuning_inspector)
-        for sidebar_scroll in (_capture_scroll, _policy_scroll, _tuning_scroll):
-            content = sidebar_scroll.widget()
-            if content is not None:
-                for control in content.findChildren(RangeControl):
-                    control.pass_slider_wheel_to_parent(sidebar_scroll)
-        policy_inspector.addStretch(1)
-        self.set_targeting_inspector_tab(0)
-        layout.addWidget(deck,1)
-
-        tabs = self.settings_tabs(
-            layout,
-            "Policy",
-            "Tracking",
-            "Compensation",
-            "Preview",
-            "Annotations",
-            "Desktop overlay",
-            "Class rules",
-            "Manual lock",
-            minimum_height=500,
-            owner_attribute="targeting_tabs",
-            fixed_titles=("Class rules",),
-        )
-        geometry = tabs["Policy"]
-        continuity = tabs["Policy"]
+        geometry = continuity = tabs["Target selection"]
         manual = tabs["Manual lock"]
+        strategy = QComboBox()
+        strategy.addItems(("Closest to aiming reference", "Highest detection confidence", "Largest visible object",
+                           "Smallest visible object", "Lowest movement"))
+        strategy.setCurrentIndex(self.settings.strategy)
+        strategy.currentIndexChanged.connect(lambda index: self.change("strategy", index))
+        self.setting(geometry, "Target selection strategy", "Choose how eligible tracks are ranked.", strategy)
+        reset = QPushButton("Reset target policy")
+        reset.clicked.connect(self.reset_target_policy)
+        geometry.addWidget(self._tuning_lock.wrap(reset), alignment=Qt.AlignmentFlag.AlignLeft)
         self.section(geometry, "Target geometry")
         zones_button = QPushButton("Edit exclusion zones")
         zones_button.setObjectName('editExclusionZones')
@@ -5639,9 +5437,6 @@ class ControlCenter(QMainWindow):
         self.target_confidence_summary.setProperty('_vaporlock_i18n_skip', True)
         continuity.addWidget(self.target_confidence_summary)
         self.refresh_target_confidence_summary()
-        confidence_help = QLabel('0 follows Detection confidence. Detection filtering remains the minimum. New targets must meet both thresholds; the current target may use retention alone. Missing or stale observations never authorize movement.')
-        confidence_help.setObjectName('detail'); confidence_help.setWordWrap(True)
-        continuity.addWidget(confidence_help)
         fov_shape = QComboBox()
         fov_shape.addItem("Circular FOV", "circle")
         fov_shape.addItem("Rectangular FOV", "rectangle")
@@ -5654,6 +5449,7 @@ class ControlCenter(QMainWindow):
         self.setting(geometry, "Acquisition radius", "Wide new-target scan boundary. For a predictable hierarchy, keep this value at or above the Near and Snap radii.", self.range("acquisition_radius", 1, 10000, 0, " px"))
         self.setting(geometry, "Retention radius", "While a selected track is lost, reserve its last confirmed anchor through the lost-target hold interval. Nearby same-class recovery also respects the Occlusion recovery radius.", self.range("retention_radius", 1, 10000, 0, " px"))
         self.section(continuity, "Lock continuity")
+        self.setting(continuity, "Switch tolerance", "How much better a challenger must score before replacing the selected target.", self.range("switching", 0.0, 0.95, 2))
         self.setting(continuity, "Minimum lock duration", "For this time after acquisition, the selected subject is retained even if another candidate briefly scores better.", self.range("lock_persistence_ms", 0, 30000, 0, " ms"))
         self.setting(continuity, "Lost-target hold", "Reserve identity after the last real observation. Missing targets never authorize movement.", self.range("lost_target_timeout_ms", 0, 10000, 0, " ms"))
         self.setting(continuity, "Minimum track age", "Matched observations required for acquisition, unless the explicit snap bypass is enabled.", self.range("minimum_track_age", 1, 120, 0, " frames"))
@@ -5668,7 +5464,11 @@ class ControlCenter(QMainWindow):
         watchlist.editingFinished.connect(lambda: self.change("watchlist", watchlist.text().strip()))
         self.setting(continuity, "Preferred class watchlist", "When populated, listed classes win ties and switching decisions. It does not hide other allowed classes, so an empty result can still recover safely.", watchlist)
         continuity.addStretch(1)
-        self.section(tabs["Class rules"], "Class priorities and anchors")
+        self.section(tabs["Class rules"], "Class priorities and aim points")
+        rule_help = QLabel("A class aim point overrides the default aim point for that class.")
+        rule_help.setObjectName("detail")
+        rule_help.setWordWrap(True)
+        tabs["Class rules"].addWidget(rule_help)
         self.class_policy_editor = ClassPolicyEditor(self.settings.class_policies, lambda rows: self.change("class_policies", rows))
         tabs["Class rules"].addWidget(self.feature_control(self.class_policy_editor))
         self.section(manual, "Manual track lock")
@@ -5683,7 +5483,7 @@ class ControlCenter(QMainWindow):
         lock_source.setCurrentIndex(max(0, lock_source.findData(self.settings.manual_lock_source)))
         lock_source.currentIndexChanged.connect(lambda index: self.change("manual_lock_source", str(lock_source.itemData(index))))
         self._discrete_registry.register('discrete.manual_lock_source.1', 'manual_lock_source', lock_source)
-        self.setting(manual, "Lock input source", "Choose the device used to pin or release the current target. Controller input uses the same controller selection configured under Output.", self.feature_control(lock_source))
+        self.setting(manual, "Lock input source", "Choose the device used to pin or release the current target. Controller input uses the same controller selection configured under Movement.", self.feature_control(lock_source))
         lock_key = QComboBox()
         for title, value in (("Middle mouse button", "middle"), ("Left mouse button", "left"), ("Right mouse button", "right"), ("Left Shift", "shift"), ("Left Control", "control"), ("Space", "space"), ("F", "f"), ("G", "g")):
             lock_key.addItem(title, value)
@@ -5715,74 +5515,18 @@ class ControlCenter(QMainWindow):
         manual.addWidget(self.manual_lock_status)
         manual.addStretch(1)
         self._build_tracking_controls(tabs["Tracking"])
-        self._build_compensation_controls(tabs["Compensation"])
-        self._build_preview_controls(tabs["Preview"], tabs["Annotations"], tabs["Desktop overlay"])
-        # The top task rail owns the selected task; its existing controls live
-        # beside the same preview. Policy's controls belong in Policy; other
-        # tasks do not display a stale Capture/Policy/Tuning selection.
-        task_tabs=self.targeting_tabs
-        task_tabs.layout().removeWidget(task_tabs._tab_scroll)
-        layout.insertWidget(0,task_tabs._tab_scroll)
-        layout.removeWidget(task_tabs)
-        inspector_layout.addWidget(task_tabs,1)
-        task_tabs.setMinimumHeight(0)
-        policy_scroll=task_tabs._stack.widget(0)
-        policy_content=policy_scroll.takeWidget()
-        policy_body=self.targeting_inspector_stack.widget(1).widget().layout()
-        policy_body.insertWidget(max(0,policy_body.count()-1),policy_content)
-        def show_task(index):
-            if index != 0 and self.current_route == "capture":
-                self._select_navigation("selection")
-            self.targeting_inspector_stack.setVisible(index==0)
-            task_tabs.setVisible(index!=0)
-            if index==0:self.set_targeting_inspector_tab(1)
-            self._update_targeting_navigation()
-            self.update_targeting_layout()
-            inspector.updateGeometry()
-        task_tabs._stack.currentChanged.connect(show_task)
-        self._mission_target_routes_ready=True
-        show_task(task_tabs.currentIndex())
-        self.refresh_policy_command_deck()
         return page
 
-    def refresh_policy_command_deck(self) -> None:
-        """Synchronize the live command-deck readouts without rebuilding the page."""
-        values = (
-            ("policy_acquisition_metric", self.settings.acquisition_radius),
-            ("policy_near_metric", self.settings.near_radius),
-            ("policy_snap_metric", self.settings.snap_radius),
-            ("policy_retention_metric", self.settings.retention_radius),
-        )
-        for attribute, value in values:
-            if hasattr(self, attribute):
-                getattr(self, attribute).setText(f"{int(value)} px")
-        if hasattr(self, "policy_switching_value"):
-            self.policy_switching_value.setText(f"{self.settings.switching:.2f}")
-
-    def set_targeting_inspector_tab(self, index: int) -> None:
-        if not hasattr(self, "targeting_inspector_stack"):
+    def update_live_preview_placement(self) -> None:
+        shell = self._shared_preview_shell
+        if self.current_page == "overview":
+            self._overview_preview_slot.addWidget(shell)
+        elif self.current_page == "capture":
+            self._capture_preview_layout.insertWidget(0, shell)
+        else:
+            shell.hide()
             return
-        if not 0 <= index < self.targeting_inspector_stack.count():
-            return
-        routes_ready = getattr(self, "_mission_target_routes_ready", False)
-        if routes_ready:
-            self.targeting_tabs.setCurrentIndex(0)
-        self.targeting_inspector_stack.setCurrentIndex(index)
-        for button_index, button in enumerate(self.targeting_inspector_buttons, start=1):
-            button.blockSignals(True)
-            button.setChecked(button_index == index)
-            button.blockSignals(False)
-        if routes_ready and self.current_page == "selection":
-            self._select_navigation("capture" if index == 0 else "selection")
-        self._update_targeting_navigation()
-
-    def _update_targeting_navigation(self) -> None:
-        if not hasattr(self, "targeting_tabs"):
-            return
-        show_targeting = self.current_route != "capture"
-        self.targeting_tabs._tab_scroll.setVisible(show_targeting)
-        for button in self.targeting_inspector_buttons:
-            button.setVisible(show_targeting and self.targeting_tabs.currentIndex() == 0)
+        shell.show()
 
     def reset_target_policy(self) -> None:
         defaults = Settings()
@@ -5803,11 +5547,10 @@ class ControlCenter(QMainWindow):
         self.setting(layout, "Velocity smoothing", "Retained fraction at a 60 Hz reference, normalized by observation time. Higher values add delay.", self.range("smoothing", 0.0, 0.95, 2))
         self.setting(layout, "Box position smoothing", "Stabilize displayed detection boxes. Anchor stabilization independently filters real observations so these filters do not stack their delays.", self.range("box_smoothing", 0.0, 0.95, 2))
         self.setting(layout, "Anchor stabilization", "Calm small box-anchor shifts before target policy and movement use them. This leaves the detection outline responsive while the lock settles cleanly.", self.range("anchor_smoothing", 0.0, 0.98, 2))
-        self.setting(layout, "Reference settle radius", "Hold the anchor at the aiming reference within this tolerance. Use zero for no extra settling tolerance.", self.range("anchor_settle_radius", 0.0, 50.0, 2, " px"))
         occlusion = QCheckBox("Enabled")
         occlusion.setChecked(self.settings.occlusion_handling)
         occlusion.toggled.connect(lambda state: self.change("occlusion_handling", state))
-        self._discrete_registry.register('discrete.occlusion_handling.2', 'occlusion_handling', occlusion)
+        self._discrete_registry.register('discrete.occlusion_handling.1', 'occlusion_handling', occlusion)
         self.setting(layout, "Occlusion recovery", "Reconnect a briefly missing target to a nearby same-class detection before releasing the established lock.", occlusion)
         self.setting(layout, "Occlusion grace", "Recovery window after the last observation. Ambiguous identities and manual pins are not substituted.", self.range("occlusion_grace_ms", 0, 10000, 0, " ms"))
         self.setting(layout, "Reacquisition radius", "Maximum anchor distance for reconnecting a target after a detector gap.", self.range("occlusion_reacquire_radius", 0, 5000, 0, " px"))
@@ -5931,35 +5674,12 @@ class ControlCenter(QMainWindow):
             self.setting(desktop, title, detail, self.feature_control(control))
         desktop.addStretch(1)
 
-    def tracking_page(self) -> QWidget:
-        subtitle = "Tune identity continuity and velocity estimation."
-        page, layout = self.new_page("Tracking", subtitle)
-        self.section(layout, "Identity continuity")
-        self.setting(layout, "Match overlap", "Minimum overlap needed to preserve an existing identity.", self.range("match_iou", 0.01, 0.99, 2))
-        self.setting(layout, "Track memory", "Elapsed retention time, independent of inference rate.", self.range("track_retention_ms", 0, 10000, 0, " ms"))
-        self.setting(layout, "Velocity smoothing", "Retained fraction at a 60 Hz reference, normalized by observation time. Higher values add delay.", self.range("smoothing", 0.0, 0.95, 2))
-        self.setting(layout, "Box position smoothing", "Stabilize displayed detection boxes. Anchor stabilization independently filters real observations so these filters do not stack their delays.", self.range("box_smoothing", 0.0, 0.95, 2))
-        self.setting(layout, "Anchor stabilization", "Calm small box-anchor shifts before target policy and movement use them. This leaves the detection outline responsive while the lock settles cleanly.", self.range("anchor_smoothing", 0.0, 0.98, 2))
-        self.setting(layout, "Reference settle radius", "Hold the anchor at the aiming reference within this tolerance. Use zero for no extra settling tolerance.", self.range("anchor_settle_radius", 0.0, 50.0, 2, " px"))
-        occlusion = QCheckBox("Enabled")
-        occlusion.setChecked(self.settings.occlusion_handling)
-        occlusion.toggled.connect(lambda state: self.change("occlusion_handling", state))
-        self.setting(layout, "Occlusion recovery", "Reconnect a briefly missing target to a nearby same-class detection before releasing the established lock.", occlusion)
-        self.setting(layout, "Occlusion grace", "Recovery window after the last observation. Ambiguous identities and manual pins are not substituted.", self.range("occlusion_grace_ms", 0, 10000, 0, " ms"))
-        self.setting(layout, "Reacquisition radius", "Maximum anchor distance for reconnecting a target after a detector gap.", self.range("occlusion_reacquire_radius", 0, 5000, 0, " px"))
-        predict_lost = QCheckBox("Predict track position between detections")
-        predict_lost.setChecked(self.settings.predict_lost)
-        predict_lost.toggled.connect(lambda state: self.change("predict_lost", state))
-        self.setting(layout, "Motion prediction", "Confidence-weighted prediction for fresh observations. Missing targets retain identity only.", self.feature_control(predict_lost))
-        self.section(layout, "Prediction")
-        self.setting(layout, "Prediction lead", "Extra lead beyond measured observation age. Stops, reversals and uncertain identity reset the estimate.", self.feature_control(self.range("prediction_lead_ms", 0, 1000, 0, " ms")))
-        self.setting(layout, "Prediction horizon", "Maximum observation age plus extra lead. The separate observation-expiry limit still applies.", self.feature_control(self.range("prediction_limit_ms", 1, 5000, 0, " ms")))
-        layout.addStretch(1)
-        return page
-
     def output_page(self) -> QWidget:
         page, layout = self.new_page("Movement", "Configure activation and output paths.")
-        tabs = self.settings_tabs(layout, "Control", "Transport", "Events", "Diagnostics", minimum_height=540)
+        tabs = self.settings_tabs(layout, "Control", "Response", "Compensation", "Transport", "Events", "Diagnostics",
+                                  minimum_height=540, owner_attribute="movement_tabs")
+        self._build_movement_response(tabs["Response"])
+        self._build_compensation_controls(tabs["Compensation"])
         from mission_layout import TaskColumns,TaskCard
         control_columns=TaskColumns(proportions=(1,1))
         for panel in (control_columns.left,control_columns.right):panel.setObjectName('missionTaskColumn')
@@ -6010,6 +5730,15 @@ class ControlCenter(QMainWindow):
         key.currentIndexChanged.connect(lambda index: self.change("activation_key", str(key.itemData(index))))
         self._discrete_registry.register('discrete.activation_key.1', 'activation_key', key)
         self.setting(activation, "Activation key", "Key that authorizes movement output.", key)
+        quick_release = QComboBox()
+        for title, value in (("Mouse Button 5", "mouse5"), ("Mouse Button 4", "mouse4"),
+                             ("Middle mouse button", "middle"), ("Left Shift", "shift"),
+                             ("Left Control", "control"), ("Space", "space"), ("Disabled", "none")):
+            quick_release.addItem(title, value)
+        quick_release.setCurrentIndex(quick_release.findData(self.settings.quick_release_key))
+        quick_release.currentIndexChanged.connect(
+            lambda index: self.change("quick_release_key", str(quick_release.itemData(index))))
+        self.setting(activation, "Quick release", "Hold to pause aim assist, motion compensation, and snap actions. Release to resume the existing activation mode.", quick_release)
         activation=controller_card.body
         source = QComboBox()
         for title, value in (("Keyboard", "keyboard"), ("Xbox controller", "controller"), ("Keyboard or controller", "either")):
@@ -6137,7 +5866,15 @@ class ControlCenter(QMainWindow):
         transport.addItem("KMBox A - official DLL", "kmbox-a")
         transport.setCurrentIndex(max(0, transport.findData(self.settings.output_transport)))
         transport.currentIndexChanged.connect(lambda index: self.change("output_transport", str(transport.itemData(index))))
-        self.setting(transport_settings, "Movement transport", "Choose the local path used for relative movement output. Hardware routes send movement only; no remapping, masking, device-identity, or keyboard operations are used.", transport)
+        transport_row = QWidget()
+        transport_row_layout = QHBoxLayout(transport_row)
+        transport_row_layout.setContentsMargins(0, 0, 0, 0)
+        transport_row_layout.addWidget(transport, 1)
+        self.mouse_elevation_button = QPushButton("Elevate mouse output")
+        self.mouse_elevation_button.setToolTip("Ask Windows for administrator approval for relative mouse output in the next Control session.")
+        self.mouse_elevation_button.clicked.connect(self.toggle_relative_mouse_elevation)
+        transport_row_layout.addWidget(self.mouse_elevation_button)
+        self.setting(transport_settings, "Movement transport", "Choose the local path used for relative movement output.", transport_row)
         self.output_transport_status = QLabel()
         self.output_transport_status.setObjectName("detail")
         self.output_transport_status.setWordWrap(True)
@@ -6188,7 +5925,7 @@ class ControlCenter(QMainWindow):
         self.setting(transport_settings, "Manual stick priority", "When you deliberately move the selected physical stick, its input wins until you release it.", manual_priority)
         self.controller_install_button = QPushButton("Install controller component")
         self.controller_install_button.clicked.connect(self.install_controller_bridge)
-        self.setting(transport_settings, "Controller component", "Setup adds a local signing certificate to Windows machine-wide Root and TrustedPublisher stores. Review the confirmation before installing or repairing. Selecting this transport does not install anything.", self.controller_install_button)
+        self.setting(transport_settings, "Controller component", "Install matching Windows SDK and Windows Driver Kit versions before setup. Setup adds a local signing certificate to Windows machine-wide Root and TrustedPublisher stores and asks for approval.", self.controller_install_button)
         self.controller_uninstall_button = QPushButton("Remove controller component")
         self.controller_uninstall_button.setObjectName("dangerButton")
         self.controller_uninstall_button.clicked.connect(self.uninstall_controller_bridge)
@@ -6237,40 +5974,18 @@ class ControlCenter(QMainWindow):
         hardware_settings.addStretch(1)
         return page
 
-    def _build_tuning_inspector(self, safeguards: QVBoxLayout) -> None:
-        def setting(parent: QVBoxLayout, title: str, detail: str, control: QWidget) -> None:
-            row = QFrame()
-            row.setObjectName("policyQuickRow")
-            row.setToolTip(detail)
-            row_layout = QVBoxLayout(row)
-            row_layout.setContentsMargins(4, 3, 4, 10)
-            row_layout.setSpacing(5)
-            label = QLabel(title)
-            label.setObjectName("fieldTitle")
-            label.setWordWrap(True)
-            label.setToolTip(detail)
-            heading_row = QHBoxLayout()
-            heading_row.addWidget(label)
-            add_guide_button(self, heading_row, title, control)
-            heading_row.addStretch(1)
-            row_layout.addLayout(heading_row)
-            if not control.toolTip():
-                control.setToolTip(detail)
-            row_layout.addWidget(self._tuning_lock.wrap(control))
-            parent.addWidget(row)
-
+    def _build_movement_response(self, safeguards: QVBoxLayout) -> None:
         self.section(safeguards, "Motion safeguards")
-        setting(safeguards, "Assistance gain", "Fraction corrected at the 60 Hz reference rate. Actual elapsed time normalizes response at other rates.", self.range("gain", 0.0, 4.0, 2))
+        self.setting(safeguards, "Assistance gain", "Fraction corrected at the 60 Hz reference rate. Actual elapsed time normalizes response at other rates.", self.range("gain", 0.0, 4.0, 2))
         for title, field in (("Horizontal target assistance", "assistance_x"), ("Vertical target assistance", "assistance_y")):
-            setting(safeguards, title, "Multiplies assistance gain on this axis. 1 preserves the current response; 0 disables target assistance on this axis. Motion compensation and physical input are separate.", batch3_spin(self, field))
-        axis_help = QLabel('Multiplies assistance gain on this axis. 1 preserves the current response; 0 disables target assistance on this axis. Motion compensation and physical input are separate.')
-        axis_help.setObjectName('detail'); axis_help.setWordWrap(True); safeguards.addWidget(axis_help)
-        setting(safeguards, "Maximum step", "Hard cap for one movement update.", self.range("max_step", 1, 500, 0, " units"))
-        setting(safeguards, "Dead zone", "Capture-pixel tolerance around the aiming reference, independent of input-unit calibration.", self.range("deadzone", 0, 500, 0, " px"))
-        setting(safeguards, "Output smoothing", "Retained fraction at a 60 Hz reference, normalized by elapsed time. Higher values add delay.", self.range("movement_smoothing", 0.0, 0.95, 2))
-        setting(safeguards, "Maximum output rate", "Hard cap for relative movement events sent each second. Enter a larger exact value for expert tuning.", self.range("output_rate", 1, 120, 0, " Hz"))
-        setting(safeguards, "Maximum speed", "Radial input-unit limit per second, independent of output report rate. Maximum step remains a separate per-report cap.", self.range("max_speed", 0, 6000, 1, " units/s"))
-        setting(safeguards, "Observation expiry", "Stop target assistance when the original capture is older than this limit, including inference latency. Repeated stale results cannot renew it. Maximum 2000 ms.", self.range("output_max_observation_age_ms", 1, 500, 0, " ms"))
+            self.setting(safeguards, title, "Multiplies assistance gain on this axis. 1 preserves the current response; 0 disables target assistance on this axis. Motion compensation and physical input are separate.", batch3_spin(self, field))
+        self.setting(safeguards, "Maximum step", "Hard cap for one movement update.", self.range("max_step", 1, 500, 0, " units"))
+        self.setting(safeguards, "Dead zone", "Capture-pixel tolerance around the aiming reference, independent of input-unit calibration.", self.range("deadzone", 0, 500, 0, " px"))
+        self.setting(safeguards, "Reference settle radius", "Hold the anchor at the aiming reference within this tolerance. Use zero for no extra settling tolerance.", self.range("anchor_settle_radius", 0.0, 50.0, 2, " px"))
+        self.setting(safeguards, "Output smoothing", "Retained fraction at a 60 Hz reference, normalized by elapsed time. Higher values add delay.", self.range("movement_smoothing", 0.0, 0.95, 2))
+        self.setting(safeguards, "Maximum output rate", "Hard cap for relative movement events sent each second. Enter a larger exact value for expert tuning.", self.range("output_rate", 1, 120, 0, " Hz"))
+        self.setting(safeguards, "Maximum speed", "Radial input-unit limit per second, independent of output report rate. Maximum step remains a separate per-report cap.", self.range("max_speed", 0, 6000, 1, " units/s"))
+        self.setting(safeguards, "Observation expiry", "Stop target assistance when the original capture is older than this limit, including inference latency. Repeated stale results cannot renew it. Maximum 2000 ms.", self.range("output_max_observation_age_ms", 1, 500, 0, " ms"))
         self.section(safeguards, "Aiming reference and calibration")
         reference = QComboBox()
         reference.addItem("Screen centre", "capture-center")
@@ -6278,33 +5993,33 @@ class ControlCenter(QMainWindow):
         reference.setCurrentIndex(max(0, reference.findData(self.settings.aim_reference)))
         reference.currentIndexChanged.connect(lambda index: self.change("aim_reference", str(reference.itemData(index))))
         self._discrete_registry.register('discrete.aim_reference.1', 'aim_reference', reference)
-        setting(safeguards, "Aiming reference", "Screen centre uses physical display coordinates. Virtual desktop uses its bounding centre. Manual offsets remain relative to capture centre; crosshair detection overrides them while enabled.", reference)
+        self.setting(safeguards, "Aiming reference", "Screen centre uses physical display coordinates. Virtual desktop uses its bounding centre. Manual offsets remain relative to capture centre; crosshair detection overrides them while enabled.", reference)
         from crosshair_ui import add_controls as add_crosshair_controls
-        add_crosshair_controls(self,safeguards,setting)
-        setting(safeguards, "Reference horizontal offset", "Positive moves right from capture center; negative moves left.", self.range("aim_reference_x", -1000, 1000, 2, " px"))
-        setting(safeguards, "Reference vertical offset", "Positive moves down from capture center; negative moves up.", self.range("aim_reference_y", -1000, 1000, 2, " px"))
-        setting(safeguards, "Horizontal input scale", "Relative input units per capture pixel. Windows acceleration, application sensitivity and zoom can change this relationship.", self.range("input_units_per_pixel_x", 0.001, 10.0, 3, " units/px"))
-        setting(safeguards, "Vertical input scale", "Relative input units per capture pixel. Controller output uses normalized velocity instead of assuming a pixel-to-stick displacement.", self.range("input_units_per_pixel_y", 0.001, 10.0, 3, " units/px"))
+        add_crosshair_controls(self, safeguards, self.setting)
+        self.setting(safeguards, "Reference horizontal offset", "Positive moves right from capture center; negative moves left.", self.range("aim_reference_x", -1000, 1000, 2, " px"))
+        self.setting(safeguards, "Reference vertical offset", "Positive moves down from capture center; negative moves up.", self.range("aim_reference_y", -1000, 1000, 2, " px"))
+        self.setting(safeguards, "Horizontal input scale", "Relative input units per capture pixel. Windows acceleration, application sensitivity and zoom can change this relationship.", self.range("input_units_per_pixel_x", 0.001, 10.0, 3, " units/px"))
+        self.setting(safeguards, "Vertical input scale", "Relative input units per capture pixel. Controller output uses normalized velocity instead of assuming a pixel-to-stick displacement.", self.range("input_units_per_pixel_y", 0.001, 10.0, 3, " units/px"))
         calibrate_scale = QPushButton("Calculate input scale")
         calibrate_scale.clicked.connect(self.calibrate_input_scale)
-        setting(safeguards, "Measured calibration", "Calculate a per-axis scale from an input displacement and the resulting image displacement measured in your authorized environment. No movement is sent by this dialog.", calibrate_scale)
+        self.setting(safeguards, "Measured calibration", "Calculate a per-axis scale from an input displacement and the resulting image displacement measured in your authorized environment. No movement is sent by this dialog.", calibrate_scale)
         curve = QComboBox()
         curve.addItem("Linear", "linear")
         curve.addItem("Quadratic precision", "quadratic")
         curve.setCurrentIndex(max(0, curve.findData(self.settings.response_curve)))
         curve.currentIndexChanged.connect(lambda index: self.change("response_curve", str(curve.itemData(index))))
         self._discrete_registry.register('discrete.response_curve.1', 'response_curve', curve)
-        setting(safeguards, "Response curve", "Quadratic response reduces small corrections while retaining larger pan commands.", self.feature_control(curve))
+        self.setting(safeguards, "Response curve", "Quadratic response reduces small corrections while retaining larger pan commands.", self.feature_control(curve))
         invert_x = QCheckBox("Invert horizontal output")
         invert_x.setChecked(self.settings.invert_x)
         invert_x.toggled.connect(lambda state: self.change("invert_x", state))
         self._discrete_registry.register('discrete.invert_x.1', 'invert_x', invert_x)
-        setting(safeguards, "Horizontal direction", "Reverse horizontal input for a setup using the opposite axis convention.", invert_x)
+        self.setting(safeguards, "Horizontal direction", "Reverse horizontal input for a setup using the opposite axis convention.", invert_x)
         invert_y = QCheckBox("Invert vertical output")
         invert_y.setChecked(self.settings.invert_y)
         invert_y.toggled.connect(lambda state: self.change("invert_y", state))
         self._discrete_registry.register('discrete.invert_y.1', 'invert_y', invert_y)
-        setting(safeguards, "Vertical direction", "Reverse vertical input for a setup using the opposite axis convention.", invert_y)
+        self.setting(safeguards, "Vertical direction", "Reverse vertical input for a setup using the opposite axis convention.", invert_y)
         for label in safeguards.parentWidget().findChildren(QLabel, "sectionLabel"):
             label.setWordWrap(True)
         safeguards.addStretch(1)
@@ -6721,96 +6436,6 @@ class ControlCenter(QMainWindow):
             self.change("motion_compensation_horizontal", 0.0)
         self.reload_motion_compensation_library()
 
-    def visuals_page(self) -> QWidget:
-        page, layout = self.new_page("Visuals", "Inspect the source capture with optional tracks, anchor, and projected motion.")
-        self.section(layout, "Live annotated preview")
-        self.preview_view = PreviewCanvas()
-        layout.addWidget(self.preview_view)
-        tabs = self.settings_tabs(layout, "Preview stream", "Annotations", "Desktop overlay", minimum_height=500)
-        stream = tabs["Preview stream"]
-        annotations = tabs["Annotations"]
-        desktop = tabs["Desktop overlay"]
-        self.section(stream, "Preview stream")
-        enabled = QCheckBox("Enabled")
-        enabled.setChecked(self.settings.preview_enabled)
-        enabled.toggled.connect(lambda state: self.change("preview_enabled", state))
-        self.setting(stream, "Live preview", "Emit compressed annotated frames from the native engine only while a session is running. Disabling this removes preview encoding work from the capture pipeline.", enabled)
-        self.setting(stream, "Preview rate", "Maximum annotated frames sent to this control center each second.", self.range("preview_fps", 1, 30, 0, " fps"))
-        self._build_preview_encoding_controls(stream)
-        snapshot = QPushButton("Save annotated PNG")
-        snapshot.clicked.connect(self.save_annotated_snapshot)
-        self.setting(stream, "Preview snapshot", "Save the most recent native annotated debug frame as a PNG in this Windows account's Vapor Lock screenshots folder.", self.feature_control(snapshot))
-        stream.addStretch(1)
-        self.section(annotations, "Annotations")
-        overlay = QCheckBox("Show annotations")
-        overlay.setChecked(self.settings.overlay_enabled)
-        overlay.toggled.connect(lambda state: self.change("overlay_enabled", state))
-        self.setting(annotations, "Detection overlay", "Draw active tracking information over the debug preview. Source frames written to the training dataset are always unannotated.", overlay)
-        boxes = QCheckBox("Show tracked boxes")
-        boxes.setChecked(self.settings.overlay_boxes)
-        boxes.toggled.connect(lambda state: self.change("overlay_boxes", state))
-        self.setting(annotations, "Track boxes", "Draw an outline for each retained track and highlight the selected lock.", boxes)
-        motion = QCheckBox("Show prediction vector")
-        motion.setChecked(self.settings.overlay_motion)
-        motion.toggled.connect(lambda state: self.change("overlay_motion", state))
-        self.setting(annotations, "Motion prediction", "Draw the current selected anchor and its configured prediction lead in the debug preview.", motion)
-        fov = QCheckBox("Show snap, near, and acquisition guides")
-        fov.setChecked(self.settings.overlay_fov)
-        fov.toggled.connect(lambda state: self.change("overlay_fov", state))
-        self.setting(annotations, "Targeting FOV", "Draw the active circular or rectangular target zones in the annotated preview.", fov)
-        masks = QCheckBox("Show instance masks")
-        masks.setChecked(self.settings.overlay_segmentation_masks)
-        masks.toggled.connect(lambda state: self.change("overlay_segmentation_masks", state))
-        self.setting(annotations, "Segmentation masks", "Draw decoded instance masks when the selected ONNX model provides prototype-mask output. Standard detection models continue to use boxes.", masks)
-        self.setting(annotations, "Mask limit", "Maximum retained masks decoded for one preview frame. Lower values reduce post-processing work on crowded scenes.", self.range("segmentation_mask_limit", 0, 32, 0))
-        self.setting(annotations, "Mask threshold", "Minimum decoded mask probability used for the visible instance boundary.", self.range("segmentation_mask_threshold", 0.01, 0.99, 2))
-        annotations.addStretch(1)
-        self.section(desktop, "On-screen overlay")
-        desktop_enabled = QCheckBox("Enabled")
-        desktop_enabled.setChecked(self.settings.desktop_overlay_enabled)
-        desktop_enabled.toggled.connect(lambda state: self.change("desktop_overlay_enabled", state))
-        self.setting(desktop, "Click-through desktop overlay", "Draw live native track metadata directly over the captured region without opening Control Center. The overlay contains no captured pixels and is excluded from capture when Windows supports it.", self.feature_control(desktop_enabled))
-        desktop_visible = QCheckBox("Visible")
-        desktop_visible.setChecked(self.settings.desktop_overlay_visible)
-        desktop_visible.toggled.connect(lambda state: self.change("desktop_overlay_visible", state))
-        self.setting(desktop, "Desktop overlay visibility", "Show or hide the active overlay without stopping capture. A global shortcut can toggle this during a session.", self.feature_control(desktop_visible))
-        desktop_layout = QComboBox()
-        for title, value in (("Minimal selected target", "minimal"), ("Standard", "standard"), ("Diagnostics", "diagnostics")):
-            desktop_layout.addItem(title, value)
-        desktop_layout.setCurrentIndex(max(0, desktop_layout.findData(self.settings.desktop_overlay_layout)))
-        desktop_layout.currentIndexChanged.connect(lambda index: self.change("desktop_overlay_layout", str(desktop_layout.itemData(index))))
-        self.setting(desktop, "Overlay layout", "Minimal limits the screen to the selected subject. Standard shows all tracks. Diagnostics adds lock-recovery and track-count context.", self.feature_control(desktop_layout))
-        self.setting(desktop, "Desktop overlay opacity", "Use the slider for a comfortable visible range, or type an exact opacity percentage.", self.feature_control(self.range("desktop_overlay_opacity", 25, 100, 0, " %")))
-        self.setting(desktop, "Desktop overlay scale", "Scale label and annotation size. The slider covers the tested range; type a larger or smaller value for expert display tuning.", self.feature_control(self.range("desktop_overlay_scale", 0.75, 1.50, 2, " x")))
-        desktop_palette = QComboBox()
-        desktop_palette.addItem("Vapor", "vapor")
-        desktop_palette.addItem("High contrast", "contrast")
-        desktop_palette.setCurrentIndex(max(0, desktop_palette.findData(self.settings.desktop_overlay_palette)))
-        desktop_palette.currentIndexChanged.connect(lambda index: self.change("desktop_overlay_palette", str(desktop_palette.itemData(index))))
-        self.setting(desktop, "Overlay colors", "Choose the standard Vapor palette or a high-contrast palette for bright displays and projection surfaces.", self.feature_control(desktop_palette))
-        self.setting(desktop, "Track color", "Color used for non-selected track boxes and labels. This custom value is stored with the current profile.", self.feature_control(self.color_editor("desktop_overlay_track_color")))
-        self.setting(desktop, "Selected target color", "Color used for the active selected target and its prediction guide.", self.feature_control(self.color_editor("desktop_overlay_selected_color")))
-        self.setting(desktop, "FOV and boundary color", "Color used for the outer targeting guide and capture-region boundary.", self.feature_control(self.color_editor("desktop_overlay_fov_color")))
-        self.setting(desktop, "Status text color", "Color used for the compact desktop-overlay status strip.", self.feature_control(self.color_editor("desktop_overlay_text_color")))
-        desktop_bounds = QCheckBox("Show active capture boundary")
-        desktop_bounds.setChecked(self.settings.desktop_overlay_capture_bounds)
-        desktop_bounds.toggled.connect(lambda state: self.change("desktop_overlay_capture_bounds", state))
-        self.setting(desktop, "Capture boundary", "Draw a thin guide around the exact selected capture region. This is useful when checking centered offsets and monitor alignment.", self.feature_control(desktop_bounds))
-        desktop_labels = QCheckBox("Show track labels and confidence")
-        desktop_labels.setChecked(self.settings.desktop_overlay_labels)
-        desktop_labels.toggled.connect(lambda state: self.change("desktop_overlay_labels", state))
-        self.setting(desktop, "Desktop labels", "Show the track identity, model label, and confidence beside each live detection.", self.feature_control(desktop_labels))
-        desktop_status = QCheckBox("Show provider, rate, and lock state")
-        desktop_status.setChecked(self.settings.desktop_overlay_status)
-        desktop_status.toggled.connect(lambda state: self.change("desktop_overlay_status", state))
-        self.setting(desktop, "Desktop status", "Show a compact Vapor Lock status strip in the upper-left corner of the overlay.", self.feature_control(desktop_status))
-        desktop_motion = QCheckBox("Show selected anchor and prediction vector")
-        desktop_motion.setChecked(self.settings.desktop_overlay_motion)
-        desktop_motion.toggled.connect(lambda state: self.change("desktop_overlay_motion", state))
-        self.setting(desktop, "Desktop motion guide", "Optional selected-target anchor and prediction visualization. It is disabled by default to keep the live overlay calm and readable.", self.feature_control(desktop_motion))
-        desktop.addStretch(1)
-        return page
-
     def cloud_studio_page(self) -> QWidget:
         page, layout = self.new_page(".cloud Studio", "Create projects, annotate masks, train models, and evaluate results.")
         from cloud_suite_ui import mount
@@ -6819,13 +6444,8 @@ class ControlCenter(QMainWindow):
 
     def dataset_page(self) -> QWidget:
         page, layout = self.new_page("Training Data", "Collect source frames, create reviewable labels, build a YOLO dataset, and optionally train a local model without leaving Vapor Lock.")
-        tabs = self.settings_tabs(layout, "Collection", "Annotation Suite", "Ultralytics", ".cloud", "Review", minimum_height=360,
-                                  owner_attribute="training_data_tabs",fixed_titles=('Ultralytics','Collection','Annotation Suite','.cloud','Review'))
-        cloud = QPushButton("Open .cloud Studio")
-        cloud.setProperty('missionIcon', 'start')
-        cloud.clicked.connect(lambda: self.show_page('cloud'))
-        tabs['.cloud'].addWidget(cloud, alignment=Qt.AlignmentFlag.AlignLeft)
-        tabs['.cloud'].addStretch(1)
+        tabs = self.settings_tabs(layout, "Collection", "Annotation Suite", "Ultralytics", "Review", minimum_height=360,
+                                  owner_attribute="training_data_tabs")
         from mission_layout import TaskColumns,TaskCard
         collection_columns = TaskColumns(proportions=(62,38))
         for panel in (collection_columns.left,collection_columns.right):panel.setObjectName('missionTaskColumn')
@@ -6861,7 +6481,6 @@ class ControlCenter(QMainWindow):
         annotation_preview.body.addWidget(self.feature_control(inspect_preview))
         annotation=annotation_settings.body
         review = tabs["Review"]
-        self.dataset_review_panel = review.parentWidget()
         enabled = QCheckBox("Enabled")
         enabled.setChecked(self.settings.dataset_enabled)
         enabled.toggled.connect(lambda state: self.change("dataset_enabled", state))
@@ -7014,9 +6633,26 @@ class ControlCenter(QMainWindow):
         training = self.ultralytics_training_layout
         collection.addStretch(1)
 
-        from mission_layout import TaskRegions
+        from mission_layout import ActionFlow, TaskRegions
         review_outer=review
         review_regions=TaskRegions()
+        self.dataset_review_panel = review_regions
+        priority_bar = QWidget()
+        priority_actions = ActionFlow(priority_bar)
+        self.dataset_review_analyze = QPushButton("Analyze review queue…")
+        self.dataset_review_analyze.setProperty('missionIcon', 'search')
+        self.dataset_review_analyze.clicked.connect(self.analyze_dataset_review)
+        self.dataset_review_stop = QPushButton("Stop analysis")
+        self.dataset_review_stop.setProperty('missionIcon', 'stop')
+        self.dataset_review_stop.clicked.connect(self.stop_dataset_worker)
+        self.dataset_review_stop.hide()
+        priority_actions.addWidget(self.dataset_review_analyze)
+        priority_actions.addWidget(self.dataset_review_stop)
+        review_outer.addWidget(priority_bar)
+        self.dataset_review_analysis_status = QLabel()
+        self.dataset_review_analysis_status.setObjectName("detail")
+        self.dataset_review_analysis_status.setWordWrap(True)
+        review_outer.addWidget(self.dataset_review_analysis_status)
         queue_region,canvas_region,class_region=review_regions.regions
         review_outer.addWidget(review_regions,1)
         queue_card=TaskCard('Review queue','image');class_card=TaskCard('Class library / editor','tag')
@@ -7027,11 +6663,10 @@ class ControlCenter(QMainWindow):
         self.dataset_review_summary.setWordWrap(True)
         review.addWidget(self.dataset_review_summary)
         review_controls = QWidget()
-        from mission_layout import ActionFlow
         review_controls_row = ActionFlow(review_controls)
         review_controls_row.setContentsMargins(0, 0, 0, 0)
         refresh_review = QPushButton("Refresh queue")
-        refresh_review.clicked.connect(self.refresh_dataset_review)
+        refresh_review.clicked.connect(lambda: self.refresh_dataset_review())
         self.dataset_review_accept = QPushButton("Mark accepted")
         self.dataset_review_accept.clicked.connect(lambda: self.set_dataset_review_status("accepted", advance=True))
         self.dataset_review_reject = QPushButton("Exclude from training")
@@ -7055,6 +6690,10 @@ class ControlCenter(QMainWindow):
         self.dataset_review_zoom_in.clicked.connect(lambda: self.dataset_review_preview.set_zoom_percent(self.dataset_review_preview.zoom_percent() + 20))
         refresh_review.setProperty('missionIcon','refresh')
         queue_card.body.addWidget(refresh_review)
+        health_review = QPushButton("Dataset health…")
+        health_review.setProperty('missionIcon', 'pulse')
+        health_review.clicked.connect(self.open_training_data_health)
+        queue_card.body.addWidget(health_review)
         review_controls_row.addWidget(self.dataset_review_accept)
         review_controls_row.addWidget(self.dataset_review_reject)
         review_controls_row.addWidget(self.dataset_review_delete)
@@ -7226,6 +6865,10 @@ class ControlCenter(QMainWindow):
         run_actions.body.addWidget(self.training_preflight)
         training_action_row=ActionRow();training_action_flow=ActionFlow(training_action_row)
         training_action_flow.addWidget(self._tuning_lock.wrap(preflight))
+        health_training = QPushButton("Dataset health…")
+        health_training.setProperty('missionIcon', 'pulse')
+        health_training.clicked.connect(lambda: self.open_training_data_health(prepared=True))
+        training_action_flow.addWidget(health_training)
         preflight_row.deleteLater()
         run_actions.body.addWidget(training_action_row)
         self.setting(training, "Epochs", "Maximum full passes over the training set.", self.range("training_epochs", 1, 100000, 0))
@@ -7663,6 +7306,12 @@ class ControlCenter(QMainWindow):
             from batch4_guard import editable
             if not editable(self, stopped=True): return
             value = validate_zones(value)
+        if field == "capture_privacy_masks":
+            from batch4_guard import editable
+            from capture_privacy import validate_masks
+            if not editable(self, stopped=True):
+                return
+            value = validate_masks(value)
         if field in BATCH3_FIELDS:
             validate_batch3({field: value})
             value = float(value)
@@ -7682,6 +7331,22 @@ class ControlCenter(QMainWindow):
             if type(value) not in (int,float) or not .01 <= value <= .99:
                 raise ValueError('Invalid annotation NMS threshold')
             value=float(value)
+        from video_input_ui import VIDEO_FIELDS
+        if field in VIDEO_FIELDS:
+            if self.engine.active or self._policy_start_pending or self._pending_controller_start:
+                self.log("INFO", self.t("Stop capture before changing the video source."))
+                if hasattr(self, "capture_input"):
+                    self.capture_input.sync()
+                return
+            if field == "capture_source" and value not in ("desktop", "window", "device", "file"):
+                raise ValueError("Invalid capture source.")
+            if field in {"video_device", "video_file"} and (
+                type(value) is not str or len(value) > (2048 if field == "video_device" else 32000)
+                or any(ord(character) < 32 for character in value)
+            ):
+                raise ValueError("Invalid video source.")
+            if field == "video_full_frame" and type(value) is not bool:
+                raise ValueError("Invalid video framing.")
         if field == 'dataset_annotation_provider' and (type(value) is not str or value not in ANNOTATION_BACKENDS):
             raise ValueError('Invalid annotation backend')
         if field in CAPTURE_FIELDS:
@@ -7720,6 +7385,19 @@ class ControlCenter(QMainWindow):
                 self._last_edit = (field, now)
                 self.undo_button.setEnabled(True)
             setattr(self.settings, field, value)
+            if field == "capture_privacy_masks":
+                self.clear_preview()
+            if field in VIDEO_FIELDS and hasattr(self, "capture_input"):
+                self.capture_input.sync()
+                if field == "capture_source" and value == "window":
+                    QTimer.singleShot(0, self.capture_input.refresh_windows)
+                if field == "capture_source" and value == "device":
+                    self.capture_input.refresh_devices()
+                self.update_desktop_overlay()
+            sample = getattr(self, "targeting_sample", None)
+            if sample is not None and field in sample.SETTINGS_FIELDS:
+                sample.settings = self.settings
+                sample.update()
             if field == "cuda_graph_replay":
                 self.refresh_cuda_preprocess_controls()
             if field in {"confidence", "acquire_confidence", "retain_confidence"}:
@@ -7771,7 +7449,6 @@ class ControlCenter(QMainWindow):
             if field in {"local_api_enabled", "local_api_lan_enabled", "local_api_port"}:
                 self.sync_local_api()
             self.refresh_local_api_snapshot()
-            self.refresh_policy_command_deck()
             if self._live_owner is not None:
                 self._live_owner.native_changed()
 
@@ -8259,7 +7936,7 @@ class ControlCenter(QMainWindow):
         self.offer_acceleration_setup()
 
     def set_start_enabled(self, requested: bool) -> None:
-        self.start_button.setEnabled(bool(requested) and not False and not self.model_probe_busy() and not self._profile_transition_pending and not self._native_closing and not self._policy_start_pending and not self._pending_controller_start and not self.xbox_compatible_bridge.preparing)
+        self.start_button.setEnabled(bool(requested) and not False and not self.model_probe_busy() and not self._profile_transition_pending and not self._native_closing and not self._policy_start_pending and not self._pending_controller_start and not self.xbox_compatible_bridge.preparing and not self.relative_mouse_elevation.preparing)
 
 
 
@@ -8345,10 +8022,16 @@ class ControlCenter(QMainWindow):
         self.session_mode_choice.blockSignals(False)
         self.log("WARN", "Stop capture before changing session mode.")
 
+    def open_runtime_repair(self) -> None:
+        from runtime_repair_ui import open_repair
+        open_repair(self, ROOT, product_version(), packaged=getattr(sys, "frozen", False))
+
     def session_settings(self) -> Settings:
         """Build an output-safe copy for the native process."""
         session = Settings(**asdict(self.settings))
-        if self.session_mode == "observe":
+        if session.capture_source == "window":
+            session._capture_window = self.capture_input.window.currentData()
+        if self.session_mode == "observe" or session.capture_source == "file":
             session.movement_enabled = False
             session.motion_compensation_enabled = False
             session.event_action_enabled = False
@@ -8359,6 +8042,8 @@ class ControlCenter(QMainWindow):
         return session
 
     def start_capture(self) -> None:
+        if getattr(self, "_runtime_repair_open", False):
+            return
         if self.cloud_background_busy():
             self.reject_cloud_busy_start()
             return
@@ -8366,6 +8051,9 @@ class ControlCenter(QMainWindow):
             self.log('INFO', 'Capture is unavailable during this native transition or verification session.')
             return
         if self.engine.active or self._policy_start_pending:
+            return
+        if self.relative_mouse_elevation.preparing:
+            self.log("INFO", "Finish or cancel Windows administrator approval before starting capture.")
             return
         self._model_selection_status_copy = None
         self.render_model_selection_status()
@@ -8376,6 +8064,8 @@ class ControlCenter(QMainWindow):
         self._start_capture_authorized(self._start_intent_generation)
 
     def _start_capture_authorized(self, intent=None) -> None:
+        if getattr(self, "_runtime_repair_open", False):
+            return
         if self.cloud_background_busy():
             self.reject_cloud_busy_start()
             return
@@ -8412,9 +8102,18 @@ class ControlCenter(QMainWindow):
             self.log("INFO", f"{self.engine.provider_label(requested)} is not installed yet. Install it from Model Library or use CPU.")
             self.show_model_start_failure()
             return
+        source = self.settings.capture_source
+        if ((source == "window" and not self.capture_input.window.currentData())
+                or (source == "device" and not self.settings.video_device)
+                or (source == "file" and (not self.settings.video_file
+                    or not resolve_product_path(self.settings.video_file).is_file()))):
+            self.log("WARN", self.t("Choose an available window, video device, or file under Capture."))
+            self.show_page("capture")
+            self.set_start_enabled(True)
+            return
         self.synchronize_motion_compensation_for_start()
         session_settings = self.session_settings()
-        observe_only = self.session_mode == "observe"
+        observe_only = self.session_mode == "observe" or session_settings.capture_source == "file"
         if not observe_only and self.settings.output_transport == "virtual-mouse" and not self.settings.virtual_mouse_opt_in:
             if self._tuning_locked:
                 self.log('INFO', self.t('Unlock tuning to change settings.'))
@@ -8449,7 +8148,7 @@ class ControlCenter(QMainWindow):
                     return
                 self.change("controller_output_opt_in", True)
             if intent is not None and intent != getattr(self, "_start_intent_generation", 0): return
-            self._pending_controller_start = Settings(**asdict(self.settings))
+            self._pending_controller_start = session_settings
             self.status.setText("PREPARING CONTROLLER")
             self.metric_state.setText("Preparing controller")
             self.diag_state.setText("Preparing controller")
@@ -8458,8 +8157,15 @@ class ControlCenter(QMainWindow):
             self.xbox_compatible_bridge.start_session(self.settings.virtual_controller_identity)
             return
         if intent is not None and intent != getattr(self, "_start_intent_generation", 0): return
+        if self.relative_mouse_elevation.preparing:
+            self.log("INFO", "Finish or cancel Windows administrator approval before starting capture.")
+            return
         self.stop_button.setEnabled(False)
-        self.engine.start(session_settings, observe_only=observe_only)
+        mouse_session = self.relative_mouse_elevation.session
+        if mouse_session is not None and not observe_only and session_settings.output_transport == "mouse":
+            self.engine.start(session_settings, mouse_host_session=mouse_session)
+        else:
+            self.engine.start(session_settings, observe_only=observe_only)
 
     def synchronize_motion_compensation_for_start(self) -> None:
         """Resolve the selected text-library preset immediately before launch."""
@@ -8488,6 +8194,7 @@ class ControlCenter(QMainWindow):
         self._policy_start_pending = False
         self._policy_start_generation = None
         self._pending_controller_start = None
+        self.relative_mouse_elevation.stop()
         self.xbox_compatible_bridge.stop_session()
         if self.engine.active:
             self.engine.stop()
@@ -8662,7 +8369,59 @@ class ControlCenter(QMainWindow):
                 "No controller binding is active for this profile. Analog movement is separate from the chosen activation binding."
             )
 
+    def toggle_relative_mouse_elevation(self) -> None:
+        if self.settings.output_transport != "mouse" or self.engine.active or self._policy_start_pending or self._native_closing:
+            return
+        require_native_effect("relative-mouse-host")
+        if self.relative_mouse_elevation.busy:
+            self.relative_mouse_elevation.stop()
+            return
+        from native_engine_layout import supports_mouse_host
+        cloud = Path(self.settings.model_path).suffix.lower() == ".cloud"
+        providers = ["cpu"] if cloud else EngineBridge.candidate_providers(self.settings)
+        for provider in providers:
+            native, _ = EngineBridge.launch_for(provider, require_model=bool(self.settings.model_path) and not cloud,
+                                                status_only=True)
+            if native is not None:
+                problem = None if supports_mouse_host(native) else EngineBridge.mouse_host_upgrade_message(provider)
+                break
+        else:
+            problem = "Build or repair a native inference engine before requesting administrator mouse output."
+        if problem:
+            self.output_transport_status.setText(self.t(problem))
+            self.log("WARN", problem)
+            return
+        candidates = [ROOT / "engine" / "VaporLockMouseHost.exe"]
+        if not getattr(sys, "frozen", False):
+            candidates.extend((ROOT / "build/windows-release/Release/VaporLockMouseHost.exe",
+                               ROOT / "build/windows-release/VaporLockMouseHost.exe"))
+        executable = next((path for path in candidates if path.is_file()), None)
+        if executable is None:
+            self.output_transport_status.setText(self.t("The administrator mouse helper is missing. Build or repair this VaporLock copy."))
+            return
+        if not supports_mouse_host(executable):
+            message = "The administrator mouse helper needs an update. Build or repair this VaporLock copy."
+            self.output_transport_status.setText(self.t(message))
+            self.log("WARN", message)
+            return
+        self.relative_mouse_elevation.prepare(executable)
+
+    def relative_mouse_elevation_changed(self) -> None:
+        self.refresh_controller_bridge_controls()
+        if hasattr(self, "start_button"):
+            self.set_start_enabled(not self.engine.active)
+
     def refresh_controller_bridge_controls(self) -> None:
+        relative = self.settings.output_transport == "mouse"
+        if hasattr(self, "mouse_elevation_button"):
+            elevation = self.relative_mouse_elevation
+            if not relative and not self.engine.active and elevation.busy:
+                elevation.stop()
+            self.mouse_elevation_button.setVisible(relative and sys.platform == "win32")
+            self.mouse_elevation_button.setEnabled(not self.engine.active and not self._policy_start_pending and not self._native_closing)
+            text = ("Cancel elevation" if elevation.preparing else
+                    "Use standard mouse" if elevation.session is not None else "Elevate mouse output")
+            self.mouse_elevation_button.setText(self.t(text))
         if hasattr(self, 'controller_deadzone_control'):
             self.controller_deadzone_control.setEnabled(self.settings.output_transport == 'virtual-xbox')
         if hasattr(self, 'controller_deadzone_status'):
@@ -8681,7 +8440,11 @@ class ControlCenter(QMainWindow):
                 self.controller_uninstall_button.setEnabled(True)
             return
         if self.settings.output_transport != "virtual-xbox":
-            self.output_transport_status.setText("The selected transport is configured in this page and the Hardware tab. Device connection is verified when capture starts.")
+            if relative:
+                text = self.relative_mouse_elevation.message or "Relative mouse uses standard Windows input. Use administrator approval when the destination app runs elevated."
+            else:
+                text = "The selected transport is configured in this page and the Hardware tab. Device connection is verified when capture starts."
+            self.output_transport_status.setText(self.t(text))
             if hasattr(self, "controller_install_button"):
                 self.controller_install_button.setEnabled(True)
             if hasattr(self, "controller_uninstall_button"):
@@ -8900,27 +8663,15 @@ class ControlCenter(QMainWindow):
             self.set_acceleration_detail(detail)
 
     def show_page(self, key: str) -> None:
-        route = key
         if self._live_coordinator is not None:
             self._live_coordinator.show_native_page()
-        if key == "capture":
-            key = "selection"
         self.current_page = key
-        panel_name = {'games': 'game_cards', 'profiles': 'profile_cards'}.get(key)
+        panel_name = {"games": "game_cards", "profiles": "profile_cards"}.get(key)
         if panel_name and hasattr(self, panel_name):
             getattr(self, panel_name).refresh()
         self.stack.setCurrentWidget(self.pages[key])
-        if hasattr(self,'_shared_preview_shell'):
-            if key=='overview':self._overview_preview_slot.addWidget(self._shared_preview_shell)
-            else:self._target_preview_layout.insertWidget(1,self._shared_preview_shell)
-            self._shared_preview_shell.show()
-        if route == "capture":
-            self.set_targeting_inspector_tab(0)
-        elif key == "selection" and self.targeting_inspector_stack.currentIndex() == 0:
-            self.set_targeting_inspector_tab(1)
-        self._select_navigation(route)
-        self._update_targeting_navigation()
-        self.update_targeting_layout()
+        self.update_live_preview_placement()
+        self._select_navigation(key)
 
     def _select_navigation(self, route: str) -> None:
         self.current_route = route
@@ -8965,12 +8716,6 @@ class ControlCenter(QMainWindow):
         while ancestor is not None and ancestor is not page:
             if isinstance(ancestor,TaskDetails):ancestor.reveal()
             ancestor=ancestor.parentWidget()
-        if page is self.pages.get("selection"):
-            for index in range(self.targeting_inspector_stack.count()):
-                tab_page = self.targeting_inspector_stack.widget(index)
-                if tab_page is target or tab_page.isAncestorOf(target):
-                    self.set_targeting_inspector_tab(index)
-                    break
         for tabs in page.findChildren(SecondarySettingsTabs):
             for index in range(tabs._stack.count()):
                 tab_page = tabs._stack.widget(index)
@@ -9271,7 +9016,7 @@ class ControlCenter(QMainWindow):
         if preview is None:
             preview = getattr(self, "preview_view", None)
         if preview is None:
-            self.log("INFO", "Open Targeting and wait for an annotated native preview before saving a snapshot.")
+            self.log("INFO", "Open Capture or Overview and wait for an annotated native preview before saving a snapshot.")
             return
         snapshot_directory = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Vapor Lock" / "screenshots"
         filename = f"vapor-lock-{datetime.now().strftime('%Y%m%d-%H%M%S-%f')[:-3]}.png"
@@ -9616,14 +9361,24 @@ class ControlCenter(QMainWindow):
             if button is not None: button.setEnabled(True)
 
     def _probe_model(self, settings, provider, completed, *, inspection=False):
-        from model_probe import ModelProbe, inert_settings
+        from model_probe import ModelProbe, ProbeResult, inert_settings
+        from native_engine_layout import supports_capture_controls
         executable, environment = self.engine.launch_for(provider, require_model=True)
         if executable is None:
-            from model_probe import ProbeResult
             completed(ProbeResult(False, 'Native engine is unavailable'))
             return
         revision = self._probe_revision
         safe = inert_settings(settings)
+        if safe.capture_source == "window":
+            safe._capture_window = self.capture_input.window.currentData()
+            if not safe._capture_window and not inspection:
+                completed(ProbeResult(False, "Choose a window under Capture before running a live model check."))
+                return
+            if inspection:
+                safe.capture_source = "desktop"
+        if (safe.capture_source == "window" or safe.capture_privacy_masks) and not supports_capture_controls(executable):
+            completed(ProbeResult(False, "Open Model Library → Runtime repair to update the native engine."))
+            return
         safe.model_path = str(resolve_product_path(settings.model_path))
         arguments = EngineBridge.arguments_for(safe, provider, observe_only=True)
         if inspection: arguments.append('--inspect-model')
@@ -9831,11 +9586,31 @@ class ControlCenter(QMainWindow):
             matched_python = ROOT / ('.venv-annotation-cuda' if cuda else '.venv-annotation-dml') / 'Scripts' / 'python.exe'
             if matched_python.is_file():
                 return str(matched_python), ['-I', '-B', str(ROOT / 'tools' / ('run_dataset_cuda_worker.py' if cuda else 'run_dataset_worker.py'))]
-            if not cuda: return sys.executable, [str(source)]
+            if not cuda:
+                from importlib.util import find_spec
+                if find_spec("onnxruntime") is None:
+                    runtimes = {"auto": ("dml", "cpu"), "directml": ("dml",), "cpu": ("cpu",)}
+                    for name in runtimes.get(provider, ()):
+                        environment = ROOT / (".venv-cloud-" + name)
+                        python = environment / "Scripts" / "python.exe"
+                        ort = environment / "Lib" / "site-packages" / "onnxruntime" / "__init__.py"
+                        if python.is_file() and ort.is_file():
+                            return str(python), [str(source)]
+                return sys.executable, [str(source)]
         return None
 
     def dataset_root_for_tools(self) -> Path:
         return resolve_dataset_root(self.settings.dataset_directory)
+
+    def open_training_data_health(self, *, prepared=False) -> None:
+        from dataset_health_ui import DatasetHealthDialog
+
+        source = self.dataset_root_for_tools()
+        if prepared and self.settings.training_dataset:
+            source = resolve_product_path(self.settings.training_dataset).parent
+        dialog = DatasetHealthDialog(self, source, 'yolo', self.settings.training_imgsz)
+        dialog.exec()
+        dialog.deleteLater()
 
     def dataset_review_manifest_path(self) -> Path:
         return self.dataset_root_for_tools() / ".vaporlock-review.json"
@@ -9864,13 +9639,17 @@ class ControlCenter(QMainWindow):
             return image.name
 
     @dataset_edit
-    def refresh_dataset_review(self, selected_row: int | None = None) -> None:
+    def refresh_dataset_review(self, selected_image: Path | None = None) -> None:
         if not hasattr(self, "dataset_review_list"):
             return
         if self.dataset_review_preview.has_draft():
             self.dataset_review_preview.notice('Finish or cancel the current polygon edit first.')
             return
-        previous_row = self.dataset_review_list.currentRow() if selected_row is None else selected_row
+        if selected_image is None:
+            previous_row = self.dataset_review_list.currentRow()
+            previous_records = getattr(self, "dataset_review_records", [])
+            if 0 <= previous_row < len(previous_records):
+                selected_image = previous_records[previous_row]
         root = self.dataset_root_for_tools()
         images = root / "images"
         self.dataset_review_decisions = self.load_dataset_review_decisions()
@@ -9878,13 +9657,25 @@ class ControlCenter(QMainWindow):
             (item for item in images.rglob("*") if item.is_file() and item.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}),
             key=lambda item: item.name.casefold(),
         ) if images.is_dir() else []
+        from dataset_review_priority import load_priorities, review_order, signals_for
+        priorities = load_priorities(root)
+        signals = {image: signals_for(priorities, self.dataset_review_key(image), image)
+                   for image in self.dataset_review_records} if priorities else {}
+        if priorities:
+            self.dataset_review_records.sort(key=lambda image: review_order(
+                self.dataset_review_decisions.get(self.dataset_review_key(image), ""), signals[image]))
+        reasons = {"disagreement": "Models disagree", "uncertain": "Near confidence threshold",
+                   "rare": "Rare class", "unreadable": "Image could not be read"}
         self.populate_dataset_review_classes()
         self.dataset_review_list.blockSignals(True)
         self.dataset_review_list.clear()
         for image in self.dataset_review_records:
             decision = self.dataset_review_decisions.get(self.dataset_review_key(image), "")
             marker = "Accepted" if decision == "accepted" else "Excluded" if decision == "rejected" else "Needs review"
-            item = QListWidgetItem(f"{marker} · {image.name}")
+            details = [self.t(reasons[signal]) for signal in signals.get(image, ())] if not decision else []
+            item = QListWidgetItem(" · ".join([self.t(marker), image.name, *details]))
+            if details:
+                item.setToolTip(" · ".join(details))
             item.setData(Qt.ItemDataRole.UserRole, str(image))
             item.setData(DatasetReviewQueueDelegate.decision_role, decision)
             self.dataset_review_list.addItem(item)
@@ -9896,7 +9687,8 @@ class ControlCenter(QMainWindow):
             f"{max(0, len(self.dataset_review_records) - accepted - rejected)} awaiting review."
         )
         if self.dataset_review_records:
-            self.dataset_review_list.setCurrentRow(max(0, min(previous_row, len(self.dataset_review_records) - 1)))
+            row = self.dataset_review_records.index(selected_image) if selected_image in self.dataset_review_records else 0
+            self.dataset_review_list.setCurrentRow(row)
         else:
             self._review_document = None
             self.dataset_review_preview.set_review_image(QImage(), [])
@@ -10219,7 +10011,12 @@ class ControlCenter(QMainWindow):
         else:
             self.dataset_review_decisions.pop(key, None)
         self.save_dataset_review_decisions()
-        self.refresh_dataset_review(row + 1 if advance else row)
+        selected = self.dataset_review_records[row]
+        if advance:
+            ordered = self.dataset_review_records[row+1:] + self.dataset_review_records[:row]
+            selected = next((image for image in ordered
+                if not self.dataset_review_decisions.get(self.dataset_review_key(image))), selected)
+        self.refresh_dataset_review(selected)
 
     def edit_dataset_review_labels(self) -> None:
         from batch7_ui import edit_label_text
@@ -10531,6 +10328,8 @@ class ControlCenter(QMainWindow):
                 getattr(self, stop).setEnabled(busy)
             if attribute == "_dataset_worker" and hasattr(self, "dataset_review_panel"):
                 self.dataset_review_panel.setEnabled(not False and (not busy or bool(process.property('vaporlock_assist_worker'))))
+                self.dataset_review_analyze.setEnabled(not busy)
+                self.dataset_review_stop.setVisible(busy and bool(process.property('vaporlock_review_analysis')))
                 self.dataset_annotation_backend.setEnabled(not busy)
                 from annotation_suite_ui import fingerprint
                 preview=getattr(self,'_ultralytics_preview',None)
@@ -10650,6 +10449,8 @@ class ControlCenter(QMainWindow):
         self._dataset_worker_buffer = b""
         assist=bool(arguments and arguments[0]=='assist')
         assist_owner=self.annotation_assist if assist else None
+        review_analysis = bool(arguments and arguments[0] == 'review-queue')
+        process.setProperty('vaporlock_review_analysis', review_analysis)
         process.setProperty('vaporlock_assist_worker',assist)
         cloud = workflow == 'ultralytics'
         process.setProperty('vaporlock_cloud_worker', cloud)
@@ -10659,7 +10460,16 @@ class ControlCenter(QMainWindow):
             cancel_path=cloud_root/('.vaporlock-ultralytics-stop-'+uuid.uuid4().hex)
             arguments=[*arguments,'--cancel-file',str(cancel_path)]
             process.setProperty('vaporlock_cloud_cancel_path',str(cancel_path))
-        worker_status = self.ultralytics_worker_status if cloud else self.dataset_worker_status
+        def current_worker_status():
+            if review_analysis:
+                return self.dataset_review_analysis_status
+            return self.ultralytics_worker_status if cloud else self.dataset_worker_status
+
+        worker_status = current_worker_status()
+        if review_analysis:
+            worker_status.setText(self.t("Analyzing review priority…"))
+        self.dataset_review_analyze.setEnabled(False)
+        self.dataset_review_stop.setVisible(review_analysis)
         backend_status = self.ultralytics_backend_status if cloud else self.dataset_backend_status
         process.setProperty('vaporlock_started_at',time.monotonic())
         if cloud:
@@ -10702,7 +10512,7 @@ class ControlCenter(QMainWindow):
         def consume() -> None:
             if self._dataset_worker is not process:
                 process.readAllStandardOutput();return
-            worker_status = self.ultralytics_worker_status if cloud else self.dataset_worker_status
+            worker_status = current_worker_status()
             backend_status = self.ultralytics_backend_status if cloud else self.dataset_backend_status
             self._dataset_worker_buffer += bytes(process.readAllStandardOutput())
             if len(self._dataset_worker_buffer)>1048576:
@@ -10796,6 +10606,10 @@ class ControlCenter(QMainWindow):
                         message=self.t('Image effects were skipped because annotation cleanup is pending.')
                     else:message=self.t('Image effects failed. Annotation results remain saved; incomplete copy output must not be used.')
                     worker_status.setText((process.property('vaporlock_annotation_summary') or '')+'\n'+message)
+                elif event == "review_priorities_ready" and review_analysis:
+                    process.setProperty('vaporlock_review_priorities_ready', True)
+                    worker_status.setText(self.tf("Review priority updated · {prioritized} of {images} images flagged.",
+                        images=payload.get('images', 0), prioritized=payload.get('prioritized', 0)))
                 elif event == "packaged":
                     self.dataset_worker_status.setText(self.tf("Ultralytics ZIP ready: {archive}", archive=Path(str(payload.get('archive', ''))).name))
                     if payload.get("warning"):
@@ -10817,7 +10631,7 @@ class ControlCenter(QMainWindow):
             try:
                 if self._dataset_worker is not process:return
                 consume()
-                worker_status = self.ultralytics_worker_status if cloud else self.dataset_worker_status
+                worker_status = current_worker_status()
                 backend_status = self.ultralytics_backend_status if cloud else self.dataset_backend_status
                 if annotation_requested and not process.property('vaporlock_provider_status'):
                     backend_status.setText(self.t('Annotation backend did not start.'))
@@ -10868,7 +10682,10 @@ class ControlCenter(QMainWindow):
                     if owned:
                         try:
                             self.sync_background_controls()
-                            if not assist and hasattr(self,'dataset_review_panel'):self.refresh_dataset_review()
+                            if not assist and hasattr(self,'dataset_review_panel'):
+                                self.refresh_dataset_review()
+                                if review_analysis and code == 0 and process.property('vaporlock_review_priorities_ready'):
+                                    self.dataset_review_list.setCurrentRow(0)
                         except RuntimeError:pass
 
         process.readyReadStandardOutput.connect(consume)
@@ -10904,6 +10721,8 @@ class ControlCenter(QMainWindow):
                 self._dataset_worker = None
                 return
             status=self.ultralytics_worker_status if process.property('vaporlock_cloud_worker') else self.dataset_worker_status
+            if process.property('vaporlock_review_analysis'):
+                status = self.dataset_review_analysis_status
             summary=process.property('vaporlock_annotation_summary') or ''
             status.setText(summary+'\n'+self.t('Stopping image effects. Labels remain saved; interrupted image changes may require recovery.') if summary
                 else self.t("Stopping background dataset task…"))
@@ -10930,6 +10749,36 @@ class ControlCenter(QMainWindow):
             self.schedule_worker_kill(process, 2000)
         except RuntimeError:
             self._dataset_worker = None
+
+    def analyze_dataset_review(self) -> None:
+        from PySide6.QtWidgets import QInputDialog
+
+        if self.dataset_review_preview.has_draft():
+            self.dataset_review_preview.notice('Finish or cancel the current polygon edit first.')
+            return
+        settings = self.settings
+        primary = resolve_product_path(settings.dataset_annotation_model or settings.model_path)
+        if not primary.is_file() or primary.suffix.lower() != '.onnx':
+            QMessageBox.information(self, self.t("Analyze review queue"),
+                self.t("Select a local ONNX annotation model in Annotation Suite first."))
+            return
+        models = [path for path in self.discovered_local_models()
+                  if path.suffix.lower() == '.onnx' and path != primary]
+        models_root = ROOT / 'models'
+        labels = [self.t("Use one model"), *(str(path.relative_to(models_root)) for path in models)]
+        selected, accepted = QInputDialog.getItem(self, self.t("Analyze review queue"),
+            self.tf("Primary model: {model}\nChoose a second model to check for disagreements.", model=primary.name),
+            labels, 0, False)
+        if not accepted:
+            return
+        arguments = ["review-queue", "--dataset", str(self.dataset_root_for_tools()),
+                     "--model", str(primary), "--provider", settings.dataset_annotation_provider,
+                     "--confidence", str(settings.dataset_annotation_confidence),
+                     "--nms-iou", str(settings.dataset_annotation_nms_iou)]
+        if selected != labels[0]:
+            arguments.extend(["--compare-model", str(models[labels.index(selected) - 1])])
+        if not self.start_dataset_worker(arguments):
+            self.dataset_review_analysis_status.setText(self.t("Finish the current session or background task before analyzing."))
 
     def annotate_dataset(self) -> None:
         root = self.dataset_root_for_tools()
@@ -11385,6 +11234,8 @@ class ControlCenter(QMainWindow):
                 self.show_model_start_failure()
 
     def apply_state(self, state: str) -> None:
+        if hasattr(self, "targeting_sample"):
+            self.targeting_sample.set_video_geometry()
         self._crosshair_telemetry=None
         from crosshair_ui import refresh_status as crosshair_status
         crosshair_status(self)
@@ -11408,6 +11259,8 @@ class ControlCenter(QMainWindow):
         self.status.style().unpolish(self.status)
         self.status.style().polish(self.status)
         active = state not in {"Stopped", "READY"}
+        if hasattr(self, "capture_input"):
+            self.capture_input.set_idle(not active)
         self.set_start_enabled(not active)
         self.stop_button.setEnabled(active and state != "Stopping")
         if hasattr(self, "session_mode_choice"):
@@ -11435,6 +11288,7 @@ class ControlCenter(QMainWindow):
             self._last_output_data = None
             self.output_diagnostic_label.setText(output_diagnostics(None))
             self._pending_controller_start = None
+            self.relative_mouse_elevation.stop()
             self.xbox_compatible_bridge.stop_session()
             self._last_selected_track = 0
             self._last_manual_lock = False
@@ -11443,6 +11297,7 @@ class ControlCenter(QMainWindow):
         elif state.startswith("Running"):
             self.clear_performance_history()
             self.session_report_cache.reset()
+        self.refresh_controller_bridge_controls()
         self.refresh_session_cockpit()
         self.update_desktop_overlay()
         self.refresh_local_api_snapshot()
@@ -11450,6 +11305,8 @@ class ControlCenter(QMainWindow):
         self.queue_telemetry_layout()
 
     def apply_telemetry(self, data: dict) -> None:
+        if hasattr(self, "targeting_sample"):
+            self.targeting_sample.set_video_geometry(data)
         from crosshair_ui import refresh_status as crosshair_status
         crosshair_status(self,data)
         from cpu_placement import observe as observe_cpu
@@ -11488,12 +11345,13 @@ class ControlCenter(QMainWindow):
         self.hud_rate.setText(fps)
         self.hud_inference.setText(inference)
         self.hud_tracks.setText(tracks)
-        self.hud_output.setText(self.t("Active").upper() if bool(data.get("output_active", False)) else self.t("Idle").upper())
-        if hasattr(self, "policy_live_track"):
-            self.policy_live_track.setText(str(selected_track) if selected_track else "--")
-        if hasattr(self, "policy_live_confidence"):
-            confidence = float(data.get("selected_confidence", 0.0))
-            self.policy_live_confidence.setText(f"{confidence:.2f}" if selected_track else "--")
+        if data.get("output_reason") == "quick-release-held":
+            output_label = "Quick release"
+        elif data.get("movement_error"):
+            output_label = "Mouse rejected"
+        else:
+            output_label = "Active" if data.get("output_active") else "Idle"
+        self.hud_output.setText(self.t(output_label).upper())
         self.diag_state.setText(running_state)
         self.diag_fps.setText(fps)
         self.diag_latency.setText(inference)
@@ -11569,7 +11427,7 @@ class ControlCenter(QMainWindow):
     def update_desktop_overlay(self, session_active: bool | None = None) -> None:
         if session_active is None:
             session_active = self.engine.overlay_metadata_active
-        self.desktop_overlay.apply_settings(self.settings, session_active)
+        self.desktop_overlay.apply_settings(self.settings, session_active and self.settings.capture_source == "desktop")
 
     def apply_live_setting_result(self, accepted: bool) -> None:
         self._profile_change_suffix = 'live changes applied' if accepted else 'live change not applied'
@@ -11580,7 +11438,7 @@ class ControlCenter(QMainWindow):
 
     def apply_desktop_overlay(self, payload: dict) -> None:
         if not payload and hasattr(self,'observation_sharing'):self.observation_sharing.cache.clear()
-        if False or not self.settings.desktop_overlay_enabled:
+        if not self.settings.desktop_overlay_enabled or self.settings.capture_source != "desktop":
             return
         if self.desktop_overlay._session_active != self.engine.overlay_metadata_active:
             self.update_desktop_overlay()
@@ -11590,7 +11448,6 @@ class ControlCenter(QMainWindow):
         if not hasattr(self, 'policy_preview_status'):
             return
         caption = 'Live annotated preview'
-        live = False
         if not self.engine.active or self.engine.intentional_stop:
             text = 'Stopped'
         elif not self.engine.session_running or self._last_preview_frame.isNull():
@@ -11604,15 +11461,12 @@ class ControlCenter(QMainWindow):
                 self.clear_preview(stale=True)
                 return
             grace = min(2.0, max(.5, 2.0 / cadence))
-            live = age < min(grace, native_budget)
             if age >= grace:
                 self.clear_preview(stale=True)
                 return
             if age >= native_budget:
                 caption = 'Snapshot — waiting for fresh frames'
                 text = 'Waiting for fresh frames'
-                for attribute in ('policy_live_track', 'policy_live_confidence'):
-                    if hasattr(self, attribute):getattr(self, attribute).setText('--')
                 remaining = grace-age
             elif self._last_selected_track:
                 text = 'Target pinned' if self._last_manual_lock else 'Selection stable'
@@ -11621,9 +11475,6 @@ class ControlCenter(QMainWindow):
                 text = 'Scanning for a target'
                 remaining = min(grace,native_budget)-age
             self._preview_expiry_timer.start(max(1, math.ceil(remaining*1000)))
-        if not live:
-            for attribute in ('policy_live_track', 'policy_live_confidence'):
-                if hasattr(self, attribute):getattr(self, attribute).setText('--')
         if self._last_preview_frame.isNull():
             placeholder = text if self.engine.active and not self.engine.intentional_stop else 'Start capture to receive the live annotated preview'
             for attribute in ('preview_view', 'policy_preview_view'):
@@ -11650,9 +11501,6 @@ class ControlCenter(QMainWindow):
         for attribute in ("preview_view", "policy_preview_view"):
             if hasattr(self, attribute):
                 getattr(self, attribute).set_frame(QImage())
-        for attribute in ('policy_live_track', 'policy_live_confidence'):
-            if hasattr(self, attribute):
-                getattr(self, attribute).setText('--')
         self.refresh_preview_status()
 
     def apply_preview(self, encoded: bytes, width: int, height: int) -> None:
@@ -11858,6 +11706,7 @@ class ControlCenter(QMainWindow):
         cloud_workspace=getattr(getattr(self,'_cloud_suite',None),'workspace',None)
         if cloud_workspace is not None and not self._native_closing and not cloud_workspace.allow_close():
             event.ignore();return
+        self.relative_mouse_elevation.stop()
         if hasattr(self,'annotation_assist'):self.annotation_assist.cancel()
         if hasattr(self,'observation_sharing'):self.observation_sharing.change(False)
         installer_task = getattr(self, '_installer_task', None)

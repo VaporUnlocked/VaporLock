@@ -72,6 +72,25 @@ class AnnotationSession:
             raise CloudInputError('Select an annotation first.')
         return value
 
+    def set_visibility(self, identity, visibility):
+        from evaluation_slices import VISIBILITY
+        self._editable()
+        if visibility not in VISIBILITY:
+            raise CloudInputError('Invalid target visibility.')
+        if identity in self.pending:
+            raise CloudInputError('Finish the current mask before changing visibility.')
+        target = self.target(identity)
+        if target.get('visibility', 'unlabeled') == visibility:
+            return
+        failure = self.failures.get(identity)
+        self._changed(identity)
+        if failure:
+            self.failures[identity] = failure
+        if visibility == 'unlabeled':
+            target.pop('visibility', None)
+        else:
+            target['visibility'] = visibility
+
     def set_mask(self, identity, mask, *, record_undo=True):
         self._editable()
         value = deepcopy(self.target(identity)); value['mask'] = deepcopy(mask); value.pop('wrapper', None)

@@ -1,5 +1,6 @@
 """Local portable-archive checks with generated inert files only."""
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +12,32 @@ SPEC.loader.exec_module(module)
 
 
 class PackageTests(unittest.TestCase):
+    def test_controller_inventory_requires_a_complete_current_build(self):
+        with tempfile.TemporaryDirectory() as folder:
+            package = Path(folder)
+            host = package/'app/controller-host'
+            for member in module.CONTROLLER_REQUIRED:
+                path = host/member
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'inert data')
+            with self.assertRaises(ValueError):
+                module.inventory(package, version='2.0.1')
+            metadata = {
+                'schema_version': 1,
+                'version': '2.0.1',
+                'files': [
+                    {'path': member, 'sha256': module.digest(host/member)}
+                    for member in sorted(module.CONTROLLER_REQUIRED)
+                ],
+            }
+            (host/module.CONTROLLER_BUILD).write_text(json.dumps(metadata), encoding='utf-8')
+            self.assertEqual(len(module.inventory(package, version='2.0.1')), len(metadata['files']) + 1)
+            with self.assertRaises(ValueError):
+                module.inventory(package, version='2.0.2')
+            (host/'coreclr.dll').write_bytes(b'changed')
+            with self.assertRaises(ValueError):
+                module.inventory(package, version='2.0.1')
+
     def test_code_models_remain_but_user_model_root_is_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

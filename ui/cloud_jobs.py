@@ -14,7 +14,8 @@ class CloudJob(QObject):
     received = Signal(dict)
     completed = Signal(bool, str)
     TERMINAL_EVENTS = frozenset({'error', 'trained', 'project_checked', 'resume_checked', 'model_checked',
-                                 'inference_closed', 'evaluated', 'image_inspected', 'exported'})
+                                 'inference_closed', 'evaluated', 'image_inspected', 'exported',
+                                 'dataset_health_checked'})
 
     def __init__(self, parent, request, *, training=False):
         super().__init__(parent)

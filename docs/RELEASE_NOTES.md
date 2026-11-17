@@ -1,4 +1,63 @@
-# VaporLock 2.0.0 Community
+# VaporLock Community release notes
+
+## 2.0.2
+
+- **Capture > Source & rate > Window** captures a selected app at its native
+  dimensions or with a centered native crop. Capture follows the window when
+  moved, pauses when minimized, and stops when the window closes.
+- **Capture > Preview > Capture privacy masks** covers selected areas with
+  opaque rectangles before preview, inference, or dataset capture. Masks
+  are saved with each profile and use coordinates relative to the final
+  frame. Review mask placement whenever you change the source or crop.
+- **Model Library > Runtime repair** checks the shipped native engines and
+  elevated mouse helper against the installed manifest. Choose the matching
+  Community Windows ZIP to restore missing or changed files.
+
+- **Movement > Transport** offers **Elevate mouse output** alongside Relative
+  Mouse. Windows asks for administrator approval for a movement-only helper.
+  Prepare it before starting capture. Approval expires when the session stops
+  or when the helper waits two minutes for a session to connect.
+- Administrator mouse output checks the selected native engine for matching
+  protocol support before requesting approval or starting capture.
+- Elevated Relative Mouse reads the configured activation, compensation and
+  quick-release controls through its helper. Movement Diagnostics shows
+  whether the activation input is held, released or unavailable.
+
+## 2.0.1
+
+- Target assistance slows as it approaches the measured aim point, and relative
+  steps stay within the remaining correction. Automatic scene compensation
+  pauses during target assistance when set to automatic activation. New default profiles start with
+  compensation disabled.
+- Use **Targeting > Aim point** for the detection-box preset, offsets, and visual
+  picker. The transparent skeleton shows the detection box, aim point, and
+  targeting zones at one screen pixel per capture pixel. Turn on **Fit whole
+  capture** to see the full capture area. **Targeting > Class rules** contains
+  per-class overrides.
+- **Capture** owns source, rate, performance, and preview controls. **Movement**
+  owns response, calibration, and motion compensation. Live desktop video is
+  available from Capture and Overview and fits the source frame's aspect ratio.
+- **Dataset health** is available from Training Data and .cloud Studio. Check for
+  duplicates and split leakage, missing labels or reviews, tiny targets, and
+  underrepresented classes before training.
+- **Movement > Control > Quick release** pauses aim assist, motion compensation,
+  and snap actions while held. Mouse Button 5 is the default.
+- **Training Data > Review > Analyze review queue** moves uncertain detections,
+  disagreements between two ONNX models, and rare classes up the review queue.
+- **.cloud Studio > Results** shows recall and mean matched box overlap for
+  separate target sizes and visibility groups. Tag visibility in **Annotate**.
+- **Capture > Source & rate** supports Windows video capture devices such as
+  capture cards and cameras. Use the full native frame or the centered crop.
+  Local video files play through inference and preview in Observe mode.
+- The optional Xbox-compatible controller host builds from the public source
+  and can be included in the Windows portable package. First-time driver setup
+  uses a matching Windows SDK and Windows Driver Kit in the default location.
+- **Movement > Diagnostics** reports Windows mouse and virtual mouse output
+  rejections. The virtual mouse reconnects after a rejected report. Both
+  transports retry from fresh observations after a short pause.
+- The main footer includes a Donate link.
+
+## 2.0.0
 
 ## What's new
 

@@ -581,6 +581,15 @@ class PerformanceChart(QWidget):
 def output_diagnostics(data):
     if not data:
         return "No active observation session"
+    movement_error = data.get("movement_error")
+    movement_detail = (("Mouse output", movement_error),) if movement_error else ()
+    if data.get("output_transport") == "mouse":
+        movement_detail = (("Mouse privilege", "administrator" if data.get("mouse_elevated") else "standard"),) + movement_detail
+    if "input_available" in data:
+        button = "held" if data.get("activation_input_down") else "released"
+        if not data["input_available"]:
+            button = "unavailable"
+        movement_detail = (("Activation input", button),) + movement_detail
     fields = (
         ("Controller", f"slot {data.get('physical_controller_slot', 0)}" if data.get("controller_connected") else "not connected / not sampled"),
         ("Activation", "authorized" if data.get("activation_authorized") else "not authorized"),
@@ -588,6 +597,7 @@ def output_diagnostics(data):
         ("Output permission", "enabled" if data.get("output_active") else "blocked"),
         ("Current gate", str(data.get("output_reason", "unavailable")).replace("-", " ")),
         ("Output accepted / failed", f"{data.get('output_sent_total', 0)} / {data.get('output_failed_total', 0)}"),
+        *movement_detail,
         ("Motion compensation", "disabled" if not data.get("motion_compensation_enabled") else ("active" if data.get("motion_compensation_active") else "waiting for activation")),
         ("Compensation mode", str(data.get("motion_compensation_mode", "preset")).replace("-", " ")),
         ("Automatic estimate", "not used" if data.get("motion_compensation_mode") == "preset" else (f"{data.get('motion_compensation_auto_tracks', 0)} agreeing tracks" if data.get("motion_compensation_auto_valid") else "waiting for agreeing tracks")),
